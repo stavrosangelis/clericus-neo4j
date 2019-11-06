@@ -1,0 +1,22 @@
+# See https://help.github.com/ignore-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+
+# misc
+.DS_Store
+
+# resources
+/resources
+
+# archive
+/archive
+
+# passwords and sensitive data
+/tools/Clericus-f242153b0bef.json
+/server/config/.private.key
+/server/config/.public.key
+
+# environment variables
+.env.production
+.env.development

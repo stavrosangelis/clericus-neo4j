@@ -1,0 +1,30 @@
+{
+  "name": "clericus-neo4j",
+  "version": "0.1.0",
+  "description": "This is an alternate Clericus API using neo4j as a database",
+  "main": "src/app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "NODE_ENV=development nodemon ./src/app.js"
+  },
+  "author": "Stavros Angelis",
+  "license": "ISC",
+  "dependencies": {
+    "argon2": "^0.24.0",
+    "canvas": "^2.6.0",
+    "cors": "^2.8.5",
+    "crypto-js": "^3.1.9-1",
+    "dotenv": "^8.2.0",
+    "exif": "^0.6.0",
+    "express": "^4.17.1",
+    "formidable": "^1.2.1",
+    "image-size": "^0.8.3",
+    "jsonwebtoken": "^8.5.1",
+    "neo4j-driver": "^1.7.6",
+    "node-iptc": "^1.0.5",
+    "nodemon": "^1.19.4",
+    "passport": "^0.4.0",
+    "passport-local": "^1.0.0",
+    "soundex": "^0.2.1"
+  }
+}

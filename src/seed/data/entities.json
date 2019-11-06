@@ -1,0 +1,55 @@
+[{
+    "example": null,
+    "label": "Person",
+    "labelId": "Person",
+    "locked": true,
+    "definition": "This is the model of a person.",
+    "parent": null,
+    "properties": []
+  },
+  {
+    "example": null,
+    "label": "Resource",
+    "labelId": "Resource",
+    "locked": true,
+    "definition": "This is the model of a resource.",
+    "parent": null,
+    "properties": []
+  },
+  {
+    "example": null,
+    "label": "Organisation",
+    "labelId": "Organisation",
+    "locked": true,
+    "definition": "This is the model of an organisation.",
+    "parent": null,
+    "properties": []
+  },
+  {
+    "example": null,
+    "label": "Event",
+    "labelId": "Event",
+    "locked": true,
+    "definition": "This is the model of an event.",
+    "parent": null,
+    "properties": []
+  },
+  {
+    "example": null,
+    "label": "Temporal",
+    "labelId": "Temporal",
+    "locked": true,
+    "definition": "This is the model of a temporal object.",
+    "parent": null,
+    "properties": []
+  },
+  {
+    "example": null,
+    "label": "Spatial",
+    "labelId": "Spatial",
+    "locked": true,
+    "definition": "This is the model of a spatial object.",
+    "parent": null,
+    "properties": []
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+  "description": "The Relations types taxonomy contains the possible relations between the data model entities e.g. [entity]Resource [relation]depicts [entity]Person.",
+  "label": "Relations types",
+  "systemType": "relationsTypes",
+  "locked": true
+}, {
+  "description": "The Event types taxonomy contains a list of all the possible event types",
+  "label": "Event types",
+  "systemType": "eventTypes",
+  "locked": true
+}, {
+  "description": "",
+  "label": "Organisation types",
+  "systemType": "organisationTypes",
+  "locked": true
+}, {
+  "description": "",
+  "label": "Resource system types",
+  "systemType": "resourceSystemTypes",
+  "locked": true
+}, {
+  "description": "",
+  "label": "People roles",
+  "systemType": "peopleRoles",
+  "locked": true
+}, {
+  "description": "The available user groups relations to users",
+  "label": "User groups",
+  "systemType": "userGroups",
+  "locked": true
+}]

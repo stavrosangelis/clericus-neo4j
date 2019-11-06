@@ -1,0 +1,14 @@
+[
+  {
+    "label": "Administrator",
+    "description": "This group has access to the back-end",
+    "isAdmin": true,
+    "isDefault": false
+  },
+  {
+    "label": "Public",
+    "description": "This group has only access to the front-end",
+    "isAdmin": false,
+    "isDefault": true
+  }
+]

@@ -1,0 +1,141 @@
+[{
+    "scopeNote": "This is an organisation that can be viewed as an administrative location division e.g. a diocese, a municipality etc.",
+    "label": "Administrative area",
+    "inverseLabel": "Administrative area",
+    "taxonomyRef": "organisationTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "depicts",
+    "inverseLabel": "isDepictedOn",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "enteredSchool",
+    "inverseLabel": "enteredSchool",
+    "taxonomyRef": "eventTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasChild",
+    "inverseLabel": "isChildOf",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasParticipant",
+    "inverseLabel": "participatedIn",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasTyped",
+    "inverseLabel": "isTypeOf",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasLocation",
+    "inverseLabel": "isLocationOf",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasMember",
+    "inverseLabel": "isMemberOf",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasPart",
+    "inverseLabel": "isPartOf",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasTime",
+    "inverseLabel": "isTimeOf",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "belongsTo",
+    "inverseLabel": "hasRegistrant",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasRelation",
+    "inverseLabel": "isRelatedTo",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasRepresentationObject",
+    "inverseLabel": "isRepresentationOf",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "hasAcquantaince",
+    "inverseLabel": "isAcquaintedWith",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "occuredInThePresenceOf",
+    "inverseLabel": "wasPresentAt",
+    "taxonomyRef": "relationsTypes"
+  },
+  {
+    "scopeNote": "The event of a Person's ordination",
+    "label": "ordained",
+    "inverseLabel": "ordained",
+    "taxonomyRef": "eventTypes"
+  },
+  {
+    "scopeNote": "This is a generic event that doesn't fall under any of defined category.",
+    "label": "other",
+    "inverseLabel": "other",
+    "taxonomyRef": "eventTypes"
+  },
+
+
+  {
+    "scopeNote": null,
+    "label": "Classpiece",
+    "inverseLabel": "Classpiece",
+    "taxonomyRef": "resourceSystemTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "Thumbnail",
+    "inverseLabel": "Thumbnail",
+    "taxonomyRef": "resourceSystemTypes"
+  },
+  {
+    "scopeNote": null,
+    "label": "guest of honor",
+    "inverseLabel": "guest of honor",
+    "taxonomyRef": "peopleRoles"
+  },
+  {
+    "scopeNote": null,
+    "label": "student",
+    "inverseLabel": "student",
+    "taxonomyRef": "peopleRoles"
+  },
+  {
+    "scopeNote": null,
+    "label": "teacher",
+    "inverseLabel": "teacher",
+    "taxonomyRef": "peopleRoles"
+  },
+  {
+    "scopeNote": null,
+    "label": "belongsToUserGroup",
+    "inverseLabel": "hasUser",
+    "taxonomyRef": "userGroups"
+  }
+]

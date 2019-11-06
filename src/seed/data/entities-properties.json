@@ -1,0 +1,90 @@
+[
+  {
+    "direction": "from",
+    "termLabelId": "hasParticipant",
+    "sourceEntityLabelId": "Event",
+    "targetEntityLabelId": "Person"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "occuredInThePresenceOf",
+    "sourceEntityLabelId": "Event",
+    "targetEntityLabelId": "Person"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "hasTime",
+    "sourceEntityLabelId": "Event",
+    "targetEntityLabelId": "Temporal"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "hasLocation",
+    "sourceEntityLabelId": "Event",
+    "targetEntityLabelId": "Spatial"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "hasRepresentationObject",
+    "sourceEntityLabelId": "Event",
+    "targetEntityLabelId": "Resource"
+  },
+
+
+
+
+  {
+    "direction": "from",
+    "termLabelId": "hasMember",
+    "sourceEntityLabelId": "Organisation",
+    "targetEntityLabelId": "Person"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "hasRepresentationObject",
+    "sourceEntityLabelId": "Organisation",
+    "targetEntityLabelId": "Resource"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "hasRelation",
+    "sourceEntityLabelId": "Organisation",
+    "targetEntityLabelId": "Resource"
+  },
+
+
+
+  {
+    "direction": "from",
+    "termLabelId": "hasRepresentationObject",
+    "sourceEntityLabelId": "Person",
+    "targetEntityLabelId": "Resource"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "hasAcquantaince",
+    "sourceEntityLabelId": "Person",
+    "targetEntityLabelId": "Person"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "belongsTo",
+    "sourceEntityLabelId": "Person",
+    "targetEntityLabelId": "Organisation"
+  },
+
+
+
+  {
+    "direction": "from",
+    "termLabelId": "depicts",
+    "sourceEntityLabelId": "Resource",
+    "targetEntityLabelId": "Person"
+  },
+  {
+    "direction": "from",
+    "termLabelId": "hasPart",
+    "sourceEntityLabelId": "Resource",
+    "targetEntityLabelId": "Resource"
+  }
+]
