@@ -41,7 +41,7 @@ class TaxonomyTerm {
   }
 
   async load() {
-    if (this._id===null && this.labelId==="") {
+    if (this._id===null && this.labelId==="" && this.inverseLabel==="") {
       return false;
     }
     let session = driver.session()
@@ -51,6 +51,12 @@ class TaxonomyTerm {
     }
     else if (this.labelId!==null) {
       query = "MATCH (n:TaxonomyTerm {labelId: '"+this.labelId+"'}) return n";
+    }
+    else if (this.inverseLabel!==null) {
+      query = "MATCH (n:TaxonomyTerm {inverseLabel: '"+this.inverseLabel+"'}) return n";
+    }
+    else {
+      return false;
     }
     let node = await session.writeTransaction(tx=>
       tx.run(query,{})
@@ -279,12 +285,15 @@ const getTaxonomyTerm = async(req, resp) => {
       msg: "Please select a valid id to continue.",
     });
   }
-  let _id=null, labelId=null;
+  let _id=null, labelId=null, inverseLabel=null;
   if (typeof parameters._id!=="undefined" && parameters._id!=="") {
     _id = parameters._id;
   }
   if (typeof parameters.labelId!=="undefined" && parameters.labelId!=="") {
     labelId = parameters.labelId;
+  }
+  if (typeof parameters.inverseLabel!=="undefined" && parameters.inverseLabel!=="") {
+    inverseLabel = parameters.inverseLabel;
   }
   let query = {};
   if (_id!==null) {
@@ -292,6 +301,9 @@ const getTaxonomyTerm = async(req, resp) => {
   }
   if (labelId!==null) {
     query.labelId = labelId;
+  }
+  if (inverseLabel!==null) {
+    query.inverseLabel = inverseLabel;
   }
   let term = new TaxonomyTerm(query);
   await term.load();

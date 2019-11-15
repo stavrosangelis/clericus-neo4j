@@ -54,6 +54,16 @@ class Organisation {
     for (let key in node) {
       this[key] = node[key];
     }
+
+    // relations
+    let events = await helpers.loadRelations(this._id, "Organisation", "Event");
+    let organisations = await helpers.loadRelations(this._id, "Organisation", "Organisation");
+    let people = await helpers.loadRelations(this._id, "Organisation", "Person");
+    let resources = await helpers.loadRelations(this._id, "Organisation", "Resource");
+    this.events = events;
+    this.organisations = organisations;
+    this.people = people;
+    this.resources = resources;
   }
 
   async save() {
@@ -63,6 +73,9 @@ class Organisation {
     }
     else {
       let session = driver.session();
+      if (this.labelSoundex===null) {
+        this.labelSoundex = helpers.soundex(this.label.trim());
+      }
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
 
@@ -125,54 +138,16 @@ const getOrganisations = async (req, resp) => {
   let queryPage = 0;
   let limit = 25;
 
-  let query = {};
-  let $and = [];
+  let query = "";
+  let queryParams = "";
 
-  /*if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      let queryBlock = {
-        '$or':[
-        {"firstName": {"$regex": label, "$options": "i"}},
-        {"lastName": {"$regex": label, "$options": "i"}}
-      ]}
-      $and.push(queryBlock);
+      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
-  if (typeof parameters.firstName!=="undefined") {
-    firstName = parameters.firstName;
-    if (firstName!=="") {
-      let queryBlock = {"firstName": {"$regex": firstName, "$options": "i"}};
-      $and.push(queryBlock);
-    }
-  }
-  if (typeof parameters.lastName!=="undefined") {
-    lastName = parameters.lastName;
-    if (lastName!=="") {
-      let queryBlock = {"lastName": {"$regex": lastName, "$options": "i"}};
-      $and.push(queryBlock);
-    }
-  }
-  if (typeof parameters.fnameSoundex!=="undefined") {
-    fnameSoundex = helpers.soundex(parameters.fnameSoundex);
-    let queryBlock = {"fnameSoundex": fnameSoundex};
-    $and.push(queryBlock);
-  }
-  if (typeof parameters.lnameSoundex!=="undefined") {
-    lnameSoundex = helpers.soundex(parameters.lnameSoundex);
-    let queryBlock = {"lnameSoundex": lnameSoundex};
-    $and.push(queryBlock);
-  }
-  if (typeof parameters.description!=="undefined") {
-    description = parameters.description.toLowerCase();
-    if (description!=="") {
-      let queryBlock = {"description": {"$regex": description, "$options": "i"}};
-      $and.push(queryBlock);
-    }
-  }
-  if ($and.length>0) {
-    query = {$and};
-  }*/
+
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
@@ -186,8 +161,11 @@ const getOrganisations = async (req, resp) => {
   }
 
   let skip = limit*queryPage;
-  query = "MATCH (n:Organisation) RETURN n SKIP "+skip+" LIMIT "+limit;
-  let data = await getOrganisationsQuery(query, limit);
+  if (queryParams!=="") {
+    queryParams = "WHERE "+queryParams;
+  }
+  query = "MATCH (n:Organisation) "+queryParams+" RETURN n SKIP "+skip+" LIMIT "+limit;
+  let data = await getOrganisationsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -212,7 +190,7 @@ const getOrganisations = async (req, resp) => {
   }
 }
 
-const getOrganisationsQuery = async (query, limit) => {
+const getOrganisationsQuery = async (query, queryParams, limit) => {
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -222,9 +200,36 @@ const getOrganisationsQuery = async (query, limit) => {
   })
 
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  // get related resources
+  let nodeResourcesPromises = nodes.map(node => {
+    let newPromise = new Promise(async (resolve,reject)=> {
+      let relations = {};
+      relations.nodeId = node._id;
+      relations.resources = await helpers.loadRelations(node._id, "Organisation", "Resource");
+      resolve(relations);
+    })
+    return newPromise;
+  });
 
+  let nodesResourcesRelations = await Promise.all(nodeResourcesPromises)
+  .then(data=>{
+    return data;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  let nodesPopulated = nodes.map(node=> {
+    let resources = [];
+    let nodeResources = nodesResourcesRelations.find(relation=>relation.nodeId===node._id);
+    if (typeof findResources!=="undefined") {
+      resources = nodeResources;
+    }
+    node.resources = nodeResources.resources;
+    return node;
+  });
   let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Organisation) RETURN count(*)")
+    tx.run("MATCH (n:Organisation) "+queryParams+" RETURN count(*)")
   )
   .then(result=> {
     session.close()
@@ -236,7 +241,7 @@ const getOrganisationsQuery = async (query, limit) => {
   });
   let totalPages = Math.ceil(count/limit)
   let result = {
-    nodes: nodes,
+    nodes: nodesPopulated,
     count: count,
     totalPages: totalPages
   }
@@ -272,7 +277,7 @@ const putOrganisation = async(req, resp) => {
       organisationData[key] = postData[key];
       // add the soundex
       if (key==='label') {
-        organisationData.lnameSoundex = helpers.soundex(postData.label.trim());
+        organisationData.labelSoundex = helpers.soundex(postData.label.trim());
       }
     }
   }
@@ -299,6 +304,7 @@ const deleteOrganisation = async(req, resp) => {
 }
 
 module.exports = {
+  Organisation: Organisation,
   getOrganisations: getOrganisations,
   getOrganisation: getOrganisation,
   putOrganisation: putOrganisation,

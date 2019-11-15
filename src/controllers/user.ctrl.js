@@ -4,10 +4,12 @@ const helpers = require("../helpers");
 const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const privateKey = fs.readFileSync('./src/config/.private.key', 'utf8');
+const referencesController = require('../controllers/references.ctrl');
 
 class User {
   constructor({_id=null,firstName=null,lastName=null,email=null,password=null,token=false, isAdmin=false, usergroup=null}) {
-    if (typeof _id!=="undefined" && _id!==null) {
+    this._id = null;
+    if (_id!==null) {
       this._id = _id;
     }
     this.firstName = firstName;
@@ -46,44 +48,48 @@ class User {
       return false;
     }
     let session = driver.session()
-    let query = "MATCH (n:User) WHERE id(n)="+this._id+" return n";
+    let query = "MATCH (n:User)-[r:belongsToUserGroup]-(ug:Usergroup) WHERE id(n)="+this._id+" return n,ug";
     let node = await session.writeTransaction(tx=>
       tx.run(query,{})
     )
     .then(result=> {
       session.close();
-      if (result.records.length>0) {
-        let record = result.records[0];
-        let outputRecord = helpers.outputRecord(record);
-        return outputRecord;
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0];
+        let user = record.toObject().n;
+        user = helpers.outputRecord(user);
+        let userGroup = record.toObject().ug;
+        userGroup = helpers.outputRecord(userGroup);
+        user.usergroup = userGroup;
+        return user;
       }
     })
-    return node;
+    // assign results to class values
+    for (let key in node) {
+      this[key] = node[key];
+    }
+    let hasPassword = false;
+    if (typeof this.password!=="undefined") {
+      hasPassword = true;
+    }
+    this.hasPassword = hasPassword;
+    delete this.password;
+    delete this.token;
   }
 
   async save() {
+    let newData = Object.assign({}, this);
     let validateUser = this.validate();
     if (!validateUser.status) {
       return validateUser;
     }
     else {
       let session = driver.session();
-      if (typeof this._id==="undefined" || this._id===null) {
-        if (this.password===null) {
-          let output = {
-            status: false,
-            msg: "",
-            errors: {field: "password", msg:  "Please provide a password to continue"}
-          }
-          return output;
-        }
-        await this.setPassword(this.password);
-      }
-      else {
-        this.password = null;
-      }
-      let nodeProperties = helpers.prepareNodeProperties(this);
-      let params = helpers.prepareParams(this);
+      this.password = null;
+      await this.load();
+      let nodeProperties = helpers.prepareNodeProperties(newData);
+      let params = helpers.prepareParams(newData);
 
       let query = "";
       if (typeof this._id==="undefined" || this._id===null) {
@@ -92,41 +98,80 @@ class User {
       else {
         query = "MATCH (n:User) WHERE id(n)="+this._id+" SET n="+nodeProperties+" RETURN n";
       }
-      const resultPromise = await new Promise((resolve, reject)=> {
-        let result = session.run(
-          query,
-          params
-        ).then(result => {
-          session.close();
-          let outputRecord = result.records[0].toObject();
-          helpers.prepareOutput(outputRecord);
-          outputRecord.n._id = outputRecord.n.identity;
-          delete(outputRecord.n.identity);
-          resolve(outputRecord);
-        });
+      const resultPromise = await session.run(
+        query,
+        params
+      ).then(result => {
+        session.close();
+        let records = result.records;
+        let output = {error: ["The record cannot be updated"], status: false, data: []};
+        if (records.length>0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let resultRecord = record.toObject()[key];
+          resultRecord = helpers.outputRecord(resultRecord);
+          output = {error: [], status: true, data: resultRecord};
+        }
+        return output;
       })
+      .catch((error) => {
+        let output = {error: error, status: false, data: []};
+        return output;
+      });
+      if (resultPromise.status) {
+        // add | update user group
+        let savedRecord = resultPromise.data;
+        if (newData.usergroup!==null && newData.usergroup!==savedRecord.usergroup._id) {
+          if (typeof savedRecord.usergroup!=="undefined") {
+            // 1. remove reference to usergroup
+            let existingUsergroupRef = {
+              items: [
+                {_id: savedRecord._id, type: "User"},
+                {_id: savedRecord.usergroup, type: "Usergroup"}
+              ],
+              taxonomyTermLabel: "belongsToUserGroup",
+            }
+            referencesController.removeReference(existingUsergroupRef);
+          }
+
+          // 2. add reference to new usergroup
+          let newUsergroupRef = {
+            items: [
+              {_id: savedRecord._id, type: "User"},
+              {_id: newData.usergroup, type: "Usergroup"}
+            ],
+            taxonomyTermLabel: "belongsToUserGroup",
+          }
+          referencesController.updateReference(newUsergroupRef);
+        }
+      }
       return resultPromise;
     }
   }
 
   async updatePassword() {
-    let password = await this.setPassword(this.password);
-    const resultPromise = await new Promise((resolve, reject)=> {
-      let query = "MATCH (n:User) WHERE id(n)=$_id SET n.password=$password RETURN n";
-      let params = {$_id: this._id, password: password};
-      let result = session.run(
-        query,
-        params
-      ).then(result => {
-        session.close();
-        let outputRecord = result.records[0].toObject();
-        helpers.prepareOutput(outputRecord);
-        outputRecord.n._id = outputRecord.n.identity;
-        delete outputRecord.n.identity;
-        delete outputRecord.n.password;
-        resolve(outputRecord);
-      });
+    await this.setPassword(this.password);
+    let query = "MATCH (n:User) WHERE id(n)="+this._id+" SET n.password='"+this.password+"' RETURN n";
+    let session = driver.session()
+    const resultPromise = await session.run(
+      query,
+      {}
+    ).then(result => {
+      session.close();
+      let records = result.records;
+      let output = {error: ["The record cannot be updated"], status: false, data: []};
+      if (records.length>0) {
+        let record = records[0];
+        let key = record.keys[0];
+        let resultRecord = record.toObject()[key];
+        resultRecord = helpers.outputRecord(resultRecord);
+        output = {error: [], status: true, data: resultRecord};
+      }
+      return output;
     })
+    .catch((error) => {
+      console.log(error)
+    });
     return resultPromise;
   }
 
@@ -134,19 +179,36 @@ class User {
     if (this._id===null) {
       return false;
     }
-    let session = driver.session()
-    let tx = session.beginTransaction()
-    let query = "MATCH (n:User) WHERE id(n)="+this._id+" DELETE n";
-    const resultPromise = await new Promise((resolve, reject)=> {
-      let result = session.run(
-        query,
-        {}
-      ).then(result => {
-        session.close();
-        resolve(result);
-      });
+    await this.load();
+    if (this.usergroup.isAdmin) {
+      return {error: ["Users belonging to the admin user group cannot be deleted. To delete this user you must first change the usergroup to something other than Admin"], status: false, data: []};
+    }
+    let session = driver.session();
+    // 1. delete relations
+    let query1 = "MATCH (n:User)-[r]-() WHERE id(n)="+this._id+" DELETE r";
+    let deleteRel = await session.writeTransaction(tx=>
+      tx.run(query1,{})
+    )
+    .then(result => {
+      session.close();
+      return result;
     })
-    return resultPromise;
+    .catch((error) => {
+      console.log(error)
+    });
+    // 2. delete node
+    let query = "MATCH (n:User) WHERE id(n)="+this._id+" DELETE n";
+    let deleteRecord = await session.writeTransaction(tx=>
+      tx.run(query,{})
+    )
+    .then(result => {
+      session.close();
+      return result;
+    })
+    .catch((error) => {
+      console.log(error)
+    });
+    return {status: true, error: [], data: deleteRecord};
   }
 
   async setPassword(password) {
@@ -195,7 +257,7 @@ const getUsers = async (req, resp) => {
     currentPage = 1;
   }
 
-  let skip = limit*page;
+  let skip = limit*queryPage;
   query = "MATCH (n:User) RETURN n SKIP "+skip+" LIMIT "+limit;
   let data = await getUsersQuery(query, limit);
   if (data.error) {
@@ -231,7 +293,12 @@ const getUsersQuery = async (query, limit) => {
     return result.records;
   })
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  let nodesResults = helpers.normalizeRecordsOutput(nodesPromise);
+  let nodes = nodesResults.map(node=> {
+    delete node.password;
+    delete node.token;
+    return node;
+  })
 
   let count = await session.writeTransaction(tx=>
     tx.run("MATCH (n:User) RETURN count(*)")
@@ -265,10 +332,10 @@ const getUser = async(req, resp) => {
   }
   let _id = parameters._id;
   let user = new User({_id: _id});
-  let data = await user.load();
+  await user.load();
   resp.json({
     status: true,
-    data: data,
+    data: user,
     error: [],
     msg: "Query results",
   });
@@ -290,24 +357,43 @@ const putUser = async(req, resp) => {
     }
   }
   let user = new User(userData);
-  let data = await user.save();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
-  });
+  let output = await user.save();
+  resp.json(output);
 }
 
 const deleteUser = async(req, resp) => {
-  let parameters = req.query;
-  let user = new User();
-  let data = await user.delete();
+  let parameters = req.body;
+  let user = new User({_id: parameters._id});
+  let output = await user.delete();
+  console.log(output)
+  resp.json(output);
+}
+
+const updateUserPassword = async (req, resp) => {
+  let postData = req.body;
+  let decoded = req.decoded;
+  if (typeof decoded==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: "Unauthorised access",
+      msg: "",
+    });
+  }
+  let _id = postData._id;
+  let user = new User({_id: _id});
+  await user.load();
+  let responseData = [];
+  if (decoded.isAdmin || _id===user._id) {
+    user.password = postData.password;
+    responseData = await user.updatePassword();
+    delete responseData.password;
+  }
   resp.json({
     status: true,
-    data: data,
+    data: responseData,
     error: [],
-    msg: "Query results",
+    msg: "",
   });
 }
 
@@ -317,4 +403,5 @@ module.exports = {
   getUser: getUser,
   putUser: putUser,
   deleteUser: deleteUser,
+  updateUserPassword: updateUserPassword,
 };

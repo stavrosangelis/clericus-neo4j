@@ -3,7 +3,8 @@ const helpers = require("../helpers");
 
 class Usergroup {
   constructor({_id=null,label=null,description=null,isAdmin=false,isDefault=false}) {
-    if (typeof _id!=="undefined" && _id!==null) {
+    this._id = _id;
+    if(_id!==null) {
       this._id = _id;
     }
     this.label = label;
@@ -32,26 +33,39 @@ class Usergroup {
   }
 
   async load() {
-    if (this._id===null) {
+    if (this._id===null && this.label==="") {
       return false;
     }
-    let session = driver.session()
-    let query = "MATCH (n:Usergroup) WHERE id(n)="+this._id+" return n";
+    let session = driver.session();
+    let query = "";
+
+    if (this._id!==null) {
+      query = "MATCH (n:Usergroup) WHERE id(n)="+this._id+" return n";
+    }
+    else if (this.label!==null) {
+      query = "MATCH (n:Usergroup {label: '"+this.label+"'}) return n";
+    }
+    else {
+      return false;
+    }
     let node = await session.writeTransaction(tx=>
       tx.run(query,{})
     )
     .then(result=> {
       session.close();
-      if (result.records.length>0) {
-        let record = result.records[0];
-        let outputRecord = record.toObject();
-        helpers.prepareOutput(outputRecord);
-        outputRecord.n._id = outputRecord.n.identity;
-        delete(outputRecord.n.identity);
-        return outputRecord;
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0];
+        let key = record.keys[0];
+        let output = record.toObject()[key];
+        output = helpers.outputRecord(output);
+        return output;
       }
     })
-    return node;
+    // assign results to class values
+    for (let key in node) {
+      this[key] = node[key];
+    }
   }
 
   async save() {
@@ -71,19 +85,44 @@ class Usergroup {
       else {
         query = "MATCH (n:Usergroup) WHERE id(n)="+this._id+" SET n="+nodeProperties+" RETURN n";
       }
-      const resultPromise = await new Promise((resolve, reject)=> {
-        let result = session.run(
-          query,
-          params
+      // ensure that there is always only one default usergroup
+      if (this.isDefault) {
+        if (this.isAdmin) {
+          let output = {error: ["You can only set a public usergroup as default"], status: false, data: []};
+          return output;
+        }
+        let queryDefault = "MATCH (n:Usergroup) WHERE n.isDefault=true SET n.isDefault=false RETURN n";
+        const resultPromise = await session.run(
+          queryDefault,
+          {}
         ).then(result => {
           session.close();
-          let outputRecord = result.records[0].toObject();
-          helpers.prepareOutput(outputRecord);
-          outputRecord.n._id = outputRecord.n.identity;
-          delete(outputRecord.n.identity);
-          resolve(outputRecord);
+          return result;
+        })
+        .catch((error) => {
+          console.log(error)
         });
+      }
+      const resultPromise = await session.run(
+        query,
+        params
+      ).then(result => {
+        session.close();
+        let records = result.records;
+        let output = {error: ["The record cannot be updated"], status: false, data: []};
+        if (records.length>0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let resultRecord = record.toObject()[key];
+          resultRecord = helpers.outputRecord(resultRecord);
+          output = {error: [], status: true, data: resultRecord};
+        }
+        return output;
       })
+      .catch((error) => {
+        let output = {error: error, status: false, data: []};
+        return output;
+      });
       return resultPromise;
     }
   }
@@ -92,19 +131,39 @@ class Usergroup {
     if (this._id===null) {
       return false;
     }
-    let session = driver.session()
-    let tx = session.beginTransaction()
+    await this.load();
+    if (this.isDefault) {
+      let output = {error: "This is the default user group. If you wish to remove it please set another group as default first.", status: false, data: []};
+      return output;
+    }
+    let session = driver.session();
+    let count = await session.writeTransaction(tx=>
+      tx.run("MATCH (n:User)-[r]->(rn:Usergroup) WHERE id(rn)="+this._id+" RETURN count(*) AS c")
+    )
+    .then(result=> {
+      session.close()
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['c'];
+      return output;
+    });
+    if (count>0) {
+      let output = {error: "This usergroup is associated with users. If you wish to delete it you must first remove these associations.", status: false, data: []};
+      return output;
+    }
     let query = "MATCH (n:Usergroup) WHERE id(n)="+this._id+" DELETE n";
-    const resultPromise = await new Promise((resolve, reject)=> {
-      let result = session.run(
-        query,
-        {}
-      ).then(result => {
-        session.close();
-        resolve(result);
-      });
+    let deleteRecord = await session.writeTransaction(tx=>
+      tx.run(query,{})
+    )
+    .then(result => {
+      session.close();
+      return result;
     })
-    return resultPromise;
+    .catch((error) => {
+      console.log(error)
+    });
+    return {status: true, error: [], data: deleteRecord};
   }
 
 
@@ -132,7 +191,7 @@ const getUsergroups = async (req, resp) => {
     currentPage = 1;
   }
 
-  let skip = limit*page;
+  let skip = limit*queryPage;
   query = "MATCH (n:Usergroup) RETURN n SKIP "+skip+" LIMIT "+limit;
   let data = await getUsergroupsQuery(query, limit);
   if (data.error) {
@@ -166,7 +225,9 @@ const getUsergroupsQuery = async (query, limit) => {
   )
   .then(result=> {
     return result.records;
-  })
+  }).catch((error) => {
+    console.log(error)
+  });
 
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
 
@@ -202,10 +263,10 @@ const getUsergroup = async(req, resp) => {
   }
   let _id = parameters._id;
   let usergroup = new Usergroup({_id: _id});
-  let data = await usergroup.load();
+  await usergroup.load();
   resp.json({
     status: true,
-    data: data,
+    data: usergroup,
     error: [],
     msg: "Query results",
   });
@@ -213,39 +274,16 @@ const getUsergroup = async(req, resp) => {
 
 const putUsergroup = async(req, resp) => {
   let postData = req.body;
-  let usergroupData = {};
-  for (let key in postData) {
-    if (postData[key]!==null) {
-      usergroupData[key] = postData[key];
-      // add the soundex
-      if (key==='firstName') {
-        usergroupData.fnameSoundex = helpers.soundex(postData.firstName.trim());
-      }
-      if (key==='lastName') {
-        usergroupData.lnameSoundex = helpers.soundex(postData.lastName.trim());
-      }
-    }
-  }
-  let usergroup = new Usergroup(usergroupData);
-  let data = await usergroup.save();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
-  });
+  let usergroup = new Usergroup(postData);
+  let output = await usergroup.save();
+  resp.json(output);
 }
 
 const deleteUsergroup = async(req, resp) => {
-  let parameters = req.query;
-  let usergroup = new Usergroup();
-  let data = await usergroup.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
-  });
+  let parameters = req.body;
+  let usergroup = new Usergroup(parameters);
+  let output = await usergroup.delete();
+  resp.json(output);
 }
 
 module.exports = {

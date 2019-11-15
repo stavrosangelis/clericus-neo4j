@@ -118,6 +118,18 @@ const normalizeRecordsOutput = (records) => {
   return output;
 }
 
+const normalizeRelationsOutput = (records) => {
+  let output = [];
+  for (let i=0; i<records.length; i++) {
+    let record = records[i];
+    let key = record.keys[0];
+    let relation = record._fields[0];
+    prepareOutput(relation);
+    output.push(relation)
+  }
+  return output;
+}
+
 const readJSONFile = (path) => {
   return new Promise((resolve, reject) => {
     fs.readFile(path, 'utf-8', (error, data)=>{
@@ -164,7 +176,6 @@ const normalizeLabelId = (label) => {
 }
 
 const loadRelations = async (srcId=null, srcType=null, targetType=null) => {
-  console.log(srcId, srcType, targetType)
   if (srcId===null || srcType===null) {
     return false;
   }
@@ -179,14 +190,30 @@ const loadRelations = async (srcId=null, srcType=null, targetType=null) => {
   .then(result=> {
     session.close();
     let records = result.records;
-    return records;
-    /*if (records.length>0) {
-      let record = records[0].toObject();
-      let outputRecord = helpers.outputRecord(record.n);
-      return outputRecord;
-    }*/
+    let relations = [];
+    for (let key in records) {
+      let record = records[key].toObject();
+      let sourceItem = outputRecord(record.n);
+      let relation = record.r;
+      prepareOutput(relation);
+      let targetItem = outputRecord(record.rn);
+      let newRelation = prepareRelation(sourceItem, relation, targetItem);
+      relations.push(newRelation);
+    }
+    return relations;
   })
-  return relations
+  return relations;
+}
+
+const prepareRelation = (sourceItem, relation, targetItem) => {
+  let newProperty = {
+    _id: relation.identity,
+    term: {
+      label: relation.type,
+    },
+    ref: targetItem
+  }
+  return newProperty;
 }
 
 const parseRequestData = async(request) =>{
@@ -197,6 +224,7 @@ const parseRequestData = async(request) =>{
         await request.on('data', chunk => {
             body += chunk.toString();
         });
+        console.log(typeof body)
         return JSON.parse(body);
     }
     else {
@@ -220,6 +248,7 @@ module.exports = {
   prepareOutput: prepareOutput,
   prepareParams: prepareParams,
   normalizeRecordsOutput: normalizeRecordsOutput,
+  normalizeRelationsOutput: normalizeRelationsOutput,
   readJSONFile: readJSONFile,
   outputRecord: outputRecord,
   normalizeLabelId: normalizeLabelId,

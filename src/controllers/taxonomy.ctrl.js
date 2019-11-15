@@ -103,7 +103,7 @@ class Taxonomy {
       else {
         await this.load();
       }
-      if (this.locked) {
+      if (this.locked && typeof this._id==="undefined" && this._id===null) {
         let output = {error: ["This taxonomy is locked and cannot be updated"], status: false, data: []};
         return output;
       }

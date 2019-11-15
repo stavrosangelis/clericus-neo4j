@@ -120,18 +120,23 @@ const seedTaxonomyTerms = async() => {
     let entry = taxonomyTerms[key];
     let source = taxonomies.find(item=>item.systemType===entry.taxonomyRef);
     let target = dbTaxonomyTerms.find(item=>item.label===entry.label);
-    let ref = {
-      items: [
-        {_id:source._id, type: "Taxonomy", role: ""},
-        {_id:target._id, type: "TaxonomyTerm", role: ""},
-      ],
-      taxonomyTermId: hasChildTerm._id
+    if (typeof source!=="undefined" && typeof target!=="undefined") {
+      let ref = {
+        items: [
+          {_id:source._id, type: "Taxonomy", role: ""},
+          {_id:target._id, type: "TaxonomyTerm", role: ""},
+        ],
+        taxonomyTermId: hasChildTerm._id
+      }
+      addReferences.push(updateReference(ref));
     }
-    addReferences.push(updateReference(ref));
   }
 
   return Promise.all(addReferences).then(data=> {
     return data;
+  })
+  .catch(error=> {
+    console.log(error)
   });
 }
 

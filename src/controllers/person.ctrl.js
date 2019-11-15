@@ -1,5 +1,4 @@
 const driver = require("../config/db-driver");
-
 const helpers = require("../helpers");
 
 class Person {
@@ -11,11 +10,49 @@ class Person {
     this.firstName = firstName;
     this.middleName = middleName;
     this.lastName = lastName;
+    this.label = this.personLabel({honorificPrefix:honorificPrefix, firstName:firstName, middleName:middleName, lastName:lastName});
     this.fnameSoundex = fnameSoundex;
     this.lnameSoundex = lnameSoundex;
-    this.alternateAppelations = alternateAppelations;
     this.description = description;
     this.status = status;
+    this.alternateAppelations = this.normalizeAppelations(alternateAppelations);
+  }
+
+  personLabel(props) {
+    let label = "";
+    if (props.honorificPrefix!==null) {
+      label += props.honorificPrefix;
+    }
+    if (props.firstName!==null) {
+      if (label!=="") {
+        label += " ";
+      }
+      label += props.firstName;
+    }
+    if (props.middleName!==null) {
+      if (label!=="") {
+        label += " ";
+      }
+      label += props.middleName;
+    }
+    if (props.lastName!==null) {
+      if (label!=="") {
+        label += " ";
+      }
+      label += props.lastName;
+    }
+    return label;
+  }
+
+  normalizeAppelations(alternateAppelations) {
+    let appelations = alternateAppelations.map(appelation=> {
+      if (appelation.label==="") {
+        appelation.label = personLabel({honorificPrefix:appelation.honorificPrefix, firstName:appelation.firstName, middleName:appelation.middleName, lastName:appelation.lastName});
+        console.log(appelation.label)
+      }
+      return appelation;
+    });
+    return appelations;
   }
 
   validate() {
@@ -87,6 +124,9 @@ class Person {
         return outputRecord;
       }
     })
+    .catch((error) => {
+      console.log(error)
+    });
     for (let key in node) {
       this[key] = node[key];
       let newAppelations = [];
@@ -97,8 +137,15 @@ class Person {
         }
         this[key] = newAppelations;
       }
-
-    }
+    }// relations
+    let events = await helpers.loadRelations(this._id, "Person", "Event");
+    let organisations = await helpers.loadRelations(this._id, "Person", "Organisation");
+    let people = await helpers.loadRelations(this._id, "Person", "Person");
+    let resources = await helpers.loadRelations(this._id, "Person", "Resource");
+    this.events = events;
+    this.organisations = organisations;
+    this.people = people;
+    this.resources = resources;
   }
 
   async save() {
@@ -116,6 +163,7 @@ class Person {
         }
       }
       this.alternateAppelations = newAppelations;
+      this.label = this.personLabel(this);
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
 
@@ -141,6 +189,9 @@ class Person {
           output = {error: [], status: true, data: resultRecord};
         }
         return output;
+      })
+      .catch((error) => {
+        console.log(error)
       });
       return resultPromise;
     }
@@ -189,54 +240,55 @@ const getPeople = async (req, resp) => {
   let queryPage = 0;
   let limit = 25;
 
-  let query = {};
-  let $and = [];
+  let query = "";
+  let queryParams = "";
 
-  /*if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      let queryBlock = {
-        '$or':[
-        {"firstName": {"$regex": label, "$options": "i"}},
-        {"lastName": {"$regex": label, "$options": "i"}}
-      ]}
-      $and.push(queryBlock);
+      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
   if (typeof parameters.firstName!=="undefined") {
     firstName = parameters.firstName;
     if (firstName!=="") {
-      let queryBlock = {"firstName": {"$regex": firstName, "$options": "i"}};
-      $and.push(queryBlock);
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams = "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
     }
   }
   if (typeof parameters.lastName!=="undefined") {
     lastName = parameters.lastName;
     if (lastName!=="") {
-      let queryBlock = {"lastName": {"$regex": lastName, "$options": "i"}};
-      $and.push(queryBlock);
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams = "LOWER(n.lastName) =~ LOWER('.*"+lastName+".*') ";
     }
   }
   if (typeof parameters.fnameSoundex!=="undefined") {
     fnameSoundex = helpers.soundex(parameters.fnameSoundex);
-    let queryBlock = {"fnameSoundex": fnameSoundex};
-    $and.push(queryBlock);
+    if (queryParams !=="") {
+      queryParams += " AND ";
+    }
+    queryParams = "LOWER(n.fnameSoundex) =~ LOWER('.*"+fnameSoundex+".*') ";
   }
   if (typeof parameters.lnameSoundex!=="undefined") {
     lnameSoundex = helpers.soundex(parameters.lnameSoundex);
-    let queryBlock = {"lnameSoundex": lnameSoundex};
-    $and.push(queryBlock);
+    if (queryParams !=="") {
+      queryParams += " AND ";
+    }
+    queryParams = "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
   }
   if (typeof parameters.description!=="undefined") {
     description = parameters.description.toLowerCase();
-    if (description!=="") {
-      let queryBlock = {"description": {"$regex": description, "$options": "i"}};
-      $and.push(queryBlock);
+    if (queryParams !=="") {
+      queryParams += " AND ";
     }
+    queryParams = "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
   }
-  if ($and.length>0) {
-    query = {$and};
-  }*/
+
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
@@ -248,10 +300,12 @@ const getPeople = async (req, resp) => {
   if (page===0) {
     currentPage = 1;
   }
-
   let skip = limit*queryPage;
-  query = "MATCH (n:Person) RETURN n SKIP "+skip+" LIMIT "+limit;
-  let data = await getPeopleQuery(query, limit);
+  if (queryParams!=="") {
+    queryParams = "WHERE "+queryParams;
+  }
+  query = "MATCH (n:Person) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
+  let data = await getPeopleQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -276,18 +330,68 @@ const getPeople = async (req, resp) => {
   }
 }
 
-const getPeopleQuery = async (query, limit) => {
+const getPeopleQuery = async (query, queryParams, limit) => {
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
   .then(result=> {
     return result.records;
-  })
+  }).catch((error) => {
+    console.log(error)
+  });
 
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  // get related resources
+  let nodeResourcesPromises = nodes.map(node => {
+    let newPromise = new Promise(async (resolve,reject)=> {
+      let relations = {};
+      relations.nodeId = node._id;
+      relations.resources = await helpers.loadRelations(node._id, "Person", "Resource");
+      resolve(relations);
+    })
+    return newPromise;
+  });
+
+  let nodesResourcesRelations = await Promise.all(nodeResourcesPromises)
+  .then(data=>{
+    return data;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+
+
+  let nodesPopulated = nodes.map(node=> {
+    let resources = [];
+    let nodeResources = nodesResourcesRelations.find(relation=>relation.nodeId===node._id);
+    if (typeof nodeResources!=="undefined") {
+      resources = nodeResources.resources.map(item=>{
+        let ref = item.ref;
+        let paths = item.ref.paths.map(path=> {
+          let pathOut = null;
+          if (typeof path==="string") {
+            pathOut = JSON.parse(path);
+            if (typeof pathOut==="string") {
+              pathOut = JSON.parse(pathOut);
+            }
+          }
+          else {
+            pathOut = path;
+          }
+          return pathOut;
+        });
+
+        item.ref.paths = paths;
+        return item;
+      });
+    }
+    node.resources = nodeResources.resources;
+    return node;
+  });
   let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Person) RETURN count(*)")
+    tx.run("MATCH (n:Person) "+queryParams+" RETURN count(*)")
   )
   .then(result=> {
     session.close();
@@ -299,7 +403,7 @@ const getPeopleQuery = async (query, limit) => {
   });
   let totalPages = Math.ceil(count/limit)
   let result = {
-    nodes: nodes,
+    nodes: nodesPopulated,
     count: count,
     totalPages: totalPages
   }
@@ -360,6 +464,7 @@ const deletePerson = async(req, resp) => {
 }
 
 module.exports = {
+  Person: Person,
   getPeople: getPeople,
   getPerson: getPerson,
   putPerson: putPerson,

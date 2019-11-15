@@ -17,6 +17,8 @@ app.use(express.json());
 app.use('/api', api);
 // serve files from archive
 app.use(express.static(process.env.ARCHIVEPATH));
+// serve resources
+app.use(express.static(process.env.RESOURCESPATH));
 /** start express server */
 app.listen(port, () => {
     console.log(`Server started at port: ${port}`);

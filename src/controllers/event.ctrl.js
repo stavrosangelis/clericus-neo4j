@@ -54,6 +54,16 @@ class Event {
     for (let key in node) {
       this[key] = node[key];
     }
+
+    // relations
+    let events = await helpers.loadRelations(this._id, "Event", "Event");
+    let organisations = await helpers.loadRelations(this._id, "Event", "Organisation");
+    let people = await helpers.loadRelations(this._id, "Event", "Person");
+    let resources = await helpers.loadRelations(this._id, "Event", "Resource");
+    this.events = events;
+    this.organisations = organisations;
+    this.people = people;
+    this.resources = resources;
   }
 
   async save() {
@@ -118,9 +128,20 @@ class Event {
 
 const getEvents = async (req, resp) => {
   let parameters = req.query;
+  let label = "";
   let page = 0;
   let queryPage = 0;
   let limit = 25;
+
+  let query = "";
+  let queryParams = "";
+
+  if (typeof parameters.label!=="undefined") {
+    label = parameters.label;
+    if (label!=="") {
+      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+    }
+  }
 
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
@@ -134,9 +155,12 @@ const getEvents = async (req, resp) => {
     currentPage = 1;
   }
 
-  let skip = limit*page;
-  let query = "MATCH (n:Event) RETURN n ORDER BY n.label";
-  let data = await getEventsQuery(query, limit);
+  let skip = limit*queryPage;
+  if (queryParams!=="") {
+    queryParams = "WHERE "+queryParams;
+  }
+  query = "MATCH (n:Event) "+queryParams+" RETURN n ORDER BY n.label";
+  let data = await getEventsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -188,7 +212,7 @@ const prepareRelation = (sourceItem, relation, targetItem) => {
   return newProperty;
 }
 
-const getEventsQuery = async (query, limit) => {
+const getEventsQuery = async (query, queryParams, limit) => {
   let session = driver.session();
   let nodes = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -200,7 +224,7 @@ const getEventsQuery = async (query, limit) => {
   });
 
   let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Event) RETURN count(*)")
+    tx.run("MATCH (n:Event) "+queryParams+" RETURN count(*)")
   )
   .then(result=> {
     session.close()

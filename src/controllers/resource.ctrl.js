@@ -97,13 +97,20 @@ class Resource {
         this[key] = paths;
       }
       if (key==="metadata") {
-        this[key] = JSON.parse(node[key]);
+        let metadata = JSON.parse(node[key]);
+        this.metadata = JSON.parse(metadata);
       }
     }
 
     // relations
+    let events = await helpers.loadRelations(this._id, "Resource", "Event");
+    let organisations = await helpers.loadRelations(this._id, "Resource", "Organisation");
     let people = await helpers.loadRelations(this._id, "Resource", "Person");
-    console.log(people);
+    let resources = await helpers.loadRelations(this._id, "Resource", "Resource");
+    this.events = events;
+    this.organisations = organisations;
+    this.people = people;
+    this.resources = resources;
   }
 
   async save() {
@@ -211,70 +218,45 @@ class Resource {
       return error;
     });
   }
-
 };
 
 const getResources = async (req, resp) => {
   let parameters = req.query;
   let label = "";
-  let firstName = "";
-  let lastName = "";
-  let fnameSoundex = "";
-  let lnameSoundex = "";
-  let _id = "";
+  let systemType = "";
   let description = "";
   let page = 0;
   let queryPage = 0;
   let limit = 25;
 
-  let query = {};
-  let $and = [];
+  let query = "";
+  let queryParams = "";
 
-  /*if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      let queryBlock = {
-        '$or':[
-        {"firstName": {"$regex": label, "$options": "i"}},
-        {"lastName": {"$regex": label, "$options": "i"}}
-      ]}
-      $and.push(queryBlock);
+      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
-  if (typeof parameters.firstName!=="undefined") {
-    firstName = parameters.firstName;
-    if (firstName!=="") {
-      let queryBlock = {"firstName": {"$regex": firstName, "$options": "i"}};
-      $and.push(queryBlock);
+  if (typeof parameters.systemType!=="undefined") {
+    systemType = parameters.systemType;
+    if (systemType!=="") {
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams = "LOWER(n.systemType) =~ LOWER('.*"+systemType+".*') ";
     }
-  }
-  if (typeof parameters.lastName!=="undefined") {
-    lastName = parameters.lastName;
-    if (lastName!=="") {
-      let queryBlock = {"lastName": {"$regex": lastName, "$options": "i"}};
-      $and.push(queryBlock);
-    }
-  }
-  if (typeof parameters.fnameSoundex!=="undefined") {
-    fnameSoundex = helpers.soundex(parameters.fnameSoundex);
-    let queryBlock = {"fnameSoundex": fnameSoundex};
-    $and.push(queryBlock);
-  }
-  if (typeof parameters.lnameSoundex!=="undefined") {
-    lnameSoundex = helpers.soundex(parameters.lnameSoundex);
-    let queryBlock = {"lnameSoundex": lnameSoundex};
-    $and.push(queryBlock);
   }
   if (typeof parameters.description!=="undefined") {
-    description = parameters.description.toLowerCase();
+    description = parameters.description;
     if (description!=="") {
-      let queryBlock = {"description": {"$regex": description, "$options": "i"}};
-      $and.push(queryBlock);
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams = "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
     }
   }
-  if ($and.length>0) {
-    query = {$and};
-  }*/
+
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
@@ -288,8 +270,11 @@ const getResources = async (req, resp) => {
   }
 
   let skip = limit*queryPage;
-  query = "MATCH (n:Resource) RETURN n SKIP "+skip+" LIMIT "+limit;
-  let data = await getResourcesQuery(query, limit);
+  if (queryParams!=="") {
+    queryParams = "WHERE "+queryParams;
+  }
+  query = "MATCH (n:Resource) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
+  let data = await getResourcesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -314,7 +299,7 @@ const getResources = async (req, resp) => {
   }
 }
 
-const getResourcesQuery = async (query, limit) => {
+const getResourcesQuery = async (query, queryParams, limit) => {
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -336,15 +321,12 @@ const getResourcesQuery = async (query, limit) => {
         }
         nodeOutput[key] = paths;
       }
-      if (key==="metadata") {
-        nodeOutput[key] = JSON.parse(node[key]);
-      }
     }
     return nodeOutput;
   });
 
   let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Resource) RETURN count(*)")
+    tx.run("MATCH (n:Resource) "+queryParams+" RETURN count(*)")
   )
   .then(result=> {
     session.close()
@@ -645,6 +627,7 @@ const parseResourceDetails = async(fileType, uploadedFile, newUploadFile, hashed
 }
 
 module.exports = {
+  Resource: Resource,
   getResources: getResources,
   getResource: getResource,
   putResource: putResource,
