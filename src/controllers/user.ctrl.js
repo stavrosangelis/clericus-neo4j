@@ -7,7 +7,7 @@ const privateKey = fs.readFileSync('./src/config/.private.key', 'utf8');
 const referencesController = require('../controllers/references.ctrl');
 
 class User {
-  constructor({_id=null,firstName=null,lastName=null,email=null,password=null,token=false, isAdmin=false, usergroup=null}) {
+  constructor({_id=null,firstName=null,lastName=null,email=null,password=null,token=false, isAdmin=false, usergroup=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -22,6 +22,10 @@ class User {
     if (token!==null) {
       this.token = token;
     }
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -217,12 +221,14 @@ class User {
 
   async validatePassword(password) {
     const passwordVerify = await argon2.verify(this.password, password);
+    let newpass = await argon2.hash(password)
     return passwordVerify;
   };
 
   generateJWT() {
     let today = new Date();
-    const expirationDate = new Date(today.getDate()+1);
+    const expirationDate = new Date();
+    expirationDate.setDate(today.getDate()+1);
     let signOptions = {
       issuer:  "Clericus app",
       email: this.email,
@@ -356,6 +362,14 @@ const putUser = async(req, resp) => {
       }
     }
   }
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof userData._id==="undefined" || userData._id===null) {
+    userData.createdBy = userId;
+    userData.createdAt = now;
+  }
+  userData.updatedBy = userId;
+  userData.updatedAt = now;
   let user = new User(userData);
   let output = await user.save();
   resp.json(output);
@@ -365,7 +379,6 @@ const deleteUser = async(req, resp) => {
   let parameters = req.body;
   let user = new User({_id: parameters._id});
   let output = await user.delete();
-  console.log(output)
   resp.json(output);
 }
 

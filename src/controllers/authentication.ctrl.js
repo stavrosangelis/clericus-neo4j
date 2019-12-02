@@ -51,7 +51,7 @@ const passportAdmin = new LocalStrategy({
     passwordField: 'password'
   },
   async function(username, password, done) {
-    let session = driver.session()
+    let session = driver.session();
     let query = "MATCH (u:User {email: $email})-[:belongsToUserGroup]->(ug) RETURN u,ug";
     let params = {
       email: username
@@ -91,14 +91,6 @@ const passportAdmin = new LocalStrategy({
 
 passport.use('local', passportLocal);
 passport.use('admin', passportAdmin);
-
-passport.serializeUser((user, done) => {
-  done(null, user._id);
-});
-
-passport.deserializeUser((userId, done) =>{
-  User.findById(userId, (err, user) => done(err, user));
-});
 
 const loginUser = async (req, resp) => {
   let postData = req.body;
@@ -171,6 +163,7 @@ const loginAdmin = async (req, resp) => {
       msg: "",
     });
   }
+  
   return passport.authenticate('admin', { session: false }, (error, passportUser, info) => {
     if(error) {
       return resp.json({

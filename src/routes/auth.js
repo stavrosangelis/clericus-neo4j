@@ -55,16 +55,22 @@ let checkAdminToken = (req, resp, next) => {
   }
   if (token!==null && token!=="null") {
     jwt.verify(token, privateKey, (error, decoded) => {
+      // check if token has expired
+      let today = new Date();
+      let expiresIn = new Date(decoded.expiresIn);
+      if (today>expiresIn) {
+          error = "Session expired. Please login again to continue.";
+      }
       if (typeof decoded!=="undefined") {
         if (decoded.isAdmin===false) {
-          error = "Unauthorised access.";
+          error = "Unauthorised access!";
         }
       }
       if (error) {
         return resp.json({
           status: false,
           data: [],
-          error: "Invalid authorization token",
+          error: error,
           msg: "",
         });
       } else {
@@ -77,7 +83,7 @@ let checkAdminToken = (req, resp, next) => {
     return resp.json({
       status: false,
       data: [],
-      error: "Authorization token not supplied",
+      error: "",
       msg: "",
     });
   }

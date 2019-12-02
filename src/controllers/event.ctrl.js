@@ -4,13 +4,17 @@ const updateReference = require("./references.ctrl").updateReference;
 const TaxonomyTerm = require("./TaxonomyTerm.ctrl").TaxonomyTerm;
 
 class Event {
-  constructor({_id=null,label=null,description=null,eventType=null}) {
+  constructor({_id=null,label=null,description=null,eventType=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     if (_id!==null) {
       this._id = _id;
     }
     this.label = label;
     this.description = description;
     this.eventType = eventType;
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -277,8 +281,16 @@ const getEvent = async(req, resp) => {
 }
 
 const putEvent = async(req, resp) => {
-  let parameters = req.body;
-  let event = new Event(parameters);
+  let postData = req.body;
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof postData._id==="undefined" || postData._id===null) {
+    postData.createdBy = userId;
+    postData.createdAt = now;
+  }
+  postData.updatedBy = userId;
+  postData.updatedAt = now;
+  let event = new Event(postData);
   let output = await event.save();
   resp.json({
     status: output.status,

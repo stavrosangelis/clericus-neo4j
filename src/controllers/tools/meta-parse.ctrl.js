@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { parse } = require('querystring');
 const helpers = require('../../helpers');
+const driver = require("../../config/db-driver");
 const resourcesPath = process.env.RESOURCESPATH;
 const serverURL = process.env.SERVERURL;
 
@@ -84,10 +85,16 @@ const associateThumbToLabels = async(req, resp) => {
     faces.forEach((face) => {
       // 01. find face boundaries
       let rectangle = face.faceRectangle;
-      let width = rectangle.width.replace("px", "");
-      width = parseInt(width,10);
-      let height = rectangle.height.replace("px", "");
-      height = parseInt(height,10);
+      let width = rectangle.width;
+      if (typeof width==="string") {
+        width = width.replace("px", "");
+        width = parseInt(width,10);
+      }
+      let height = rectangle.height
+      if (typeof height==="string") {
+        height = height.replace("px", "");
+        height = parseInt(width,10);
+      }
 
       // 02. find face top-bottom points
       let topY = rectangle.top;
@@ -149,12 +156,22 @@ var highlightFaces = async(inputFile, faces, outputFile, Canvas, outputDir, face
   });
 
   let facesCropPromises = [];
+  if (typeof faces==="string") {
+    faces = JSON.parse(faces);
+  }
   faces.forEach((face) => {
     context.beginPath();
     let rectangle = face.faceRectangle;
-    let width = rectangle.width.replace("px", "");
-    width = parseInt(width,10);
-    let height = rectangle.height.replace("px", "");
+    let width = rectangle.width;
+    if (typeof width==="string") {
+      width = width.replace("px", "");
+      width = parseInt(width,10);
+    }
+    let height = rectangle.height;
+    if (typeof height==="string") {
+      height = height.replace("px", "");
+      height = parseInt(width,10);
+    }
     height = parseInt(height,10);
     context.moveTo(rectangle.left, rectangle.top);
     context.lineTo(rectangle.left+width, rectangle.top);
@@ -387,56 +404,51 @@ const listClassPiece = (req, resp) => {
 
   fs.readdir(fsPath, function(error, files) {
     let responseData = [];
-    for (let i=0;i<files.length; i++) {
-      let file = files[i];
-      if (fileName===file) {
-        let fileString = path.parse(thumbnailsDir+"/"+file).name;
-        let outputDir = resourcesPath+"output/"+fileString+"/";
-        let outputURL = serverURL+"output/"+fileString+"/";
-        let outputImagesDir = outputDir+"images/";
-        let outputImagesURL = outputURL+"images/";
-        let outputFacesDir = outputDir+"thumbnails/";
-        let outputFacesURL = outputURL+"thumbnails/";
-        let outputJsonDir = outputDir+"json";
-        let outputJsonURL = outputURL+"json";
+    let file = files.find(f=>f===fileName);
+    let fileString = path.parse(thumbnailsDir+"/"+file).name;
+    let outputDir = resourcesPath+"output/"+fileString+"/";
+    let outputURL = serverURL+"output/"+fileString+"/";
+    let outputImagesDir = outputDir+"images/";
+    let outputImagesURL = outputURL+"images/";
+    let outputFacesDir = outputDir+"thumbnails/";
+    let outputFacesURL = outputURL+"thumbnails/";
+    let outputJsonDir = outputDir+"json";
+    let outputJsonURL = outputURL+"json";
 
-        let thumbnail = null;
-        let fullsize = null;
-        let compressed = null;
-        let facesThumbnails = false;
-        let facesJSON = null;
-        let textJSON = null;
-        if (fs.existsSync(thumbnailsDir+"/"+file)) {
-            thumbnail = thumbnailsURL+"/"+file;
-        }
-        if (fs.existsSync(fullsizeDir+"/"+file)) {
-            fullsize = fullsizeURL+"/"+file;
-        }
-        if (fs.existsSync(compressedDir+"/"+file)) {
-            compressed = compressedURL+"/"+file;
-        }
-        if (fs.existsSync(outputFacesDir+"/0.jpg")) {
-            facesThumbnails = true;
-        }
-        if (fs.existsSync(outputJsonDir+"/"+fileString+"-faces.json")) {
-            facesJSON = outputJsonURL+"/"+fileString+"-faces.json";
-        }
-        if (fs.existsSync(outputJsonDir+"/"+fileString+"-text.json")) {
-            textJSON = outputJsonURL+"/"+fileString+"-text.json";
-        }
-        let responseFile = {
-          name: file,
-          thumbnail: thumbnail,
-          fullsize: fullsize,
-          compressed: compressed,
-          facesThumbnails: facesThumbnails,
-          faces: facesJSON,
-          text: textJSON,
-         }
-        responseData.push(responseFile);
-      }
+    let thumbnail = null;
+    let fullsize = null;
+    let compressed = null;
+    let facesThumbnails = false;
+    let facesJSON = null;
+    let textJSON = null;
+    if (fs.existsSync(thumbnailsDir+"/"+file)) {
+        thumbnail = thumbnailsURL+"/"+file;
     }
-
+    if (fs.existsSync(fullsizeDir+"/"+file)) {
+        fullsize = fullsizeURL+"/"+file;
+    }
+    if (fs.existsSync(compressedDir+"/"+file)) {
+        compressed = compressedURL+"/"+file;
+    }
+    if (fs.existsSync(outputFacesDir+"/0.jpg")) {
+        facesThumbnails = true;
+    }
+    if (fs.existsSync(outputJsonDir+"/"+fileString+"-faces.json")) {
+        facesJSON = outputJsonURL+"/"+fileString+"-faces.json";
+    }
+    if (fs.existsSync(outputJsonDir+"/"+fileString+"-text.json")) {
+        textJSON = outputJsonURL+"/"+fileString+"-text.json";
+    }
+    let responseFile = {
+      name: file,
+      thumbnail: thumbnail,
+      fullsize: fullsize,
+      compressed: compressed,
+      facesThumbnails: facesThumbnails,
+      faces: facesJSON,
+      text: textJSON,
+     }
+    responseData.push(responseFile);
     resp.json({
       status: true,
       data: responseData,
@@ -469,7 +481,7 @@ const createThumbnails = async(req, resp) => {
 
 }
 
-var createThumbnail = async(srcPath=null, targetPath=null, fileName=null, customWidth=null, customHeight=null) => {
+const createThumbnail = async(srcPath=null, targetPath=null, fileName=null, customWidth=null, customHeight=null) => {
   if (srcPath===null || targetPath===null || fileName===null) {
     return false;
   }
@@ -526,7 +538,7 @@ var createThumbnail = async(srcPath=null, targetPath=null, fileName=null, custom
 
 }
 
-var createCompressed = async(srcPath=null, targetPath=null, fileName=null, customWidth=null, customHeight=null) => {
+const createCompressed = async(srcPath=null, targetPath=null, fileName=null, customWidth=null, customHeight=null) => {
   if (srcPath===null || targetPath===null || fileName===null) {
     return false;
   }
@@ -627,7 +639,7 @@ const updateClassPieceFaces = async(req, resp) => {
   }
 }
 
-var degreesToRadians = (degrees) => {
+const degreesToRadians = (degrees) => {
 	let radians = 0;
 	if (degrees>0) {
 		radians = degrees * Math.PI / 180;
@@ -638,7 +650,7 @@ var degreesToRadians = (degrees) => {
 	return -radians;
 }
 
-var rotateCoordinates = (cx,cy,x,y,radians, width, height,rotateDegrees) => {
+const rotateCoordinates = (cx,cy,x,y,radians, width, height,rotateDegrees) => {
     let cos = Math.cos(radians);
     let sin = Math.sin(radians);
     let newCoordinates = {};
@@ -659,11 +671,98 @@ var rotateCoordinates = (cx,cy,x,y,radians, width, height,rotateDegrees) => {
     return newCoordinates;
 }
 
+const queryTexts = async(req, resp) => {
+  let postData = req.body;
+  let texts = postData.texts;
+
+  let promises = [];
+  for (let i=0; i<texts.length; i++) {
+    let word = texts[i];
+    if (word.length>2) {
+      let honorificPrefix = new Promise((resolve,reject)=>{
+        resolve(countWordType(word, "honorificPrefix"));
+      });
+      let firstName = new Promise((resolve,reject)=>{
+        resolve(countWordType(word, "firstName"));
+      });
+      let middleName = new Promise((resolve,reject)=>{
+        resolve(countWordType(word, "middleName"));
+      });
+      let lastName = new Promise((resolve,reject)=>{
+        resolve(countWordType(word, "lastName"));
+      });
+      let diocese = new Promise((resolve,reject)=>{
+        resolve(countWordType(word, "diocese"));
+      });
+      promises.push(Promise.all([honorificPrefix, firstName, middleName, lastName, diocese]));
+    }
+  }
+
+  let results = await Promise.all(promises).then(data=>{
+    return data;
+  });
+  // group results
+  let output = results.map(result => {
+    let counts = {
+      honorificPrefix: result.find(item=>item.type==="honorificPrefix")['count'],
+      firstName: result.find(item=>item.type==="firstName")['count'],
+      middleName: result.find(item=>item.type==="middleName")['count'],
+      lastName: result.find(item=>item.type==="lastName")['count'],
+      diocese: result.find(item=>item.type==="diocese")['count'],
+    };
+    let countsArr = [];
+    for (let key in counts) {
+      countsArr.push([key, counts[key]]);
+    }
+    countsArr.sort((a, b) =>{
+      return b[1] - a[1];
+    });
+    let firstCount = countsArr[0];
+    let obj = {
+      word: result[0].word,
+      type: null,
+      count: null,
+    }
+    if (firstCount[1]>0) {
+      obj.type = firstCount[0]
+      obj.count = firstCount[1]
+    }
+    return obj;
+  });
+  resp.json({
+    status: true,
+    data: output,
+    error: [],
+    msg: "Word counts results",
+  });
+}
+
+const countWordType = async(word, type) => {
+  let queryWord = helpers.escapeRegExp(word);
+  let session = driver.session();
+  let query = "MATCH (n:Person) WHERE LOWER(n."+type+") =~ LOWER('.*"+queryWord+".*') RETURN count(*) AS count";
+  let count = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['count'];
+    return output;
+  }).catch((error) => {
+    console.log(error)
+  });
+  return {word: word, type: type, count: parseInt(count,10)};
+}
+
 module.exports = {
   metaParseClassPiece: metaParseClassPiece,
   associateThumbToLabels: associateThumbToLabels,
   listClassPieces: listClassPieces,
   listClassPiece: listClassPiece,
   createThumbnails: createThumbnails,
-  updateClassPieceFaces: updateClassPieceFaces
+  updateClassPieceFaces: updateClassPieceFaces,
+  queryTexts: queryTexts,
 }

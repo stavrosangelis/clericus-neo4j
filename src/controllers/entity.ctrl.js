@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Entity {
-  constructor({_id=null,label=null,labelId=null,locked=false,definition=null,example=null, parent=null}) {
+  constructor({_id=null,label=null,labelId=null,locked=false,definition=null,example=null, parent=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     if (_id!==null) {
       this._id = _id;
     }
@@ -12,6 +12,10 @@ class Entity {
     this.definition = definition;
     this.example = example;
     this.parent = parent;
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -316,8 +320,16 @@ const getEntity = async(req, resp) => {
 }
 
 const putEntity = async(req, resp) => {
-  let parameters = req.body;
-  let entity = new Entity(parameters);
+  let postData = req.body;
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof postData._id==="undefined" || postData._id===null) {
+    postData.createdBy = userId;
+    postData.createdAt = now;
+  }
+  postData.updatedBy = userId;
+  postData.updatedAt = now;
+  let entity = new Entity(postData);
   let output = await entity.save();
   resp.json({
     status: output.status,

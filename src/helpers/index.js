@@ -144,12 +144,33 @@ const readJSONFile = (path) => {
 }
 
 const outputRecord = (record) => {
-  let output = {};
   prepareOutput(record);
-  for (let key in record.properties) {
-    output[key] = record.properties[key];
-  }
+  let output = Object.assign({}, record.properties);
   output._id = record.identity;
+  delete output.identity;
+  return output;
+}
+
+const outputRelation = (relation) => {
+  prepareOutput(relation);
+  let output = Object.assign({}, relation);
+  output._id = relation.identity;
+  delete output.identity;
+  return output;
+}
+
+const outputPaths = (paths, _id=null) => {
+  let output = paths.map((path,i)=>{
+    let segments = path.segments.map(segment=> {
+      let start = outputRecord(segment.start);
+      start.entityType = segment.start.labels;
+      let rel = outputRelation(segment.relationship);
+      let end = outputRecord(segment.end);
+      end.entityType = segment.end.labels;
+      return {start:start,rel:rel,end:end};
+    });
+    return segments;
+  });
   return output;
 }
 
@@ -222,9 +243,8 @@ const parseRequestData = async(request) =>{
     if(request.headers['content-type'] === FORM_URLENCODED) {
         let body = '';
         await request.on('data', chunk => {
-            body += chunk.toString();
+          body += chunk.toString();
         });
-        console.log(typeof body)
         return JSON.parse(body);
     }
     else {
@@ -237,6 +257,10 @@ const parseRequestData = async(request) =>{
   }
 
 }
+
+const escapeRegExp = (str) => {
+  return str.replace(/[\\^$'"|?*+()[{]/g, '\\$&')
+};
 
 module.exports = {
   soundex: soundex,
@@ -251,7 +275,10 @@ module.exports = {
   normalizeRelationsOutput: normalizeRelationsOutput,
   readJSONFile: readJSONFile,
   outputRecord: outputRecord,
+  outputRelation: outputRelation,
+  outputPaths: outputPaths,
   normalizeLabelId: normalizeLabelId,
   loadRelations: loadRelations,
   parseRequestData: parseRequestData,
+  escapeRegExp: escapeRegExp,
 }

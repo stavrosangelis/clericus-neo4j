@@ -68,7 +68,7 @@
   },
   {
     "direction": "from",
-    "termLabelId": "belongsTo",
+    "termLabelId": "hasAffiliation",
     "sourceEntityLabelId": "Person",
     "targetEntityLabelId": "Organisation"
   },

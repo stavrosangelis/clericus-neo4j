@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Organisation {
-  constructor({_id=null,label=null,labelSoundex=null,description=null,organisationType=null,status=false}) {
+  constructor({_id=null,label=null,labelSoundex=null,description=null,organisationType=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -12,6 +12,10 @@ class Organisation {
     this.description = description;
     this.organisationType = organisationType;
     this.status = status;
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -271,6 +275,14 @@ const getOrganisation = async(req, resp) => {
 
 const putOrganisation = async(req, resp) => {
   let postData = req.body;
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof postData._id==="undefined" || postData._id===null) {
+    postData.createdBy = userId;
+    postData.createdAt = now;
+  }
+  postData.updatedBy = userId;
+  postData.updatedAt = now;
   let organisationData = {};
   for (let key in postData) {
     if (postData[key]!==null) {

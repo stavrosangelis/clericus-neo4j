@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Usergroup {
-  constructor({_id=null,label=null,description=null,isAdmin=false,isDefault=false}) {
+  constructor({_id=null,label=null,description=null,isAdmin=false,isDefault=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = _id;
     if(_id!==null) {
       this._id = _id;
@@ -11,6 +11,10 @@ class Usergroup {
     this.description = description;
     this.isAdmin = isAdmin;
     this.isDefault = isDefault;
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -274,6 +278,15 @@ const getUsergroup = async(req, resp) => {
 
 const putUsergroup = async(req, resp) => {
   let postData = req.body;
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof postData._id==="undefined" || postData._id===null) {
+    postData.createdBy = userId;
+    postData.createdAt = now;
+  }
+  postData.updatedBy = userId;
+  postData.updatedAt = now;
+
   let usergroup = new Usergroup(postData);
   let output = await usergroup.save();
   resp.json(output);

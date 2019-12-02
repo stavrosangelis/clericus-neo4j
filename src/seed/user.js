@@ -7,13 +7,21 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 const crypto = require('crypto-js');
 
-const seedUser = async() => {
+const seedUser = async(email, password) => {
   // 1. load default user data
   const entries = await readJSONFile(process.env.ABSPATH+'src/seed/data/user.json');
   let defaultUser = entries.data;
 
   // 2. hash user password
-  defaultUser.password = crypto.SHA1(defaultUser.password).toString();
+  if (email!==null) {
+    defaultUser.email = email;
+  }
+  if (password!==null) {
+    defaultUser.password = password;
+  }
+  else {
+    defaultUser.password = crypto.SHA1(defaultUser.password).toString();
+  }
 
   // 3. initiate a user from the user model
   let newUser = new User(defaultUser);
@@ -24,8 +32,8 @@ const seedUser = async() => {
   //5. save user password
   newUser._id = saveUser.data._id;
   newUser.password = defaultUser.password;
+
   await newUser.updatePassword();
-  console.log(newUser)
 
   // 6. link user to admin userGroup
   // 6.1. load taxonomy term

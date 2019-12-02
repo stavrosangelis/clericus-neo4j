@@ -1,4 +1,5 @@
 const driver = require("../config/db-driver");
+const helpers = require("../helpers");
 
 const TaxonomyTerm = require('./taxonomyTerm.ctrl').TaxonomyTerm;
 
@@ -150,7 +151,59 @@ const removeReference = async(reference) => {
   return resultPromise;
 }
 
+const getReferences = async(req, resp) => {
+  let parameters = req.query;
+  if (typeof parameters._id==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: "Please provide a valid node id to continue",
+      msg: "Query results",
+    });
+  }
+  let _id = parameters._id;
+  let steps = 0;
+  if (typeof parameters.steps!=="undefined") {
+    steps = parseInt(parameters.steps,10);
+    if (steps>6) {
+      steps = 6;
+    }
+  }
+
+  // 1. query for node
+  let session = driver.session()
+  let query = "MATCH p=(n)-[r]->(rn) WHERE id(n)="+_id+" return collect(distinct p) as p";
+  if (steps>1) {
+    query = "MATCH p=(n)-[r*"+steps+"]->(rn) WHERE id(n)="+_id+" return collect(distinct p) as p";
+  }
+  let results = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    let records = result.records;
+    let output = [];
+    if (records.length>0) {
+      for (let i in records) {
+        let record = records[i].toObject().p;
+        let paths = helpers.outputPaths(record, _id);
+        output = paths;
+      }
+    }
+    console.log(output)
+    return output;
+  });
+
+  resp.json({
+    status: true,
+    data: results,
+    error: [],
+    msg: "Query results",
+  });
+}
+
 module.exports = {
+  getReferences: getReferences,
   putReference: putReference,
   putReferences: putReferences,
   updateReference: updateReference,

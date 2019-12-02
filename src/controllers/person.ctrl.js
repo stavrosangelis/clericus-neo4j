@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Person {
-  constructor({_id=null,label=null,honorificPrefix=null,firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,status=false}) {
+  constructor({_id=null,label=null,honorificPrefix=null,firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     if (typeof _id!=="undefined" && _id!==null) {
       this._id = _id;
     }
@@ -16,6 +16,10 @@ class Person {
     this.description = description;
     this.status = status;
     this.alternateAppelations = this.normalizeAppelations(alternateAppelations);
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   personLabel(props) {
@@ -446,6 +450,14 @@ const putPerson = async(req, resp) => {
       }
     }
   }
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof personData._id==="undefined" || personData._id===null) {
+    personData.createdBy = userId;
+    personData.createdAt = now;
+  }
+  personData.updatedBy = userId;
+  personData.updatedAt = now;
   let person = new Person(personData);
   let output = await person.save();
   resp.json(output);

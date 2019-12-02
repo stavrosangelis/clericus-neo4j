@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class TaxonomyTerm {
-  constructor({_id=null,label=null,labelId=null,locked=false,inverseLabel=null,inverseLabelId=null,scopeNote=null,count=0}) {
+  constructor({_id=null,label=null,labelId=null,locked=false,inverseLabel=null,inverseLabelId=null,scopeNote=null,count=0,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -14,6 +14,10 @@ class TaxonomyTerm {
     this.inverseLabelId = inverseLabelId;
     this.scopeNote = scopeNote;
     this.count = count;
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -317,6 +321,14 @@ const getTaxonomyTerm = async(req, resp) => {
 
 const putTaxonomyTerm = async(req, resp) => {
   let postData = req.body;
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof postData._id==="undefined" || postData._id===null) {
+    postData.createdBy = userId;
+    postData.createdAt = now;
+  }
+  postData.updatedBy = userId;
+  postData.updatedAt = now;
   let term = new TaxonomyTerm(postData);
   let data = await term.save();
   resp.json({

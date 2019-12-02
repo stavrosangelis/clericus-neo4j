@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Taxonomy {
-  constructor({_id=null,label=null,locked=false,description=null,systemType=null}) {
+  constructor({_id=null,label=null,locked=false,description=null,systemType=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -11,6 +11,10 @@ class Taxonomy {
     this.locked = locked;
     this.description = description;
     this.systemType = systemType;
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -287,6 +291,14 @@ const getTaxonomy = async(req, resp) => {
 
 const putTaxonomy = async(req, resp) => {
   let parameters = req.body;
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  if (typeof parameters._id==="undefined" || parameters._id===null) {
+    parameters.createdBy = userId;
+    parameters.createdAt = now;
+  }
+  parameters.updatedBy = userId;
+  parameters.updatedAt = now;
   let taxonomy = new Taxonomy(parameters);
   let output = await taxonomy.save();
   resp.json({

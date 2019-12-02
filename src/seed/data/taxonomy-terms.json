@@ -60,8 +60,8 @@
   },
   {
     "scopeNote": null,
-    "label": "belongsTo",
-    "inverseLabel": "hasRegistrant",
+    "label": "hasAffiliation",
+    "inverseLabel": "isAffiliatedWith",
     "taxonomyRef": "relationsTypes"
   },
   {

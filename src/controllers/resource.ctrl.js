@@ -7,7 +7,7 @@ const {promisify} = require('util');
 const formidable = require('formidable');
 
 class Resource {
-  constructor({_id=null,label=null,description=null,fileName=null,metadata=[],paths=null,resourceType=null,systemType=null,uploadedFile=null,status=false}) {
+  constructor({_id=null,label=null,description=null,fileName=null,metadata=[],paths=null,resourceType=null,systemType=null,uploadedFile=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -21,6 +21,10 @@ class Resource {
     this.systemType = systemType;
     this.uploadedFile = uploadedFile;
     this.status = status;
+    this.createdBy = createdBy;
+    this.createdAt = createdAt;
+    this.updatedBy = updatedBy;
+    this.updatedAt = updatedAt;
   }
 
   validate() {
@@ -98,7 +102,10 @@ class Resource {
       }
       if (key==="metadata") {
         let metadata = JSON.parse(node[key]);
-        this.metadata = JSON.parse(metadata);
+        if (typeof metadata==="string") {
+          metadata = JSON.parse(metadata);
+        }
+        this.metadata = metadata;
       }
     }
 
@@ -355,6 +362,7 @@ const getResource = async(req, resp) => {
       msg: "Please select a valid id to continue.",
     });
   }
+
   let _id = parameters._id;
   let resource = new Resource({_id:_id});
   await resource.load();
@@ -368,7 +376,17 @@ const getResource = async(req, resp) => {
 
 const putResource = async(req, resp) => {
   let postData = await helpers.parseRequestData(req);
-  let resource = new Resource(postData.resource);
+  let now = new Date().toISOString();
+  let userId = req.decoded.id;
+  let resourceData = postData.resource;
+  if (typeof resourceData._id==="undefined" || resourceData._id===null) {
+    resourceData.createdBy = userId;
+    resourceData.createdAt = now;
+  }
+  resourceData.updatedBy = userId;
+  resourceData.updatedAt = now;
+
+  let resource = new Resource(resourceData);
   let data = await resource.save();
   resp.json({
     status: true,

@@ -9,11 +9,19 @@ const seedEntities = require('./entities.js').seedEntities;
 const seedEntitiesProperties = require('./entities-properties.js').seedEntitiesProperties;
 
 const seedData = async(req, resp) => {
-  let reference = req.body;
+  let postData = req.body;
+  let email = null;
+  let password = null;
+  if (typeof postData.email!=="undefined" && postData.email!=="") {
+    email = postData.email;
+  }
+  if (typeof postData.password!=="undefined" && postData.password!=="") {
+    password = postData.password;
+  }
   let status = true;
   let errors = [];
   let data = {};
-
+  
   // 1. check settings
   // 1.1. check if seeding is allowed
   let settingsData = await settings.loadSettings();
@@ -54,7 +62,7 @@ const seedData = async(req, resp) => {
   console.log("step 5 complete");
 
   // 6. insert default admin account
-  let seedUserPromise = await seedUser();
+  let seedUserPromise = await seedUser(email, password);
   data.user = seedUserPromise;
   console.log("step 6 complete");
 

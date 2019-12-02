@@ -153,6 +153,8 @@ const classPieceIdentifyDuplicates = async(req, resp) => {
             score += 15;
           }
           if (score>15) {
+            let resources = await helpers.loadRelations(matchedFace._id, "Person", "Resource");
+            matchedFace.resources = resources;
             let newFaceMatch = matchedFace;
             newFaceMatch.score = score;
             returnMatches.push(newFaceMatch);
@@ -272,6 +274,9 @@ var facesImageResources = async(jsonPath,fileName) => {
 
   let output = await new Promise((resolve, reject) => {
     let dataJson = JSON.parse(fileData);
+    if (typeof dataJson==="string") {
+      dataJson = JSON.parse(dataJson);
+    }
     var facesData = facesEach(dataJson,fileName);
     facesData.then(data=> {
       resolve(data);
@@ -306,10 +311,13 @@ var facesEach = async (dataJson,fileName) => {
       path: resourcesPath+"output/"+fileName+"/thumbnails/"+j+".jpg",
       src: serverURL+"output/"+fileName+"/thumbnails/"+j+".jpg"
     }
+    newItem.honorificPrefix = faceData.honorificPrefix;
     newItem.firstName = faceData.firstName;
+    newItem.middleName = faceData.middleName;
     newItem.lastName = faceData.lastName;
     newItem.diocese = faceData.diocese;
     newItem.default = faceData.default;
+    newItem.type = faceData.type;
     j++;
     return newItem;
   });
@@ -357,11 +365,20 @@ var faceImageData = (face, imageDefaultData) => {
   }
   let defaultData = Object.assign(imageDefaultData,defaultValues);
   //let rotate = null;
+  let honorificPrefix = "";
   let firstName = "";
+  let middleName = "";
   let lastName = "";
   let diocese = "";
+  let type = "";
+  if (typeof face.honorificPrefix!=="undefined") {
+    honorificPrefix = face.honorificPrefix;
+  }
   if (typeof face.firstName!=="undefined") {
     firstName = face.firstName;
+  }
+  if (typeof face.middleName!=="undefined") {
+    middleName = face.middleName;
   }
   if (typeof face.lastName!=="undefined") {
     lastName = face.lastName;
@@ -369,12 +386,18 @@ var faceImageData = (face, imageDefaultData) => {
   if (typeof face.diocese!=="undefined") {
     diocese = face.diocese;
   }
+  if (typeof face.type!=="undefined") {
+    type = face.type;
+  }
   if (typeof face.rotate!=="undefined") {
     defaultData.rotate = face.rotate;
   }
+  faceObj.honorificPrefix = honorificPrefix;
   faceObj.firstName = firstName;
+  faceObj.middleName = middleName;
   faceObj.lastName = lastName;
   faceObj.diocese = diocese;
+  faceObj.type = type;
   faceObj.default = defaultData;
   return faceObj;
 }
@@ -628,7 +651,7 @@ var ingestPerson = async(person, classpiece) => {
 
     // 6. link person to diocese
     if (typeof ingestDiocesePromise!=="undefined") {
-      let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "belongsTo"});
+      let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "hasAffiliation"});
       await organisationTaxonomyTerm.load();
 
       let organisationReference = {
