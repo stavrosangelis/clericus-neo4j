@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Person {
-  constructor({_id=null,label=null,honorificPrefix=null,firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,honorificPrefix=[],firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     if (typeof _id!=="undefined" && _id!==null) {
       this._id = _id;
     }
@@ -24,9 +24,6 @@ class Person {
 
   personLabel(props) {
     let label = "";
-    if (props.honorificPrefix!==null) {
-      label += props.honorificPrefix;
-    }
     if (props.firstName!==null) {
       if (label!=="") {
         label += " ";
@@ -51,8 +48,7 @@ class Person {
   normalizeAppelations(alternateAppelations) {
     let appelations = alternateAppelations.map(appelation=> {
       if (appelation.label==="") {
-        appelation.label = personLabel({honorificPrefix:appelation.honorificPrefix, firstName:appelation.firstName, middleName:appelation.middleName, lastName:appelation.lastName});
-        console.log(appelation.label)
+        appelation.label = personLabel({firstName:appelation.firstName, middleName:appelation.middleName, lastName:appelation.lastName});
       }
       return appelation;
     });

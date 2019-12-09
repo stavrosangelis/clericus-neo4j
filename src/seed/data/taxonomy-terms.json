@@ -5,6 +5,18 @@
     "taxonomyRef": "organisationTypes"
   },
   {
+    "scopeNote": "A Diocese is a religious administrative location division",
+    "label": "Diocese",
+    "inverseLabel": "Diocese",
+    "taxonomyRef": "organisationTypes" 
+  },
+  {
+    "scopeNote": "A religious order is a religious organisation",
+    "label": "Religious order",
+    "inverseLabel": "Religious Order",
+    "taxonomyRef": "organisationTypes"
+  },
+  {
     "scopeNote": null,
     "label": "depicts",
     "inverseLabel": "isDepictedOn",
@@ -61,7 +73,7 @@
   {
     "scopeNote": null,
     "label": "hasAffiliation",
-    "inverseLabel": "isAffiliatedWith",
+    "inverseLabel": "isAffiliationOf",
     "taxonomyRef": "relationsTypes"
   },
   {

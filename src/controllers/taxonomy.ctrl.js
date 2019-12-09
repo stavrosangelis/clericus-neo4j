@@ -323,7 +323,7 @@ const deleteTaxonomy = async(req, resp) => {
 
 const getTaxonomyTerms = async(_id) =>{
   let session = driver.session();
-  let query = "MATCH (t:Taxonomy) WHERE id(t)="+_id+" MATCH (n:TaxonomyTerm)-[r:isChildOf]->(t) RETURN n";
+  let query = "MATCH (t:Taxonomy) WHERE id(t)="+_id+" MATCH (n:TaxonomyTerm)-[r:isChildOf]->(t) RETURN n ORDER BY n.label";
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )

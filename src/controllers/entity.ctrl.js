@@ -103,7 +103,10 @@ class Entity {
   }
 
   async loadProperties() {
-    let session = driver.session()
+    if (typeof this._id==="undefined" || this._id===null) {
+      return false;
+    }
+    let session = driver.session();
     let query = "MATCH (n:Entity)-[r]->(re:Entity) WHERE id(n)="+this._id+" RETURN n,r,re";
     let relations = await session.writeTransaction(tx=>
       tx.run(query,{})
@@ -299,7 +302,6 @@ const getEntity = async(req, resp) => {
       msg: "Please select a valid id or a valid label to continue.",
     });
   }
-  let _id = parameters._id;
   let entity = null;
     if (typeof parameters._id!=="undefined" && parameters._id!=="") {
       let _id = parameters._id;

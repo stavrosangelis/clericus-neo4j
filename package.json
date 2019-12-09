@@ -1,7 +1,7 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.9.95",
-  "description": "This is an alternate Clericus API using neo4j as a database",
+  "version": "0.11.85",
+  "description": "This is the Clericus API using neo4j as a database",
   "main": "src/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -13,6 +13,8 @@
   "dependencies": {
     "argon2": "^0.24.0",
     "axios": "^0.19.0",
+    "bluebird": "^3.7.2",
+    "body-parser": "^1.19.0",
     "canvas": "^2.6.0",
     "cors": "^2.8.5",
     "crypto-js": "^3.1.9-1",

@@ -110,9 +110,31 @@ const normalizeRecordsOutput = (records) => {
   let output = [];
   for (let i=0; i<records.length; i++) {
     let record = records[i];
+    let labels = null;
+    if (typeof record._fields[0].labels!=="undefined") {
+      labels = record._fields[0].labels;
+    }
     let key = record.keys[0];
     prepareOutput(record);
     let outputItem = outputRecord(record.toObject()[key]);
+    if (labels!==null) {
+      outputItem.systemLabels = labels;
+    }    
+    output.push(outputItem)
+  }
+  return output;
+}
+
+const normalizeGraphRecordsOutput = (records) => {
+  let output = [];
+  for (let i=0; i<records.length; i++) {
+    let record = records[i];;
+    let key = record.keys[0];
+    prepareOutput(record);
+    let outputItem = outputRecord(record.toObject()[key]);
+    if (record.keys.indexOf("count")>-1) {
+      outputItem.count = record.toObject()['count'];
+    }
     output.push(outputItem)
   }
   return output;
@@ -161,7 +183,14 @@ const outputRelation = (relation) => {
 
 const outputPaths = (paths, _id=null) => {
   let output = paths.map((path,i)=>{
-    let segments = path.segments.map(segment=> {
+    let segments = path.segments.filter(segment=>{
+      let end = outputRecord(segment.end);
+      if (end._id===_id) {
+        return false;
+      }
+      return true;
+    })
+    .map(segment=> {
       let start = outputRecord(segment.start);
       start.entityType = segment.start.labels;
       let rel = outputRelation(segment.relationship);
@@ -208,7 +237,7 @@ const loadRelations = async (srcId=null, srcType=null, targetType=null) => {
   let relations = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
-  .then(result=> {
+  .then(async result=> {
     session.close();
     let records = result.records;
     let relations = [];
@@ -218,7 +247,7 @@ const loadRelations = async (srcId=null, srcType=null, targetType=null) => {
       let relation = record.r;
       prepareOutput(relation);
       let targetItem = outputRecord(record.rn);
-      let newRelation = prepareRelation(sourceItem, relation, targetItem);
+      let newRelation = await prepareRelation(sourceItem, relation, targetItem);
       relations.push(newRelation);
     }
     return relations;
@@ -226,13 +255,34 @@ const loadRelations = async (srcId=null, srcType=null, targetType=null) => {
   return relations;
 }
 
-const prepareRelation = (sourceItem, relation, targetItem) => {
+const prepareRelation = async(sourceItem, relation, targetItem) => {
   let newProperty = {
     _id: relation.identity,
     term: {
       label: relation.type,
     },
     ref: targetItem
+  }
+  if (typeof relation.properties.role!=="undefined" && relation.properties.role!==null && relation.properties.role!=="null") {
+    let roleId = relation.properties.role;
+    let session = driver.session()
+    let query = "MATCH (n:TaxonomyTerm) WHERE id(n)="+roleId+" return n";
+    let role = await session.writeTransaction(tx=>
+      tx.run(query,{})
+    )
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0];
+        let key = record.keys[0];
+        let output = record.toObject()[key];
+        output = outputRecord(output);
+        return output;
+      }
+    })
+    newProperty.term.role = role.labelId;
+    newProperty.term.roleLabel = role.label;
   }
   return newProperty;
 }
@@ -241,11 +291,16 @@ const parseRequestData = async(request) =>{
   if( typeof request.headers!=="undefined") {
     const FORM_URLENCODED = 'application/x-www-form-urlencoded';
     if(request.headers['content-type'] === FORM_URLENCODED) {
+      try {
         let body = '';
         await request.on('data', chunk => {
           body += chunk.toString();
         });
         return JSON.parse(body);
+      }
+      catch (error) {
+        return error;
+      }
     }
     else {
       return null;
@@ -272,6 +327,7 @@ module.exports = {
   prepareOutput: prepareOutput,
   prepareParams: prepareParams,
   normalizeRecordsOutput: normalizeRecordsOutput,
+  normalizeGraphRecordsOutput: normalizeGraphRecordsOutput,
   normalizeRelationsOutput: normalizeRelationsOutput,
   readJSONFile: readJSONFile,
   outputRecord: outputRecord,

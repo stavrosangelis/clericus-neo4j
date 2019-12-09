@@ -246,8 +246,8 @@ const cropImg = async(i, total, inputFile, initialX, initialY, width, height, ro
 		canvas.width=width;
     canvas.height=height;
 
-    let left = (width - newWidth)-32;
-    let top = (width - newWidth)-10;
+    let left = (width - newWidth)-12;
+    let top = (width - newWidth)-5;
     if (rotateDegrees<180) {
       top = 0;
     }

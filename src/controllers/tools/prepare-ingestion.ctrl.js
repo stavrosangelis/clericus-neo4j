@@ -4,6 +4,7 @@ const { parse } = require('querystring');
 const assert = require('assert');
 const helpers = require('../../helpers');
 const driver = require("../../config/db-driver");
+const Promise = require("bluebird");
 
 const ExifImage = require('exif').ExifImage;
 const IptcImage = require('node-iptc');
@@ -141,24 +142,31 @@ const classPieceIdentifyDuplicates = async(req, resp) => {
           let matchedFace = nodes[j];
           let score = 0;
           if (matchedFace.firstName.toLowerCase() === firstName.toLowerCase()) {
-            score += 35;
+            score += 50;
+          }
+          else if (helpers.soundex(matchedFace.firstName) === helpers.soundex(firstName)) {
+            score += 25;
           }
           if (matchedFace.lastName.toLowerCase() === lastName.toLowerCase()) {
-            score += 35;
+            score += 50;
           }
-          if (matchedFace.fnameSoundex === helpers.soundex(firstName)) {
-            score += 15;
+          else if (helpers.soundex(matchedFace.lastName) === helpers.soundex(lastName)) {
+            score += 25;
           }
-          if (matchedFace.lnameSoundex === helpers.soundex(lastName)) {
-            score += 15;
-          }
-          if (score>15) {
+          if (score>50) {
             let resources = await helpers.loadRelations(matchedFace._id, "Person", "Resource");
+            let organisations = await helpers.loadRelations(matchedFace._id, "Person", "Organisation");
             matchedFace.resources = resources;
+            matchedFace.organisations = organisations;
             let newFaceMatch = matchedFace;
             newFaceMatch.score = score;
             returnMatches.push(newFaceMatch);
           }
+        }
+        if (returnMatches.length>0) {
+          returnMatches.sort(function (a,b) {
+            return b.score - a.score;
+          });
         }
         face.matches = returnMatches;
         resolve(face);
@@ -179,7 +187,7 @@ const classPieceIdentifyDuplicates = async(req, resp) => {
 
   resp.json({
     status: true,
-    data: duplicates,
+    data: JSON.stringify(duplicates),
     error: false,
     msg: '',
   })
@@ -200,32 +208,21 @@ const ingestClasspiece = async(req, resp) => {
   if (typeof data.classpiece!=="undefined") {
     classpiece = data.classpiece;
 
-    let dbClassPiece = await ingestClasspieceImage(classpiece);
+    dbClassPiece = await ingestClasspieceImage(classpiece);
     classpiece._id = dbClassPiece.data._id;
   }
   // 2. ingest and link faces
   if (typeof data.faces!=="undefined") {
     let faces = data.faces;
     let facesPromises = [];
-    for (let i=0;i<faces.length; i++) {
-      let face = faces[i];
-      let newFace = {};
-
-      let ingestPersonDB = ingestPerson(face, classpiece);
-      facesPromises.push(ingestPersonDB);
+    for (let face of faces) {
+      await ingestPerson(face, classpiece);
     }
-    dbFaces = await Promise.all(facesPromises).then(data=>{
-      return data;
-    })
-    .catch((error)=> {
-      return error;
-    });
   }
 
   let response = {};
   response.classpiece = dbClassPiece;
   response.faces = dbFaces;
-
   resp.json({
     status: true,
     data: response,
@@ -301,8 +298,7 @@ var facesEach = async (dataJson,fileName) => {
   }
 
   let facesdata = await Promise.all(facesDataPromises).then(data=>{return data});
-  let j=0;
-  let faces = dataJson.map(item=> {
+  let faces = dataJson.map((item,j)=> {
     let imageData = facesdata[j];
     let newItem = {};
     let faceData = faceImageData(item, imageData.default);
@@ -316,9 +312,9 @@ var facesEach = async (dataJson,fileName) => {
     newItem.middleName = faceData.middleName;
     newItem.lastName = faceData.lastName;
     newItem.diocese = faceData.diocese;
+    newItem.dioceseType = faceData.dioceseType;
     newItem.default = faceData.default;
     newItem.type = faceData.type;
-    j++;
     return newItem;
   });
   return faces;
@@ -357,10 +353,9 @@ var faceImageResource = async(imgPath) => {
 var faceImageData = (face, imageDefaultData) => {
   let faceObj = {};
   let defaultValues = {};
-  if (typeof face.boundingPoly!=="undefined") {
-    let vertices = face.boundingPoly.vertices;
-    let x = face.boundingPoly.vertices[0].x;
-    let y = face.boundingPoly.vertices[0].y;
+  if (typeof face.faceRectangle!=="undefined") {
+    let x = face.faceRectangle.left;
+    let y = face.faceRectangle.top;
     defaultValues = {x: x,y: y};
   }
   let defaultData = Object.assign(imageDefaultData,defaultValues);
@@ -370,6 +365,7 @@ var faceImageData = (face, imageDefaultData) => {
   let middleName = "";
   let lastName = "";
   let diocese = "";
+  let dioceseType = "";
   let type = "";
   if (typeof face.honorificPrefix!=="undefined") {
     honorificPrefix = face.honorificPrefix;
@@ -386,6 +382,9 @@ var faceImageData = (face, imageDefaultData) => {
   if (typeof face.diocese!=="undefined") {
     diocese = face.diocese;
   }
+  if (typeof face.dioceseType!=="undefined") {
+    dioceseType = face.dioceseType;
+  }
   if (typeof face.type!=="undefined") {
     type = face.type;
   }
@@ -397,6 +396,7 @@ var faceImageData = (face, imageDefaultData) => {
   faceObj.middleName = middleName;
   faceObj.lastName = lastName;
   faceObj.diocese = diocese;
+  faceObj.dioceseType = dioceseType;
   faceObj.type = type;
   faceObj.default = defaultData;
   return faceObj;
@@ -444,63 +444,7 @@ var imgDimensions = (imgPath) => {
   });
 }
 
-var comparePerson = async(personData) => {
-  let firstName = "";
-  let lastName = "";
-  let fnameSoundex = "";
-  let lnameSoundex = "";
-  let query = {};
-  let $and = [];
-
-  if (typeof personData.firstName!=="undefined") {
-    firstName = personData.firstName;
-    if (firstName!=="") {
-      let queryBlock = {"firstName": {"$regex": firstName, "$options": "i"}};
-      $and.push(queryBlock);
-    }
-  }
-  if (typeof personData.lastName!=="undefined") {
-    lastName = personData.lastName;
-    if (lastName!=="") {
-      let queryBlock = {"lastName": {"$regex": lastName, "$options": "i"}};
-      $and.push(queryBlock);
-    }
-  }
-  if (typeof personData.fnameSoundex!=="undefined") {
-    fnameSoundex = personData.fnameSoundex;
-    let queryBlock = {"fnameSoundex": fnameSoundex};
-    $and.push(queryBlock);
-  }
-  if (typeof personData.lnameSoundex!=="undefined") {
-    lnameSoundex = personData.lnameSoundex;
-    let queryBlock = {"lnameSoundex": lnameSoundex};
-    $and.push(queryBlock);
-  }
-  if ($and.length>0) {
-    query = {$and};
-  }
-
-
-  Person.find(query)
-  .exec((error, data) => {
-    if (error) {
-      console.log(error)
-    }
-    else {
-      return data;
-    }
-  });
-}
-
-var parseDataPromise = (req) => {
-  return new Promise((resolve, reject) => {
-    parseRequestData(req, parameters => {
-      resolve(parameters);
-    });
-  });
-}
-
-var ingestClasspieceImage = async (classpiece) => {
+const ingestClasspieceImage = async (classpiece) => {
   let classpieceRef = new TaxonomyTerm({"labelId": "Classpiece"});
   await classpieceRef.load();
 
@@ -552,118 +496,124 @@ var ingestClasspieceImage = async (classpiece) => {
   return classpieceImage;
 }
 
-var ingestPerson = async(person, classpiece) => {
-  // 1. insert/update person
-  if (person.firstName==="") {
-    person.firstName = "Unknown";
-  }
-  if (person.lastName==="") {
-    person.lastName = "Unknown";
-  }
-  let honorificPrefix = null;
-  let firstName = null;
-  let middleName = null;
-  let lastName = null;
-  if (typeof person.honorificPrefix!=="undefined") {
-    honorificPrefix = person.honorificPrefix;
-  }
-  if (typeof person.firstName!=="undefined") {
-    firstName = person.firstName;
-  }
-  if (typeof person.middleName!=="undefined") {
-    middleName = person.middleName;
-  }
-  if (typeof person.lastName!=="undefined") {
-    lastName = person.lastName;
-  }
-  let personData = {
-    honorificPrefix: honorificPrefix,
-    firstName: firstName,
-    middleName: middleName,
-    lastName: lastName,
-  };
-  if (typeof person._id!=="undefined") {
-    personData._id = person._id;
-  }
-  let newPerson = new Person(personData);
-  let ingestPersonPromise = await newPerson.save();
-
-  if (ingestPersonPromise.status) {
-    // assign id to person object
-    person._id = ingestPersonPromise.data._id;
-    person.label = ingestPersonPromise.data.label;
-    // 2. insert/update thumbnail
-    let ingestPersonThumbnailPromise = await ingestPersonThumbnail(person, classpiece);
-
-    // 3. insert diocese
-    let ingestDiocesePromise = await ingestDiocese(person);
-
-    // 4. link person to classpiece
-    if (classpiece!==null) {
-      // 4.1 get person role term id
-      let role = "student";
-      if (typeof person.type!=="undefined") {
-        role = person.type;
-      }
-      let classpieceRelRole = new TaxonomyTerm({labelId: role});
-      await classpieceRelRole.load();
-
-      // 4.2 link classpiece to person
-      let classpieceTaxonomyTerm = new TaxonomyTerm({labelId: "depicts"});
-      await classpieceRelRole.load();
-      let classpieceReference = {
-        items: [
-          {_id: classpiece._id, type: "Resource", role: null},
-          {_id: ingestPersonPromise.data._id, type: "Person", role: classpieceRelRole._id}
-        ],
-        taxonomyTermId: classpieceTaxonomyTerm._id,
-      }
-
-      let insertClasspieceReference = await referencesController.updateReference(classpieceReference);
-
-      // 4.2. link classpiece to thumbnail
-      let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasPart"});
-      await classpieceThumbnailTaxonomyTerm.load();
-
-      let classpieceThumbnailReference = {
-        items: [
-          {_id: classpiece._id, type: "Resource"},
-          {_id: ingestPersonThumbnailPromise.data._id, type: "Resource"}
-        ],
-        taxonomyTermId: classpieceThumbnailTaxonomyTerm._id,
-      }
-
-      let insertClasspieceThumbnailReference = await referencesController.updateReference(classpieceThumbnailReference);
+const ingestPerson = async(person, classpiece) => {
+  let newPerson = await new Promise(async(resolve,reject) => {
+    // 1. insert/update person
+    if (person.firstName==="") {
+      person.firstName = "Unknown";
     }
-
-    // 5. link person to thumbnail
-    let thumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasRepresentationObject"});
-    await thumbnailTaxonomyTerm.load();
-
-    let thumbnailReference = {
-      items: [
-        {_id: ingestPersonPromise.data._id, type: "Person"},
-        {_id: ingestPersonThumbnailPromise.data._id, type: "Resource"},
-      ],
-      taxonomyTermId: thumbnailTaxonomyTerm._id,
+    if (person.lastName==="") {
+      person.lastName = "Unknown";
     }
-    let insertThumbnailReference = await referencesController.updateReference(thumbnailReference);
+    let honorificPrefix = null;
+    let firstName = null;
+    let middleName = null;
+    let lastName = null;
+    if (typeof person.honorificPrefix!=="undefined") {
+      honorificPrefix = person.honorificPrefix;
+    }
+    if (typeof person.firstName!=="undefined") {
+      firstName = person.firstName;
+    }
+    if (typeof person.middleName!=="undefined") {
+      middleName = person.middleName;
+    }
+    if (typeof person.lastName!=="undefined") {
+      lastName = person.lastName;
+    }
+    let personData = {
+      honorificPrefix: honorificPrefix,
+      firstName: firstName,
+      middleName: middleName,
+      lastName: lastName,
+    };
+    if (typeof person._id!=="undefined") {
+      personData._id = person._id;
+    }
+    let newPerson = new Person(personData);
+    let ingestPersonPromise = await newPerson.save();
 
-    // 6. link person to diocese
-    if (typeof ingestDiocesePromise!=="undefined") {
-      let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "hasAffiliation"});
-      await organisationTaxonomyTerm.load();
+    if (ingestPersonPromise.status) {
+      // assign id to person object
+      person._id = ingestPersonPromise.data._id;
+      person.label = ingestPersonPromise.data.label;
+      // 2. insert/update thumbnail
+      let ingestPersonThumbnailPromise = await ingestPersonThumbnail(person, classpiece);
 
-      let organisationReference = {
+      // 3. insert diocese
+      let ingestDiocesePromise = await ingestDiocese(person);
+
+      // 4. link person to classpiece
+      if (classpiece!==null) {
+        // 4.1 get person role term id
+        let role = "student";
+        if (typeof person.type!=="undefined") {
+          role = person.type;
+        }
+        let classpieceRelRole = new TaxonomyTerm({labelId: role});
+        await classpieceRelRole.load();
+
+        // 4.2 link classpiece to person
+        let classpieceTaxonomyTerm = new TaxonomyTerm({labelId: "depicts"});
+        await classpieceTaxonomyTerm.load();
+
+
+        let classpieceReference = {
+          items: [
+            {_id: classpiece._id, type: "Resource", role: null},
+            {_id: ingestPersonPromise.data._id, type: "Person", role: classpieceRelRole._id}
+          ],
+          taxonomyTermId: classpieceTaxonomyTerm._id,
+        }
+
+        let insertClasspieceReference = await referencesController.updateReference(classpieceReference);
+
+        // 4.2. link classpiece to thumbnail
+        let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasPart"});
+        await classpieceThumbnailTaxonomyTerm.load();
+
+        let classpieceThumbnailReference = {
+          items: [
+            {_id: classpiece._id, type: "Resource"},
+            {_id: ingestPersonThumbnailPromise.data._id, type: "Resource"}
+          ],
+          taxonomyTermId: classpieceThumbnailTaxonomyTerm._id,
+        }
+
+        let insertClasspieceThumbnailReference = await referencesController.updateReference(classpieceThumbnailReference);
+      }
+
+      // 5. link person to thumbnail
+      let thumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasRepresentationObject"});
+      await thumbnailTaxonomyTerm.load();
+
+      let thumbnailReference = {
         items: [
           {_id: ingestPersonPromise.data._id, type: "Person"},
-          {_id: ingestDiocesePromise._id, type: "Organisation"},
+          {_id: ingestPersonThumbnailPromise.data._id, type: "Resource"},
         ],
-        taxonomyTermId: organisationTaxonomyTerm._id,
+        taxonomyTermId: thumbnailTaxonomyTerm._id,
       }
-      let insertOrganisationReference = await referencesController.updateReference(organisationReference);
+      let insertThumbnailReference = await referencesController.updateReference(thumbnailReference);
+
+      // 6. link person to diocese
+      if (typeof ingestDiocesePromise!=="undefined") {
+        let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "hasAffiliation"});
+        await organisationTaxonomyTerm.load();
+
+        let organisationReference = {
+          items: [
+            {_id: ingestPersonPromise.data._id, type: "Person"},
+            {_id: ingestDiocesePromise._id, type: "Organisation"},
+          ],
+          taxonomyTermId: organisationTaxonomyTerm._id,
+        }
+        let insertOrganisationReference = await referencesController.updateReference(organisationReference);
+      }
     }
-  }
+    resolve(person);
+  });
+  return newPerson;
 }
 
 const ingestPersonThumbnail = async(person, classpiece) => {
@@ -742,11 +692,14 @@ const ingestPersonThumbnail = async(person, classpiece) => {
 var ingestDiocese = async(person) => {
   let organisation = {};
   organisation.label = person.diocese;
-  organisation.organisationType = 'diocese';
+  organisation.organisationType = person.dioceseType;
 
   // check if organisation exists
   let session = driver.session();
-  let query = "MATCH (n:Organisation) WHERE n.label='"+organisation.label+"' AND n.organisationType='"+organisation.organisationType+"' RETURN n";
+  let query = "MATCH (n:Organisation) WHERE n.label='"+organisation.label+"' RETURN n";
+  if (organisation.organisationType!=="")  {
+    query = "MATCH (n:Organisation) WHERE n.label='"+organisation.label+"' AND n.organisationType='"+organisation.organisationType+"' RETURN n";
+  }
   let existingOrganisation = await session.writeTransaction(tx=>
     tx.run(query,{})
   )

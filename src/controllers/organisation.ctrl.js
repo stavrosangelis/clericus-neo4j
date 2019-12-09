@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Organisation {
-  constructor({_id=null,label=null,labelSoundex=null,description=null,organisationType=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,labelSoundex=null,alternateAppelations=[],description=null,organisationType=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -12,6 +12,7 @@ class Organisation {
     this.description = description;
     this.organisationType = organisationType;
     this.status = status;
+    this.alternateAppelations = alternateAppelations;
     this.createdBy = createdBy;
     this.createdAt = createdAt;
     this.updatedBy = updatedBy;
@@ -24,6 +25,16 @@ class Organisation {
     if (this.label==="") {
       status = false;
       errors.push({field: "label", msg: "The label must not be empty"});
+    }
+    if (this.alternateAppelations.length>0) {
+      for (let key in this.alternateAppelations) {
+        let alternateAppelation = this.alternateAppelations[key];
+        let label = "";
+        if (alternateAppelation.label.length<2) {
+          status = false;
+          errors.push({field: "appelation", msg: "Appelation label must contain at least 2 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
+        }
+      }
     }
     let msg = "The record is valid";
     if (!status) {
@@ -57,6 +68,14 @@ class Organisation {
     })
     for (let key in node) {
       this[key] = node[key];
+      let newAppelations = [];
+      if (key==="alternateAppelations" && node[key].length>0) {
+        for (let akey in node[key]) {
+          let alternateAppelation = JSON.parse(node[key][akey]);
+          newAppelations.push(alternateAppelation);
+        }
+        this[key] = newAppelations;
+      }
     }
 
     // relations
@@ -77,6 +96,14 @@ class Organisation {
     }
     else {
       let session = driver.session();
+      let newAppelations = [];
+      if (this.alternateAppelations.length>0) {
+        for (let key in this.alternateAppelations) {
+          let alternateAppelation = JSON.stringify(this.alternateAppelations[key]);
+          newAppelations.push(alternateAppelation);
+        }
+      }
+      this.alternateAppelations = newAppelations;
       if (this.labelSoundex===null) {
         this.labelSoundex = helpers.soundex(this.label.trim());
       }
@@ -111,19 +138,32 @@ class Organisation {
   }
 
   async delete() {
-    let session = driver.session()
-    let tx = session.beginTransaction()
-    let query = "MATCH (n:Organisation) WHERE id(n)="+this._id+" DELETE n";
-    const resultPromise = await new Promise((resolve, reject)=> {
-      let result = session.run(
-        query,
-        {}
-      ).then(result => {
-        session.close();
-        resolve(result);
-      });
+    let session = driver.session();
+    // 1. delete relations
+    let query1 = "MATCH (n:Organisation)-[r]-() WHERE id(n)="+this._id+" DELETE r";
+    let deleteRel = await session.writeTransaction(tx=>
+      tx.run(query1,{})
+    )
+    .then(result => {
+      session.close();
+      return result;
     })
-    return resultPromise;
+    .catch((error) => {
+      console.log(error)
+    });
+    // 2. delete node
+    let query = "MATCH (n:Organisation) WHERE id(n)="+this._id+" DELETE n";
+    let deleteRecord = await session.writeTransaction(tx=>
+      tx.run(query,{})
+    )
+    .then(result => {
+      session.close();
+      return result;
+    })
+    .catch((error) => {
+      console.log(error)
+    });
+    return deleteRecord;
   }
 
 
@@ -168,7 +208,7 @@ const getOrganisations = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = "MATCH (n:Organisation) "+queryParams+" RETURN n SKIP "+skip+" LIMIT "+limit;
+  query = "MATCH (n:Organisation) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
   let data = await getOrganisationsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -304,8 +344,8 @@ const putOrganisation = async(req, resp) => {
 }
 
 const deleteOrganisation = async(req, resp) => {
-  let parameters = req.query;
-  let organisation = new Organisation();
+  let params = req.query;
+  let organisation = new Organisation(params);
   let data = await organisation.delete();
   resp.json({
     status: true,

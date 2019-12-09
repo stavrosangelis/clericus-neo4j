@@ -5,23 +5,24 @@ const server = express.Router();
 
 // import constrollers
 const authController = require('../controllers/authentication.ctrl')
+const cvisionController = require('../controllers/tools/computer-vision.ctrl');
 const dashboardController = require('../controllers/dashboard.ctrl')
 const entityController = require('../controllers/entity.ctrl');
 const eventController = require('../controllers/event.ctrl');
-const taxonomyController = require('../controllers/taxonomy.ctrl');
+const graphController = require('../controllers/graph.ctrl');
+const languageCodesController = require('../controllers/language.codes.ctrl');
+const organisationController = require('../controllers/organisation.ctrl');
 const personController = require('../controllers/person.ctrl');
 const resourceController = require('../controllers/resource.ctrl');
-const organisationController = require('../controllers/organisation.ctrl');
-const graphController = require('../controllers/graph.ctrl');
 const referencesController = require('../controllers/references.ctrl');
+const seedController = require('../seed/');
+const settingsController = require('../controllers/settings.ctrl');
+const taxonomyController = require('../controllers/taxonomy.ctrl');
 const taxonomyTermController = require('../controllers/taxonomyTerm.ctrl');
 const toolsParseController = require('../controllers/tools/meta-parse.ctrl');
 const toolsIngestionController = require('../controllers/tools/prepare-ingestion.ctrl');
-const cvisionController = require('../controllers/tools/computer-vision.ctrl');
 const userController = require('../controllers/user.ctrl');
 const usergroupController = require('../controllers/usergroup.ctrl');
-const seedController = require('../seed/');
-const settingsController = require('../controllers/settings.ctrl');
 
 // authentication
 passport.use('local', authController.passportLocal);
@@ -47,6 +48,10 @@ server.delete('/event', auth.checkAdminToken, eventController.deleteEvent);
 
 //graph
 server.get('/graph', graphController.getGraphData);
+server.get('/related-nodes', graphController.getRelatedNodes);
+
+// languageCodes
+server.get('/language-codes', languageCodesController.getLanguageCodes);
 
 // person
 server.put('/person', auth.checkAdminToken, personController.putPerson);

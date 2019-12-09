@@ -71,9 +71,36 @@ const updateReference = async(reference) => {
   if (taxonomyTerm._id===null) {
     return false;
   }
-  let query = "MATCH (n1:"+srcItem.type+") WHERE id(n1)="+srcItem._id+" MATCH (n2:"+targetItem.type+") WHERE id(n2)="+targetItem._id+" CREATE UNIQUE (n1)-[:"+taxonomyTerm.labelId+"]->(n2) CREATE UNIQUE (n2)-[:"+taxonomyTerm.inverseLabelId+"]->(n1)";
+  let props = {};
+  let srcRole = "";
+  let targetRole = "";
+  if (
+    (typeof srcItem.role!=="undefined" && srcItem.role!=="" && srcItem.role!==null) ||
+    (typeof targetItem.role!=="undefined" && targetItem.role!=="" && targetItem.role!==null)
+  ) {
+    if (srcItem.role!=="" && (targetItem.role===""|| targetItem.role==="null" || targetItem.role===null)) {
+      targetItem.role = srcItem.role;
+    }
+    else if (targetItem.role!=="" && (srcItem.role==="" || srcItem.role==="null" || srcItem.role===null)) {
+      srcItem.role = targetItem.role;
+    }
+    srcRole = " SET r1={role:'"+srcItem.role+"'}";
+    targetRole = " SET r2={role:'"+targetItem.role+"'}";
+    if (direction==="to") {
+      srcRole = " SET r1={role:'"+targetItem.role+"'}";
+      targetRole = " SET r2={role:'"+srcItem.role+"'}";
+    }
+  }
+
+  let query = "MATCH (n1:"+srcItem.type+") WHERE id(n1)="+srcItem._id
+  +" MATCH (n2:"+targetItem.type+") WHERE id(n2)="+targetItem._id
+  +" CREATE UNIQUE (n1)-[r1:"+taxonomyTerm.labelId+"]->(n2)"+srcRole
+  +" CREATE UNIQUE (n2)-[r2:"+taxonomyTerm.inverseLabelId+"]->(n1)"+targetRole;
   if (direction==="to") {
-    query = "MATCH (n1:"+targetItem.type+") WHERE id(n1)="+targetItem._id+" MATCH (n2:"+srcItem.type+") WHERE id(n2)="+srcItem._id+" CREATE UNIQUE (n1)-[:"+taxonomyTerm.labelId+"]->(n2) CREATE UNIQUE (n2)-[:"+taxonomyTerm.inverseLabelId+"]->(n1)";
+    query = "MATCH (n1:"+targetItem.type+") WHERE id(n1)="+targetItem._id
+    +" MATCH (n2:"+srcItem.type+") WHERE id(n2)="+srcItem._id
+    +" CREATE UNIQUE (n1)-[r1:"+taxonomyTerm.labelId+"]->(n2)"+srcRole
+    +" CREATE UNIQUE (n2)-[r2:"+taxonomyTerm.inverseLabelId+"]->(n1)"+targetRole;
   }
   let resultExec = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -172,9 +199,9 @@ const getReferences = async(req, resp) => {
 
   // 1. query for node
   let session = driver.session()
-  let query = "MATCH p=(n)-[r]->(rn) WHERE id(n)="+_id+" return collect(distinct p) as p";
+  let query = "MATCH p=(n)-[r]->(rn) WHERE id(n)="+_id+" AND NOT id(rn)="+_id+" return collect(distinct p) as p";
   if (steps>1) {
-    query = "MATCH p=(n)-[r*"+steps+"]->(rn) WHERE id(n)="+_id+" return collect(distinct p) as p";
+    query = "MATCH p=(n)-[r*.."+steps+"]->(rn)  WHERE id(n)="+_id+" AND NOT id(rn)="+_id+" return collect(distinct p) as p";
   }
   let results = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -190,7 +217,6 @@ const getReferences = async(req, resp) => {
         output = paths;
       }
     }
-    console.log(output)
     return output;
   });
 
