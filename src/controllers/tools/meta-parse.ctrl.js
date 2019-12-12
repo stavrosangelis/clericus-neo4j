@@ -170,7 +170,7 @@ var highlightFaces = async(inputFile, faces, outputFile, Canvas, outputDir, face
     let height = rectangle.height;
     if (typeof height==="string") {
       height = height.replace("px", "");
-      height = parseInt(width,10);
+      height = parseInt(height,10);
     }
     height = parseInt(height,10);
     context.moveTo(rectangle.left, rectangle.top);
