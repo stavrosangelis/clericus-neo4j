@@ -18,7 +18,7 @@ const archivePath = process.env.ARCHIVEPATH;
 const parseRequestData = helpers.parseRequestData;
 
 const referencesController = require('../references.ctrl')
-const TaxonomyTerm = require('../TaxonomyTerm.ctrl').TaxonomyTerm;
+const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 const Resource = require('../resource.ctrl').Resource;
 const Person = require('../person.ctrl').Person;
 const Organisation = require('../organisation.ctrl').Organisation;

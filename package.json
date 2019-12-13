@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "NODE_ENV=production pm2 start ./src/app.js --name clericus",
-    "dev": "NODE_ENV=development nodemon ./src/app.js"
+    "dev": "NODE_ENV=development nodemon ./src/app.js",
+    "pm2-dev": "NODE_ENV=development pm2 start ./src/app.js --name clericus-dev"
   },
   "author": "Stavros Angelis",
   "license": "ISC",

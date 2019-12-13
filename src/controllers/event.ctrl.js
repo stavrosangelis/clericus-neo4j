@@ -1,7 +1,7 @@
 const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 const updateReference = require("./references.ctrl").updateReference;
-const TaxonomyTerm = require("./TaxonomyTerm.ctrl").TaxonomyTerm;
+const TaxonomyTerm = require("./taxonomyTerm.ctrl").TaxonomyTerm;
 
 class Event {
   constructor({_id=null,label=null,description=null,eventType=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {

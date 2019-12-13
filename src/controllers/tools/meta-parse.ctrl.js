@@ -602,7 +602,7 @@ const createCompressed = async(srcPath=null, targetPath=null, fileName=null, cus
 }
 
 const updateClassPieceFaces = async(req, resp) => {
-  let parameters = await helpers.parseRequestData(req, data =>data);
+  let parameters = req.body;
   let file = "";
   if (typeof parameters.file!=="undefined") {
     file = parameters.file;
