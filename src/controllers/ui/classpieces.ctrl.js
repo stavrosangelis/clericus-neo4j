@@ -162,6 +162,9 @@ const getClasspiece = async(req, resp) => {
   if (typeof classpiece.metadata==="string") {
     classpiece.metadata = JSON.parse(classpiece.metadata);
   }
+  if (typeof classpiece.metadata==="string") {
+    classpiece.metadata = JSON.parse(classpiece.metadata);
+  }
   if (typeof classpiece.paths[0]==="string") {
     classpiece.paths = classpiece.paths.map(p=>{
       let path = JSON.parse(p);
