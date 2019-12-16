@@ -3,7 +3,7 @@ const passport = require('passport');
 const auth = require('./auth');
 const server = express.Router();
 
-// import constrollers
+// admin controllers
 const authController = require('../controllers/authentication.ctrl')
 const cvisionController = require('../controllers/tools/computer-vision.ctrl');
 const dashboardController = require('../controllers/dashboard.ctrl')
@@ -24,6 +24,17 @@ const toolsIngestionController = require('../controllers/tools/prepare-ingestion
 const userController = require('../controllers/user.ctrl');
 const usergroupController = require('../controllers/usergroup.ctrl');
 
+// ui constrollers
+const analyticsController = require('../controllers/ui/analytics.ctrl')
+const classpiecesController = require('../controllers/ui/classpieces.ctrl')
+
+// ******* ui endpoints ******** //
+server.get('/generic-stats', analyticsController.genericStats);
+server.get('/classpieces', classpiecesController.getClasspieces);
+server.get('/classpiece', classpiecesController.getClasspiece);
+
+
+// ******* admin endpoints ******** //
 // authentication
 passport.use('local', authController.passportLocal);
 server.post('/login', authController.loginUser);

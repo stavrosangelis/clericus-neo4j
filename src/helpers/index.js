@@ -119,7 +119,7 @@ const normalizeRecordsOutput = (records) => {
     let outputItem = outputRecord(record.toObject()[key]);
     if (labels!==null) {
       outputItem.systemLabels = labels;
-    }    
+    }
     output.push(outputItem)
   }
   return output;
@@ -337,4 +337,5 @@ module.exports = {
   loadRelations: loadRelations,
   parseRequestData: parseRequestData,
   escapeRegExp: escapeRegExp,
+  prepareRelation: prepareRelation,
 }

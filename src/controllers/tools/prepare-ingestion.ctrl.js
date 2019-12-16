@@ -454,7 +454,7 @@ const ingestClasspieceImage = async (classpiece) => {
 
     let hashedName = hashFileName(classpiece.label)+"."+fileExtension;
 
-    let fullsizeSrc = resourcesPath+"images/processed/fullsize/"+classpiece.fileName;
+    let fullsizeSrc = resourcesPath+"images/processed/compressed/"+classpiece.fileName;
     let fullsizeTarget = archivePath+"images/fullsize/"+hashedName;
     let fullsizePath = "images/fullsize/"+hashedName;
     copyFile(fullsizeSrc, fullsizeTarget);
