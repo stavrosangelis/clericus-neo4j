@@ -1,6 +1,26 @@
 const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
+/**
+* @api {get} /graph Get graph
+* @apiName get graph
+* @apiGroup Network graph
+*
+* @apiParam {boolean} [events] Whether to load events data.
+* @apiParam {boolean} [organisations] Whether to load organisations data.
+* @apiParam {boolean} [people] Whether to load people data.
+* @apiParam {boolean} [resources] Whether to load resources data.
+* @apiSuccessExample {json} Success-Response:
+{
+	"status": true,
+	"data": {
+		"nodes": [...],
+		"links": [...]
+	},
+	"error": [],
+	"msg": "Query results"
+}
+*/
 const getGraphData = async (req, resp) => {
   let params = req.query;
   let eventsLoad = true;
@@ -214,7 +234,15 @@ const parseReferences = (refs) =>{
 const flattenDeep = (arr1) => {
    return arr1.reduce((acc, val) => Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val), []);
 }
-
+/**
+* @api {get} /related-nodes Get related nodes
+* @apiName get related-nodes
+* @apiGroup Network graph
+*
+* @apiParam {string} _id The id of the source node.
+* @apiParam {number=1..6} [steps] The number of steps to take in the graph to get the related nodes
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":[{"lastName":"Alamain","firstName":"Colm","honorificPrefix":[""],"middleName":"","label":"Colm  Alamain","alternateAppelations":[],"status":false,"_id":"45","systemLabels":["Person"]},{"firstName":"Tomas","lastName":"O Hogain","honorificPrefix":[""],"middleName":"","label":"Tomas  O Hogain","alternateAppelations":[],"status":false,"_id":"187","systemLabels":["Person"]}],"error":[],"msg":"Query results"}*/
 const getRelatedNodes = async(req, resp) => {
   let parameters = req.query;
   if (typeof parameters._id==="undefined") {
@@ -224,6 +252,7 @@ const getRelatedNodes = async(req, resp) => {
       error: "Please provide a valid node id to continue",
       msg: "Query results",
     });
+    return false;
   }
   let _id = parameters._id;
   let steps = 1;
@@ -252,6 +281,7 @@ const getRelatedNodes = async(req, resp) => {
     msg: "Query results",
   });
 }
+
 module.exports = {
   getGraphData: getGraphData,
   getRelatedNodes: getRelatedNodes,

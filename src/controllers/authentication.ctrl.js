@@ -125,7 +125,7 @@ const loginUser = async (req, resp) => {
       const user = passportUser;
       user.token = passportUser.generateJWT();
 
-      let returnUser = new UserClass(user._id, user.firstName, user.lastName, user.email, null, user.token);
+      let returnUser = new User(user._id, user.firstName, user.lastName, user.email, null, user.token);
       resp.json({
         status: true,
         data: returnUser,
@@ -144,6 +144,40 @@ const loginUser = async (req, resp) => {
   })(req, resp);
 }
 
+/**
+* @api {post} /admin-login Admin login
+* @apiName admin-login
+* @apiGroup Session
+* @apiPermission admin
+*
+* @apiParam {string} email The user email
+* @apiParam {string} password The user password
+*
+* @apiSuccessExample {json} Success-Response:
+{
+    "status": true,
+    "data": {
+        "_id": "260",
+        "firstName": "Admin",
+        "lastName": "",
+        "email": "admin@test.com",
+        "usergroup": {
+            "description": "This group has access to the back-end",
+            "isDefault": false,
+            "isAdmin": true,
+            "label": "Administrator",
+            "_id": "401"
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3N1ZXIiOiJDbGVyaWN1cyBhcHAiLCJlbWFpbCI6ImFkbWluQHRlc3QuY29tIiwiaWQiOiIyNjAiLCJleHBpcmVzSW4iOiIyMDIwLTAxLTE1VDExOjQ1OjM5LjYwOVoiLCJhbGdvcml0aG0iOiJSUzI1NiIsImlzQWRtaW4iOnRydWUsImlhdCI6MTU3OTAwMjMzOX0.LJsBRcM3J5d_wvm4wneQCRDeN3mBRArmCgaosMQzl-0",
+        "createdBy": null,
+        "createdAt": null,
+        "updatedBy": null,
+        "updatedAt": null
+    },
+    "error": [],
+    "msg": ""
+}
+*/
 const loginAdmin = async (req, resp) => {
   let postData = req.body;
   if(!postData.email) {
@@ -153,6 +187,7 @@ const loginAdmin = async (req, resp) => {
       error: "Please enter a valid email address to continue",
       msg: "",
     });
+    return false;
   }
 
   if(!postData.password) {
@@ -162,8 +197,9 @@ const loginAdmin = async (req, resp) => {
       error: "Please enter your password to continue",
       msg: "",
     });
+    return false;
   }
-  
+
   return passport.authenticate('admin', { session: false }, (error, passportUser, info) => {
     if(error) {
       return resp.json({
@@ -172,6 +208,7 @@ const loginAdmin = async (req, resp) => {
         error: error,
         msg: "",
       });
+      return false;
     }
 
     if(passportUser) {
@@ -198,7 +235,17 @@ const loginAdmin = async (req, resp) => {
 
 const registerUser = async (req, resp) => {
   let postData = req.body;
-  let user = new UserClass();
+  let emailRegEx = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
+  if (typeof postData.email==="undefined" || postData.email==="" || postData.email.search(emailRegEx) === -1) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please enter a valid email address to continue",
+    });
+    return false;
+  }
+  let user = new User();
   for (let key in postData) {
     if (postData[key]!==null) {
       user[key] = postData[key];
@@ -213,6 +260,22 @@ const registerUser = async (req, resp) => {
   });
 }
 
+/**
+* @api {post} /admin-session Admin session
+* @apiName admin-session
+* @apiGroup Session
+* @apiPermission admin
+*
+* @apiParam {string} token An active jwt token
+*
+* @apiSuccessExample {json} Success-Response:
+{
+  "status":true,
+  "data":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3N1ZXIiOiJDbGVyaWN1cyBhcHAiLCJlbWFpbCI6ImFkbWluQHRlc3QuY29tIiwiaWQiOiIyNjAiLCJleHBpcmVzSW4iOiIyMDIwLTAxLTE1VDExOjU2OjEwLjQ3OFoiLCJhbGdvcml0aG0iOiJSUzI1NiIsImlzQWRtaW4iOnRydWUsImlhdCI6MTU3OTAwMjk3MH0.O1i9yxQDjeBt0XMaqNzLnAiuBQvtoA3GEo0JDEAdn3M",
+  "error":false,
+  "msg":"Token successfully verified"
+}
+*/
 const activeSession = async (req, resp) => {
   let parameters = req.body;
   if (typeof parameters.token==="undefined" || parameters.token==="") {

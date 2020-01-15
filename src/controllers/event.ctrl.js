@@ -109,27 +109,45 @@ class Event {
   }
 
   async delete() {
-    let session = driver.session()
-    let queryRel = "MATCH (n:Event)-[r]->() WHERE id(n)="+this._id+" AND n.locked=false DELETE r";
-    let queryNode = "MATCH (n:Event) WHERE id(n)="+this._id+"  AND n.locked=false DELETE n"
+    let session = driver.session();
+    // 1. delete relations
+    let query1 = "MATCH (n:Event)-[r]-() WHERE id(n)="+this._id+" DELETE r";
     let deleteRel = await session.writeTransaction(tx=>
-      tx.run(queryRel,{})
+      tx.run(query1,{})
     )
-    .then(async result=> {
+    .then(result => {
       session.close();
       return result;
+    })
+    .catch((error) => {
+      console.log(error)
     });
-    let deleteNode = await session.writeTransaction(tx=>
-      tx.run(queryNode,{})
+    // 2. delete node
+    let query = "MATCH (n:Event) WHERE id(n)="+this._id+" DELETE n";
+    let deleteRecord = await session.writeTransaction(tx=>
+      tx.run(query,{})
     )
-    .then(async result=> {
+    .then(result => {
       session.close();
       return result;
+    })
+    .catch((error) => {
+      console.log(error)
     });
-    return {relations: deleteRel.summary.counters._stats, node: deleteNode.summary.counters._stats};
+    return deleteRecord;
   }
 };
-
+/**
+* @api {get} /events Get events
+* @apiName get events
+* @apiGroup Events
+*
+* @apiParam {string} [label] A string to match against the events labels.
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"currentPage":1,"data":[{"createdAt":"2020-01-14T14:48:31.753Z","updatedBy":"260","createdBy":"260","description":"test event description","label":"Test event","eventType":"293","updatedAt":"2020-01-14T14:48:31.753Z","_id":"2255","systemLabels":["Event"]}],"totalItems":"1","totalPages":1},"error":[],"msg":"Query results"}
+*/
 const getEvents = async (req, resp) => {
   let parameters = req.query;
   let label = "";
@@ -163,7 +181,7 @@ const getEvents = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = "MATCH (n:Event) "+queryParams+" RETURN n ORDER BY n.label";
+  query = "MATCH (n:Event) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
   let data = await getEventsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -202,6 +220,7 @@ const prepareRelations = (records) => {
   }
   return relations;
 }
+
 const prepareRelation = (sourceItem, relation, targetItem) => {
   let newProperty = {
     _id: relation.idevent,
@@ -218,14 +237,14 @@ const prepareRelation = (sourceItem, relation, targetItem) => {
 
 const getEventsQuery = async (query, queryParams, limit) => {
   let session = driver.session();
-  let nodes = await session.writeTransaction(tx=>
+  let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
   .then(result=> {
-    let records = result.records;
-    let outputRecords = helpers.normalizeRecordsOutput(records);
-    return outputRecords;
+    return result.records;
   });
+
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
 
   let count = await session.writeTransaction(tx=>
     tx.run("MATCH (n:Event) "+queryParams+" RETURN count(*)")
@@ -247,31 +266,29 @@ const getEventsQuery = async (query, queryParams, limit) => {
   return result;
 }
 
+/**
+* @api {get} /event Get event
+* @apiName get event
+* @apiGroup Events
+*
+* @apiParam {string} _id The _id of the requested event.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"2255","label":"Test event","description":"test event description","eventType":"293","createdBy":null,"createdAt":null,"updatedBy":"260","updatedAt":"2020-01-14T15:00:13.430Z","events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
+*/
 const getEvent = async(req, resp) => {
   let parameters = req.query;
-  if (
-    (typeof parameters._id==="undefined" || parameters._id==="") &&
-    (typeof parameters.labelId==="undefined" || parameters.labelId==="")
-  ) {
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
     resp.json({
       status: false,
       data: [],
       error: true,
       msg: "Please select a valid id or a valid label to continue.",
     });
+    return false;
   }
   let _id = parameters._id;
-  let event = null;
-    if (typeof parameters._id!=="undefined" && parameters._id!=="") {
-      let _id = parameters._id;
-      event = new Event({_id:_id});
-      await event.load();
-    }
-    else if (typeof parameters.labelId!=="undefined" && parameters.labelId!=="") {
-      let labelId = parameters.labelId;
-      event = new Event({labelId:labelId});
-      await event.loadByLabelId();
-    }
+  let event = new Event({_id:_id});
+  await event.load();
   resp.json({
     status: true,
     data: event,
@@ -280,8 +297,30 @@ const getEvent = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /event Put event
+* @apiName put event
+* @apiGroup Events
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the event. This should be undefined|null|blank in the creation of a new event.
+* @apiParam {string} label The label of the event.
+* @apiParam {string} [description] The description of the event.
+* @apiParam {string} [eventType] The event type.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"createdAt":"2020-01-14T14:48:31.753Z","updatedBy":"260","createdBy":"260","description":"test event descriptiomn","label":"Test event","eventType":"293","updatedAt":"2020-01-14T14:48:31.753Z","_id":"2255"},"error":[],"msg":"Query results"}
+*/
 const putEvent = async(req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The event data must not be empty",
+    });
+    return false;
+  }
   let now = new Date().toISOString();
   let userId = req.decoded.id;
   if (typeof postData._id==="undefined" || postData._id===null) {
@@ -300,14 +339,69 @@ const putEvent = async(req, resp) => {
   });
 }
 
+/**
+* @api {delete} /event Delete event
+* @apiName delete event
+* @apiGroup Events
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the event for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Event) WHERE id(n)=569 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":28,"high":0}}},"error":[],"msg":"Query results"}
+*/
 const deleteEvent = async(req, resp) => {
   let parameters = req.query;
-  console.log(parameters._id)
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select a valid id or a valid label to continue.",
+    });
+    return false;
+  }
   let event = new Event({_id: parameters._id});
   let data = await event.delete();
   resp.json({
     status: true,
     data: data,
+    error: [],
+    msg: "Query results",
+  });
+}
+
+/**
+* @api {delete} /events Delete events
+* @apiName delete events
+* @apiGroup Events
+* @apiPermission admin
+*
+* @apiParam {array} _ids The ids of the events for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":[{"records":[],"summary":{"statement":{"text":"MATCH (n:Event) WHERE id(n)=1149 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":6,"high":0}}}],"error":[],"msg":"Query results"}
+*/
+const deleteEvents = async(req, resp) => {
+  let deleteData = req.body;
+  if (typeof deleteData._ids==="undefined" || deleteData._ids.length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select valid ids to continue.",
+    });
+    return false;
+  }
+  let responseData = [];
+  for (let i=0; i<deleteData._ids.length; i++) {
+    let _id = deleteData._ids[i];
+    let event = new Event({_id: _id});
+    responseData.push(await event.delete());
+  }
+  resp.json({
+    status: true,
+    data: responseData,
     error: [],
     msg: "Query results",
   });
@@ -319,4 +413,5 @@ module.exports = {
   getEvent: getEvent,
   putEvent: putEvent,
   deleteEvent: deleteEvent,
+  deleteEvents: deleteEvents,
 };

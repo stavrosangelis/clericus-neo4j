@@ -33,14 +33,16 @@ server.get('/generic-stats', analyticsController.genericStats);
 server.get('/classpieces', classpiecesController.getClasspieces);
 server.get('/classpiece', classpiecesController.getClasspiece);
 
-
+/**
+* @apiDefine admin This endpoint is only available to users with administrator priviledges
+*/
 // ******* admin endpoints ******** //
 // authentication
 passport.use('local', authController.passportLocal);
-server.post('/login', authController.loginUser);
+//server.post('/login', authController.loginUser);
 server.post('/admin-login', authController.loginAdmin);
 server.post('/admin-session', auth.checkAdminToken, authController.activeSession);
-server.post('/register', authController.registerUser);
+//server.post('/register', authController.registerUser);
 
 // dashboard
 server.get('/dashboard', auth.checkAdminToken, dashboardController.dashboardStats);
@@ -56,6 +58,7 @@ server.put('/event', auth.checkAdminToken, eventController.putEvent);
 server.get('/event', eventController.getEvent);
 server.get('/events', eventController.getEvents);
 server.delete('/event', auth.checkAdminToken, eventController.deleteEvent);
+server.delete('/events', auth.checkAdminToken, eventController.deleteEvents);
 
 //graph
 server.get('/graph', graphController.getGraphData);
@@ -69,19 +72,22 @@ server.put('/person', auth.checkAdminToken, personController.putPerson);
 server.get('/person', personController.getPerson);
 server.get('/people', personController.getPeople);
 server.delete('/person', auth.checkAdminToken, personController.deletePerson);
+server.delete('/people', auth.checkAdminToken, personController.deletePeople);
 
 // resources
 server.put('/resource', auth.checkAdminToken, resourceController.putResource);
 server.post('/upload-resource', auth.checkAdminToken, resourceController.uploadResource);
-server.get('/resource', auth.checkAdminToken, resourceController.getResource);
+server.get('/resource',  resourceController.getResource);
 server.get('/resources', resourceController.getResources);
 server.delete('/resource', auth.checkAdminToken, resourceController.deleteResource);
+server.delete('/resources', auth.checkAdminToken, resourceController.deleteResources);
 
 // organisations
 server.put('/organisation', auth.checkAdminToken, organisationController.putOrganisation);
 server.get('/organisation', organisationController.getOrganisation);
 server.get('/organisations', organisationController.getOrganisations);
 server.delete('/organisation', auth.checkAdminToken, organisationController.deleteOrganisation);
+server.delete('/organisations', auth.checkAdminToken, organisationController.deleteOrganisations);
 
 // references
 server.get('/references', auth.checkAdminToken, referencesController.getReferences);

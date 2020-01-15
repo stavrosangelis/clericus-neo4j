@@ -2,12 +2,13 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Taxonomy {
-  constructor({_id=null,label=null,locked=false,description=null,systemType=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,labelId=null,locked=false,description=null,systemType=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
     }
     this.label = label;
+    this.labelId = labelId;
     this.locked = locked;
     this.description = description;
     this.systemType = systemType;
@@ -102,7 +103,9 @@ class Taxonomy {
       let newData = this;
       // normalize label id
       if (typeof this._id==="undefined" || this._id===null) {
-        this.labelId = helpers.normalizeLabelId(this.label);
+        let normalizedLabel = helpers.normalizeLabelId(this.label);
+        this.labelId = normalizedLabel;
+        this.systemType = helpers.lowerCaseOnlyFirst(normalizedLabel);
       }
       else {
         await this.load();
@@ -130,10 +133,10 @@ class Taxonomy {
         let output = {error: ["The record cannot be updated"], status: false, data: []};
         if (records.length>0) {
           let record = records[0];
-          let key = record.keys[0]
-          let outputRecord = record.toObject()[key];
-          helpers.prepareOutput(outputRecord);
-          output = {error: [], status: true, data: outputRecord};
+          let key = record.keys[0];
+          let resultRecord = record.toObject()[key];
+          resultRecord = helpers.outputRecord(resultRecord);
+          output = {error: [], status: true, data: resultRecord};
         }
         return output;
       });
@@ -158,15 +161,27 @@ class Taxonomy {
     return deleteRecord;
   }
 };
-
+/**
+* @api {get} /taxonomies Get taxonomies
+* @apiName get taxonomies
+* @apiGroup Taxonomies
+*
+* @apiParam {string} [systemType] A systemType to match against the taxonomies' systemType.
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"currentPage":1,"data":[{"systemType":"eventTypes","description":"The Event types taxonomy contains a list of all the possible event types","label":"Event types","labelId":"EventTypes","locked":true,"_id":"81","systemLabels":["Taxonomy"]},{"systemType":"organisationTypes","description":"","label":"Organisation types","labelId":"OrganisationTypes","locked":true,"_id":"140","systemLabels":["Taxonomy"]},{"systemType":"peopleRoles","description":"","label":"People roles","labelId":"PeopleRoles","locked":true,"_id":"1","systemLabels":["Taxonomy"]},{"systemType":"relationsTypes","description":"The Relations types taxonomy contains the possible relations between the data model entities e.g. [entity]Resource [relation]depicts [entity]Person.","label":"Relations types","labelId":"RelationsTypes","locked":true,"_id":"178","systemLabels":["Taxonomy"]},{"systemType":"resourceSystemTypes","description":"","label":"Resource system types","labelId":"ResourceSystemTypes","locked":true,"_id":"0","systemLabels":["Taxonomy"]},{"systemType":"userGroups","description":"The available user groups relations to users","label":"User groups","labelId":"UserGroups","locked":true,"_id":"101","systemLabels":["Taxonomy"]}],"totalItems":"6","totalPages":1},"error":[],"msg":"Query results"}
+*/
 const getTaxonomies = async (req, resp) => {
   let parameters = req.query;
+  let systemType = null;
   let page = 0;
   let queryPage = 0;
   let limit = 25;
-  let queryParams = {};
 
-  let systemType = null;
+  let query = "";
+  let queryParams = "";
+
   if (typeof parameters.systemType!=="undefined") {
     systemType = parameters.systemType;
     queryParams.systemType = systemType;
@@ -184,12 +199,12 @@ const getTaxonomies = async (req, resp) => {
     currentPage = 1;
   }
 
-  let skip = limit*page;
-  let nodeProperties = helpers.prepareNodeProperties(queryParams);
-  let params = helpers.prepareParams(queryParams);
-
-  let query = "MATCH (n:Taxonomy "+nodeProperties+")";
-  let data = await getTaxonomiesQuery(query, params, skip, limit);
+  let skip = limit*queryPage;
+  if (queryParams!=="") {
+    queryParams = "WHERE "+queryParams;
+  }
+  query = "MATCH (n:Taxonomy) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
+  let data = await getTaxonomiesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -214,25 +229,18 @@ const getTaxonomies = async (req, resp) => {
   }
 }
 
-const getTaxonomiesQuery = async (query, params, skip, limit) => {
+const getTaxonomiesQuery = async (query, queryParams, limit) => {
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query+" RETURN n SKIP "+skip+" LIMIT "+limit,params)
+    tx.run(query,{})
   )
   .then(result=> {
     session.close();
     return result.records;
   })
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
-  let nodesOutput = [];
-  for (let key in nodes) {
-    let node = nodes[key];
-    //let nodeOutput = node;
-    //nodeOutput.taxonomyterms = await getTaxonomyTerms(node._id);
-    nodesOutput.push(node);
-  }
   let count = await session.writeTransaction(tx=>
-    tx.run(query+"RETURN count(*)", params)
+    tx.run("MATCH (n:Taxonomy) "+queryParams+" RETURN count(*)")
   )
   .then(result=> {
     session.close();
@@ -242,27 +250,37 @@ const getTaxonomiesQuery = async (query, params, skip, limit) => {
     let output = countObj['count(*)'];
     return output;
   });
-  let totalPages = Math.ceil(count/limit)
+  let totalPages = Math.ceil(count/limit);
   let result = {
-    nodes: nodesOutput,
+    nodes: nodes,
     count: count,
     totalPages: totalPages
   }
   return result;
 }
 
+/**
+* @api {get} /taxonomy Get taxonomy
+* @apiName get taxonomy
+* @apiGroup Taxonomies
+*
+* @apiParam {string} _id The _id of the requested taxonomy. Either the _id or the systemType should be provided.
+* @apiParam {string} systemType The systemType of the requested taxonomy. Either the _id or the systemType should be provided.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"140","label":"Organisation types","locked":true,"description":"","systemType":"organisationTypes","createdBy":null,"createdAt":null,"updatedBy":null,"updatedAt":null,"labelId":"OrganisationTypes","taxonomyterms":[{"inverseLabel":"Administrative area","inverseLabelId":"AdministrativeArea","labelId":"AdministrativeArea","count":0,"label":"Administrative area","locked":false,"scopeNote":"This is an organisation that can be viewed as an administrative location division e.g. a diocese, a municipality etc.","_id":"179","systemLabels":["TaxonomyTerm"]},{"inverseLabel":"Diocese","inverseLabelId":"Diocese","labelId":"Diocese","count":0,"label":"Diocese","locked":false,"scopeNote":"A Diocese is a religious administrative location division","_id":"20","systemLabels":["TaxonomyTerm"]},{"inverseLabel":"Religious Order","inverseLabelId":"ReligiousOrder","labelId":"ReligiousOrder","count":0,"label":"Religious order","locked":false,"scopeNote":"A religious order is a religious organisation","_id":"141","systemLabels":["TaxonomyTerm"]}]},"error":[],"msg":"Query results"}
+*/
 const getTaxonomy = async(req, resp) => {
   let parameters = req.query;
   if (
-      (typeof parameters._id==="undefined" && parameters._id==="") ||
-      (typeof parameters.systemType==="undefined" && parameters.systemType==="")
-    ) {
+    (typeof parameters._id==="undefined" || parameters._id==="") && (typeof parameters.systemType==="undefined" || parameters.systemType==="")
+  ) {
     resp.json({
       status: false,
       data: [],
       error: true,
       msg: "Please select a valid id to continue.",
     });
+    return false;
   }
   let _id=null, systemType=null;
   if (typeof parameters._id!=="undefined" && parameters._id!=="") {
@@ -289,8 +307,34 @@ const getTaxonomy = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /taxonomy Put taxonomy
+* @apiName put taxonomy
+* @apiGroup Taxonomies
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the taxonomy. This should be undefined|null|blank in the creation of a new taxonomy.
+* @apiParam {string} label The taxonomy's label.
+* @apiParam {boolean} [locked=false] If the taxonomy can be updated or not.
+* @apiParam {string} [description] A description about the taxonomy.
+* @apiExample {json} Example:
+* {
+  "label":"Test",
+  "description":"test description"
+}
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"createdAt":"2020-01-15T12:56:39.387Z","updatedBy":"260","labelId":"Test","createdBy":"260","systemType":"test","description":"","label":"Test","locked":false,"updatedAt":"2020-01-15T12:56:39.387Z","_id":"2480"},"error":[],"msg":"Query results"}*/
 const putTaxonomy = async(req, resp) => {
   let parameters = req.body;
+  if (Object.keys(parameters).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The taxonomy must not be empty",
+    });
+    return false;
+  }
   let now = new Date().toISOString();
   let userId = req.decoded.id;
   if (typeof parameters._id==="undefined" || parameters._id===null) {
@@ -309,6 +353,16 @@ const putTaxonomy = async(req, resp) => {
   });
 }
 
+/**
+* @api {delete} /taxonomy Delete taxonomy
+* @apiName delete taxonomy
+* @apiGroup Taxonomies
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the taxonomy for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Taxonomy) WHERE id(n)=2480 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":1,"high":0}}},"error":[],"msg":"Query results"}*/
 const deleteTaxonomy = async(req, resp) => {
   let postData = req.body;
   let taxonomy = new Taxonomy(postData);

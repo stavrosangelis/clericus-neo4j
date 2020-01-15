@@ -45,7 +45,7 @@ class TaxonomyTerm {
   }
 
   async load() {
-    if (this._id===null && this.labelId==="" && this.inverseLabel==="") {
+    if (this._id===null && this.labelId==="" && this.inverseLabelId==="") {
       return false;
     }
     let session = driver.session()
@@ -56,8 +56,8 @@ class TaxonomyTerm {
     else if (this.labelId!==null) {
       query = "MATCH (n:TaxonomyTerm {labelId: '"+this.labelId+"'}) return n";
     }
-    else if (this.inverseLabel!==null) {
-      query = "MATCH (n:TaxonomyTerm {inverseLabel: '"+this.inverseLabel+"'}) return n";
+    else if (this.inverseLabelId!==null) {
+      query = "MATCH (n:TaxonomyTerm {inverseLabelId: '"+this.inverseLabelId+"'}) return n";
     }
     else {
       return false;
@@ -84,7 +84,7 @@ class TaxonomyTerm {
   }
 
   async countRelations() {
-    if (this._id===null || this.label==="") {
+    if (this._id===null || this.labelId==="") {
       return false;
     }
     let session = driver.session();
@@ -194,20 +194,45 @@ class TaxonomyTerm {
   }
 
 };
-
+/**
+* @api {get} /taxonomy-terms Get taxonomy terms
+* @apiName get taxonomy terms
+* @apiGroup Taxonomy terms
+*
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{
+    "status": true,
+    "data": {
+        "currentPage": 1,
+        "data": [
+            {
+                "inverseLabel": "Diocese",
+                "inverseLabelId": "Diocese",
+                "labelId": "Diocese",
+                "count": 0,
+                "label": "Diocese",
+                "locked": false,
+                "scopeNote": "A Diocese is a religious administrative location division",
+                "_id": "20",
+                "systemLabels": [
+                    "TaxonomyTerm"
+                ]
+            }
+        ],
+        "totalItems": 60,
+        "totalPages": 3
+    },
+    "error": [],
+    "msg": "Query results"
+}
+*/
 const getTaxonomyTerms = async (req, resp) => {
   let parameters = req.query;
-  let label = "";
-  let firstName = "";
-  let lastName = "";
-  let fnameSoundex = "";
-  let lnameSoundex = "";
-  let _id = "";
-  let description = "";
   let page = 0;
   let queryPage = 0;
   let limit = 25;
-
 
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
@@ -268,6 +293,7 @@ const getTaxonomyTermsQuery = async (query, limit) => {
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
     let output = countObj['count(*)'];
+    output = parseInt(output,10);
     return output;
   });
   let totalPages = Math.ceil(count/limit)
@@ -279,15 +305,29 @@ const getTaxonomyTermsQuery = async (query, limit) => {
   return result;
 }
 
+/**
+* @api {get} /taxonomy-term Get taxonomy term
+* @apiName get taxonomy term
+* @apiGroup Taxonomy terms
+*
+* @apiParam {string} _id The _id of the requested taxonomy term. Either the _id or the labelId or the inverseLabelId should be provided.
+* @apiParam {string} labelId The labelId of the requested taxonomy term. Either the _id or the labelId or the inverseLabelId should be provided.
+* @apiParam {string} inverseLabelId The inverseLabelId of the requested taxonomy term. Either the _id or the labelId or the inverseLabelId should be provided.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"87","label":"Classpiece","labelId":"Classpiece","locked":false,"inverseLabel":"Classpiece","inverseLabelId":"Classpiece","scopeNote":null,"count":"0","createdBy":null,"createdAt":null,"updatedBy":null,"updatedAt":null},"error":[],"msg":"Query results"}
+*/
 const getTaxonomyTerm = async(req, resp) => {
   let parameters = req.query;
-  if ((typeof parameters._id==="undefined" && parameters._id==="") || (typeof parameters.labelId==="undefined" && parameters.labelId==="")) {
+  if (
+    (typeof parameters._id==="undefined" || parameters._id==="") && (typeof parameters.labelId==="undefined" || parameters.labelId==="")
+  ) {
     resp.json({
       status: false,
       data: [],
       error: true,
       msg: "Please select a valid id to continue.",
     });
+    return false;
   }
   let _id=null, labelId=null, inverseLabel=null;
   if (typeof parameters._id!=="undefined" && parameters._id!=="") {
@@ -319,8 +359,36 @@ const getTaxonomyTerm = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /taxonomy-term Put taxonomy term
+* @apiName put taxonomy term
+* @apiGroup Taxonomy terms
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the taxonomy term. This should be undefined|null|blank in the creation of a new taxonomy term.
+* @apiParam {string} label The taxonomy term's label.
+* @apiParam {boolean} [locked=false] If the taxonomy term can be updated or not.
+* @apiParam {string} inverseLabel The taxonomy term's inverseLabel.
+* @apiParam {string} [scopeNote] A scopeNote about the taxonomy term.
+* @apiExample {json} Example:
+* {
+  "label":"Test",
+  "description":"test description"
+}
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"error":[],"status":true,"data":{"inverseLabel":"enteredSchool","inverseLabelId":"enteredSchool","updatedBy":"260","labelId":"enteredSchool","count":"0","_id":"102","label":"enteredSchool","locked":false,"updatedAt":"2020-01-15T15:02:48.163Z"}},"error":[],"msg":"Query results"}
+*/
 const putTaxonomyTerm = async(req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The taxonomy term must not be empty",
+    });
+    return false;
+  }
   let now = new Date().toISOString();
   let userId = req.decoded.id;
   if (typeof postData._id==="undefined" || postData._id===null) {
@@ -339,6 +407,17 @@ const putTaxonomyTerm = async(req, resp) => {
   });
 }
 
+/**
+* @api {delete} /taxonomy-term Delete taxonomy term
+* @apiName delete taxonomy term
+* @apiGroup Taxonomy terms
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the taxonomy term for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:TaxonomyTerm) WHERE id(n)=2500 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":1,"high":0},"resultAvailableAfter":{"low":9,"high":0}}},"error":[],"msg":"Query results"}
+*/
 const deleteTaxonomyTerm = async(req, resp) => {
   let postData = req.body;
   let term = new TaxonomyTerm(postData);

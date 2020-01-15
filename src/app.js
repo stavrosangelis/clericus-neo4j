@@ -27,5 +27,5 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 1
 
 /** start express server */
 app.listen(port, () => {
-    console.log(`Server started at port: ${port}`);
+  console.log(`Server started at port: ${port}`);
 });

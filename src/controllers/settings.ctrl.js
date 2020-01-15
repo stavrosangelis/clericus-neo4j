@@ -1,6 +1,21 @@
 const fs = require("fs");
 const seedSettings = require('../seed/settings.js');
 
+/**
+* @api {get} /settings Get settings
+* @apiName get settings
+* @apiGroup Settings
+*
+* @apiSuccessExample {json} Success-Response:
+{
+    "status": true,
+    "data": {
+        "seedingAllowed": false
+    },
+    "error": [],
+    "msg": "Settings loaded successfully"
+}
+*/
 const getSettings = async (req, resp) => {
   let parameters = req.body;
   let seedSettingsData = await seedSettings.loadSettings();

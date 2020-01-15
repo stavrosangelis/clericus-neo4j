@@ -8,6 +8,14 @@ const seedUser = require('./user.js').seedUser;
 const seedEntities = require('./entities.js').seedEntities;
 const seedEntitiesProperties = require('./entities-properties.js').seedEntitiesProperties;
 
+/**
+* @api {post} /seed-db Post seed db
+* @apiName post seed db
+* @apiGroup Seed
+*
+* @apiParam {string} email The admin user email.
+* @apiParam {string} password The admin user password.
+*/
 const seedData = async(req, resp) => {
   let postData = req.body;
   let email = null;
@@ -21,7 +29,7 @@ const seedData = async(req, resp) => {
   let status = true;
   let errors = [];
   let data = {};
-  
+
   // 1. check settings
   // 1.1. check if seeding is allowed
   let settingsData = await settings.loadSettings();
@@ -66,17 +74,17 @@ const seedData = async(req, resp) => {
   data.user = seedUserPromise;
   console.log("step 6 complete");
 
-  // 7.1 insert entities
+  // 7 insert entities
   let seedEntitiesPromise = await seedEntities();
   data.entities = seedEntitiesPromise;
   console.log("step 7.1 complete");
 
-  // 7.2 insert entity properties
+  // 8 insert entity properties
   let seedEntitiesPropertiesPromise = await seedEntitiesProperties();
   data.entitiesProperties = seedEntitiesPropertiesPromise;
   console.log("step 7.2 complete");
 
-  // 8. dissalow any further seeding in the database
+  // 9. dissalow any further seeding in the database
   let disallowSeeding = await settings.disallowSeeding();
   data.seeding = disallowSeeding;
   console.log("step 8 complete");

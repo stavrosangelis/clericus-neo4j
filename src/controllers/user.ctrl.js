@@ -90,10 +90,15 @@ class User {
     }
     else {
       let session = driver.session();
-      this.password = null;
-      await this.load();
-      let nodeProperties = helpers.prepareNodeProperties(newData);
-      let params = helpers.prepareParams(newData);
+      console.log(this);
+
+      let nodeProperties = helpers.prepareNodeProperties(this);
+      let params = helpers.prepareParams(this);
+
+      console.log(nodeProperties)
+      console.log("/n")
+
+      console.log(params)
 
       let query = "";
       if (typeof this._id==="undefined" || this._id===null) {
@@ -184,7 +189,7 @@ class User {
       return false;
     }
     await this.load();
-    if (this.usergroup.isAdmin) {
+    if (this.usergroup!==null && this.usergroup.isAdmin) {
       return {error: ["Users belonging to the admin user group cannot be deleted. To delete this user you must first change the usergroup to something other than Admin"], status: false, data: []};
     }
     let session = driver.session();
@@ -242,6 +247,17 @@ class User {
 
 };
 
+/**
+* @api {get} /users Get users
+* @apiName get users
+* @apiGroup Users
+* @apiPermission admin
+*
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"currentPage":1,"data":[{"firstName":"Admin","lastName":"","email":"admin@test.com","_id":"260","systemLabels":["User"]}],"totalItems":1,"totalPages":1},"error":[],"msg":"Query results"}
+*/
 const getUsers = async (req, resp) => {
   let parameters = req.query;
   let page = 0;
@@ -315,6 +331,7 @@ const getUsersQuery = async (query, limit) => {
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
     let output = countObj['count(*)'];
+    output = parseInt(output,10);
     return output;
   });
   let totalPages = Math.ceil(count/limit)
@@ -326,15 +343,26 @@ const getUsersQuery = async (query, limit) => {
   return result;
 }
 
+/**
+* @api {get} /user Get user
+* @apiName get user
+* @apiGroup Users
+* @apiPermission admin
+*
+* @apiParam {string} _id The _id of the requested user.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"260","firstName":"Admin","lastName":"","email":"admin@test.com","usergroup":{"description":"This group has access to the back-end","isDefault":false,"isAdmin":true,"label":"Administrator","_id":"401"},"createdBy":null,"createdAt":null,"updatedBy":null,"updatedAt":null,"hasPassword":true},"error":[],"msg":"Query results"}
+*/
 const getUser = async(req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" && parameters._id==="") {
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: "Please provide a valid user id to continue.",
     });
+    return false;
   }
   let _id = parameters._id;
   let user = new User({_id: _id});
@@ -347,8 +375,33 @@ const getUser = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /user Put user
+* @apiName put user
+* @apiGroup Users
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the user. This should be undefined|null|blank in the creation of a new user.
+* @apiParam {string} [firstName] The user's first name.
+* @apiParam {string} [lastName] The user's last name.
+* @apiParam {string} email The user's email.
+* @apiParam {string} usergroup The user's usergroup id.
+* @apiParam {string} [password] The user's password.
+
+* @apiSuccessExample {json} Success-Response:
+{"error":[],"status":true,"data":{"firstName":"","createdAt":"2020-01-15T16:49:21.096Z","lastName":"","updatedBy":"260","createdBy":"260","usergroup":"240","email":"test@test.com","token":false,"updatedAt":"2020-01-15T16:49:21.096Z","_id":"2656"}}
+*/
 const putUser = async(req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The user must not be empty",
+    });
+    return false;
+  }
   let userData = {};
   for (let key in postData) {
     if (postData[key]!==null) {
@@ -375,15 +428,57 @@ const putUser = async(req, resp) => {
   resp.json(output);
 }
 
+/**
+* @api {delete} /user Delete user
+* @apiName delete user
+* @apiGroup Users
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the user for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"error":[],"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:User) WHERE id(n)=2656 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":20,"high":0}}}}
+*/
 const deleteUser = async(req, resp) => {
   let parameters = req.body;
+  if (typeof parameters._id==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please provide a valid user id to continue.",
+    });
+    return false;
+  }
   let user = new User({_id: parameters._id});
   let output = await user.delete();
   resp.json(output);
 }
 
+/**
+* @api {post} /user-password Post user password
+* @apiName post user password
+* @apiGroup Users
+* @apiPermission admin
+*
+* @apiParam {string} _id The _id of the user.
+* @apiParam {string} password The user's new password.
+* @apiParam {string} passwordRepeat The user's new password repeat.
+
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"error":[],"status":true,"data":{"lastName":"test 2","createdAt":"2020-01-15T16:54:49.345Z","firstName":"test 2","password":"$argon2i$v=19$m=4096,t=3,p=1$ASReF+F6uNDu/x1pQjzABg$10eyaxG8yCh7rPqUVKx2CDejIYe6mAyMn5sUWx2ARJQ","updatedBy":"260","createdBy":"260","usergroup":"240","email":"test3@test.com","updatedAt":"2020-01-15T16:54:49.345Z","token":false,"_id":"2656"}},"error":[],"msg":""}
+*/
 const updateUserPassword = async (req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The uploaded file must not be empty",
+    });
+    return false;
+  }
   let decoded = req.decoded;
   if (typeof decoded==="undefined") {
     resp.json({

@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Organisation {
-  constructor({_id=null,label=null,labelSoundex=null,alternateAppelations=[],description=null,organisationType=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,labelSoundex=null,alternateAppelations=[],description=null,organisationType=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -169,15 +169,39 @@ class Organisation {
 
 };
 
+/**
+* @api {get} /organisations Get organisations
+* @apiName get organisations
+* @apiGroup Organisations
+*
+* @apiParam {string} [label] A string to match against the organisations' labels.
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{
+  "status": true,
+  "data": {
+    "currentPage": 1,
+    "data": [{
+      "label": "Achadh Conaire",
+      "labelSoundex": "A232",
+      "alternateAppelations": [],
+      "organisationType": "Diocese",
+      "status": false,
+      "_id": "135",
+      "systemLabels": ["Organisation"],
+      "resources": []
+    }],
+    "totalItems": 80,
+    "totalPages": 4
+  },
+  "error": [],
+  "msg": "Query results"
+}
+*/
 const getOrganisations = async (req, resp) => {
   let parameters = req.query;
   let label = "";
-  let firstName = "";
-  let lastName = "";
-  let fnameSoundex = "";
-  let lnameSoundex = "";
-  let _id = "";
-  let description = "";
   let page = 0;
   let queryPage = 0;
   let limit = 25;
@@ -281,6 +305,7 @@ const getOrganisationsQuery = async (query, queryParams, limit) => {
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
     let output = countObj['count(*)'];
+    output = parseInt(output,10);
     return output;
   });
   let totalPages = Math.ceil(count/limit)
@@ -292,15 +317,25 @@ const getOrganisationsQuery = async (query, queryParams, limit) => {
   return result;
 }
 
+/**
+* @api {get} /organisation Get organisation
+* @apiName get organisation
+* @apiGroup Organisations
+*
+* @apiParam {string} _id The _id of the requested organisation.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"375","label":"Cill Da Lua","labelSoundex":"C434","description":null,"organisationType":"Diocese","status":false,"alternateAppelations":[],"createdBy":null,"createdAt":null,"updatedBy":null,"updatedAt":null,"events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
+*/
 const getOrganisation = async(req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" && parameters._id==="") {
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
     resp.json({
       status: false,
       data: [],
       error: true,
       msg: "Please select a valid id to continue.",
     });
+    return false;
   }
   let _id = parameters._id;
   let organisation = new Organisation({_id:_id});
@@ -313,8 +348,35 @@ const getOrganisation = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /organisation Put organisation
+* @apiName put organisation
+* @apiGroup Organisations
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the organisation. This should be undefined|null|blank in the creation of a new organisation.
+* @apiParam {string} label The organisation's label.
+* @apiParam {string} [description] A description about the organisation.
+* @apiParam {string} [organisationType] The type of the organisation. The available values come from the Organisation types taxonomy.
+* @apiParam {string} [status=private] The status of the person.
+* @apiParam {array} [alternateAppelations] The organisation's alternate appelations.
+* @apiParam {string}  alternateAppelation[label] The organisation's alternate appelation label.
+* @apiParam {string}  [alternateAppelation[note]] The organisation's alternate appelation note.
+* @apiParam {object}  [alternateAppelation[language]] The organisation's alternate appelation language.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"error":[],"status":true,"data":{"updatedBy":"260","labelSoundex":"A232","description":"","_id":"135","label":"Achadh Conaire","alternateAppelations":[],"updatedAt":"2020-01-15T11:05:14.136Z","organisationType":"Diocese","status":false}},"error":[],"msg":"Query results"}
+*/
 const putOrganisation = async(req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The organisation must not be empty",
+    });
+    return false;
+  }
   let now = new Date().toISOString();
   let userId = req.decoded.id;
   if (typeof postData._id==="undefined" || postData._id===null) {
@@ -343,6 +405,16 @@ const putOrganisation = async(req, resp) => {
   });
 }
 
+/**
+* @api {delete} /organisation Delete organisation
+* @apiName delete organisation
+* @apiGroup Organisations
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the organisation for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Organisation) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":17,"high":0}}},"error":[],"msg":"Query results"}*/
 const deleteOrganisation = async(req, resp) => {
   let params = req.query;
   let organisation = new Organisation(params);
@@ -355,10 +427,47 @@ const deleteOrganisation = async(req, resp) => {
   });
 }
 
+/**
+* @api {delete} /organisations Delete organisations
+* @apiName delete organisations
+* @apiGroup Organisations
+* @apiPermission admin
+*
+* @apiParam {array} _ids The ids of the organisations for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":[{"records":[],"summary":{"statement":{"text":"MATCH (n:Organisation) WHERE id(n)=2109 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":5,"high":0}}}],"error":[],"msg":"Query results"}
+*/
+const deleteOrganisations = async(req, resp) => {
+  let deleteData = req.body;
+  if (typeof deleteData._ids==="undefined" || deleteData._ids.length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select valid ids to continue.",
+    });
+    return false;
+  }
+  let responseData = [];
+  for (let i=0; i<deleteData._ids.length; i++) {
+    let _id = deleteData._ids[i];
+    let organisation = new Organisation({_id: _id});
+    responseData.push(await organisation.delete());
+  }
+  resp.json({
+    status: true,
+    data: responseData,
+    error: [],
+    msg: "Query results",
+  });
+}
+
 module.exports = {
   Organisation: Organisation,
   getOrganisations: getOrganisations,
   getOrganisation: getOrganisation,
   putOrganisation: putOrganisation,
   deleteOrganisation: deleteOrganisation,
+  deleteOrganisations: deleteOrganisations,
 };

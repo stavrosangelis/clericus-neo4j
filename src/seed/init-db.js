@@ -2,18 +2,18 @@ const driver = require("../config/db-driver");
 
 const initDB = async() => {
   // 01. create indexes
-  let indeces = await createIndeces();
+  let indexes = await createIndexes();
   // 02. set unique constraints
   let constraints = await createUniqueConstrains();
 
   let response = {
-    indeces: indeces,
+    indexes: indexes,
     constraints: constraints,
   }
   return response;
 }
 
-const createIndeces = async () => {
+const createIndexes = async () => {
   let session = driver.session()
   let q1 = "CREATE INDEX ON :Person(label, firstName, middleName, lastName)"
   let q2 = " CREATE INDEX ON :Organisation(label)"
@@ -67,7 +67,6 @@ const createIndeces = async () => {
   })
   return [rp1,rp2,rp3,rp4,rp5];
 }
-
 
 const createUniqueConstrains = async () => {
   let session = driver.session()

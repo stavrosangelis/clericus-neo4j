@@ -12,7 +12,7 @@ const seedTaxonomies = async() => {
     });
     promises.push(insertPromise);
   }
-  
+
   return Promise.all(promises).then((data)=> {
     return data;
   })

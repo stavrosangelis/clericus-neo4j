@@ -20,3 +20,6 @@
 # environment variables
 .env.production
 .env.development
+
+# nyc coverage reports
+/.nyc_output

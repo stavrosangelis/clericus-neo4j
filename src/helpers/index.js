@@ -7,11 +7,17 @@ const ExifImage = require('exif').ExifImage;
 const IptcImage = require('node-iptc');
 const driver = require("../config/db-driver");
 
-const soundex = (data) => {
+const soundex = (data=null) => {
+  if (data===null || data==="") {
+    return "";
+  }
   return Soundex(data);
 }
 
 const hashFileName = (data) => {
+  if (data===null || data==="") {
+    return false;
+  }
   let newData = data+randomChars();
   return crypto.createHash("md5").update(newData).digest('hex');
 }
@@ -225,6 +231,15 @@ const normalizeLabelId = (label) => {
   return output;
 }
 
+const lowerCaseOnlyFirst = (str) => {
+  if (typeof str!=='string') {
+    return str;
+  }
+  let firstLetter = str.charAt(0).toLowerCase();
+  let restOfString = str.slice(1);
+  return  firstLetter+restOfString;
+}
+
 const loadRelations = async (srcId=null, srcType=null, targetType=null) => {
   if (srcId===null || srcType===null) {
     return false;
@@ -334,6 +349,7 @@ module.exports = {
   outputRelation: outputRelation,
   outputPaths: outputPaths,
   normalizeLabelId: normalizeLabelId,
+  lowerCaseOnlyFirst: lowerCaseOnlyFirst,
   loadRelations: loadRelations,
   parseRequestData: parseRequestData,
   escapeRegExp: escapeRegExp,

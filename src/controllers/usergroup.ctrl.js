@@ -173,9 +173,19 @@ class Usergroup {
 
 };
 
+/**
+* @api {get} /user-groups Get usergroups
+* @apiName get usergroups
+* @apiGroup Usergroups
+* @apiPermission admin
+*
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"currentPage":1,"data":[{"description":"This group has only access to the front-end","isDefault":true,"isAdmin":false,"label":"Public","_id":"240","systemLabels":["Usergroup"]},{"description":"This group has access to the back-end","isDefault":false,"isAdmin":true,"label":"Administrator","_id":"401","systemLabels":["Usergroup"]}],"totalItems":2,"totalPages":1},"error":[],"msg":"Query results"}
+*/
 const getUsergroups = async (req, resp) => {
   let parameters = req.query;
-  let label = "";
   let page = 0;
   let queryPage = 0;
   let limit = 25;
@@ -244,6 +254,7 @@ const getUsergroupsQuery = async (query, limit) => {
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
     let output = countObj['count(*)'];
+    output = parseInt(output,10);
     return output;
   });
   let totalPages = Math.ceil(count/limit)
@@ -255,9 +266,19 @@ const getUsergroupsQuery = async (query, limit) => {
   return result;
 }
 
+/**
+* @api {get} /user-group Get usergroup
+* @apiName get usergroup
+* @apiGroup Usergroups
+* @apiPermission admin
+*
+* @apiParam {string} _id The _id of the requested usergroup.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"240","label":"Public","description":"This group has only access to the front-end","isAdmin":false,"isDefault":true,"createdBy":null,"createdAt":null,"updatedBy":null,"updatedAt":null},"error":[],"msg":"Query results"}
+*/
 const getUsergroup = async(req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" && parameters._id==="") {
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
     resp.json({
       status: false,
       data: [],
@@ -276,8 +297,31 @@ const getUsergroup = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /user-group Put usergroup
+* @apiName put usergroup
+* @apiGroup Usergroups
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the usergroup. This should be undefined|null|blank in the creation of a new usergroup.
+* @apiParam {string} label The usergroup's label.
+* @apiParam {boolean} [isAdmin=false] If the usergroup has access to the administration back-end.
+* @apiParam {boolean} [isDefault=false] If this is the default usergroup.
+
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"2656","label":"test","description":"","isAdmin":false,"isDefault":false,"createdBy":"260","createdAt":"2020-01-15T17:03:23.588Z","updatedBy":"260","updatedAt":"2020-01-15T17:03:23.588Z"},"error":[],"msg":"Query results"}
+*/
 const putUsergroup = async(req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The user group must not be empty",
+    });
+    return false;
+  }
   let now = new Date().toISOString();
   let userId = req.decoded.id;
   if (typeof postData._id==="undefined" || postData._id===null) {
@@ -292,6 +336,17 @@ const putUsergroup = async(req, resp) => {
   resp.json(output);
 }
 
+/**
+* @api {delete} /usergroup Delete usergroup
+* @apiName delete usergroup
+* @apiGroup Usergroups
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the usergroup for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"error":[],"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Usergroup) WHERE id(n)=2656 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":11,"high":0}}}}
+*/
 const deleteUsergroup = async(req, resp) => {
   let parameters = req.body;
   let usergroup = new Usergroup(parameters);

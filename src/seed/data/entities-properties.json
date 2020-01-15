@@ -51,6 +51,12 @@
     "sourceEntityLabelId": "Organisation",
     "targetEntityLabelId": "Resource"
   },
+  {
+    "direction": "from",
+    "termLabelId": "hasRelation",
+    "sourceEntityLabelId": "Organisation",
+    "targetEntityLabelId": "Event"
+  },
 
 
 

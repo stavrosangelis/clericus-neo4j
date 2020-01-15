@@ -1,6 +1,13 @@
 const driver = require("../../config/db-driver");
 const helpers = require("../../helpers");
 
+/**
+* @api {get} /generic-stats Generic statistics
+* @apiName generic-stats
+* @apiGroup Analytics
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"people":220,"resources":220,"organisations":80,"events":0},"error":false,"msg":""}
+*/
 const genericStats = (req, resp) => {
   let countPeoplePromise = countPeople();
   let countResourcesPromise = countResources();

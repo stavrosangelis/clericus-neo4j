@@ -144,22 +144,27 @@ class Entity {
       else {
         query = "MATCH (n:Entity) WHERE id(n)="+this._id+" AND n.locked=false SET n="+nodeProperties+" RETURN n";
       }
-      let updateResult = await session.run(
+      let resultPromise = await session.run(
           query,
           params
         )
         .then(result => {
           session.close();
-          let output = {error: ["The record cannot be updated"], status: false, data: []};
           let records = result.records;
+          let output = {error: ["The record cannot be updated"], status: false, data: []};
           if (records.length>0) {
-            let outputRecord = records[0].toObject();
-            helpers.prepareOutput(outputRecord);
-            let output = {error: [], status: true, data: outputRecord};
+            let record = records[0];
+            let key = record.keys[0];
+            let resultRecord = record.toObject()[key];
+            resultRecord = helpers.outputRecord(resultRecord);
+            output = {error: [], status: true, data: resultRecord};
           }
           return output;
-        });
-      return updateResult;
+        })
+      .catch((error) => {
+        console.log(error)
+      });
+      return resultPromise;
     }
   }
 
@@ -185,7 +190,16 @@ class Entity {
   }
 
 };
-
+/**
+* @api {get} /entities Get entities
+* @apiName get entities
+* @apiGroup Entities
+*
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"currentPage":1,"data":[{"definition":"This is the model of an event.","label":"Event","labelId":"Event","locked":true,"_id":"49","systemLabels":["Entity"]},{"definition":"This is the model of an organisation.","label":"Organisation","labelId":"Organisation","locked":true,"_id":"450","systemLabels":["Entity"]},{"definition":"This is the model of a person.","label":"Person","labelId":"Person","locked":true,"_id":"402","systemLabels":["Entity"]},{"definition":"This is the model of a resource.","label":"Resource","labelId":"Resource","locked":true,"_id":"261","systemLabels":["Entity"]},{"definition":"This is the model of a spatial object.","label":"Spatial","labelId":"Spatial","locked":true,"_id":"313","systemLabels":["Entity"]},{"definition":"This is the model of a temporal object.","label":"Temporal","labelId":"Temporal","locked":true,"_id":"413","systemLabels":["Entity"]},{"createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","labelId":"TestEntity","createdBy":"260","definition":"This is a test entity.","label":"Test entity","locked":false,"updatedAt":"2020-01-14T12:54:12.873Z","_id":"2257","systemLabels":["Entity"]}],"totalItems":"7","totalPages":1},"error":[],"msg":"Query results"}
+*/
 const getEntities = async (req, resp) => {
   let parameters = req.query;
   let page = 0;
@@ -244,6 +258,7 @@ const prepareRelations = (records) => {
   }
   return relations;
 }
+
 const prepareRelation = (sourceItem, relation, targetItem) => {
   let newProperty = {
     _id: relation.identity,
@@ -289,11 +304,20 @@ const getEntitiesQuery = async (query, limit) => {
   return result;
 }
 
+/**
+* @api {get} /entity Get entity
+* @apiName get entity
+* @apiGroup Entities
+*
+* @apiParam {string} _id The _id of the requested entity. If labelId is provided _id can be omitted.
+* @apiParam {string} labelId The labelId of the requested entity. If _id is provided labelId can be omitted.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"2257","label":"Test entity","labelId":"TestEntity","locked":false,"definition":"This is a test entity.","example":null,"parent":null,"createdBy":"260","createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","updatedAt":"2020-01-14T12:54:12.873Z","properties":[]},"error":[],"msg":"Query results"}
+*/
 const getEntity = async(req, resp) => {
   let parameters = req.query;
   if (
-    (typeof parameters._id==="undefined" || parameters._id==="") &&
-    (typeof parameters.labelId==="undefined" || parameters.labelId==="")
+    (typeof parameters._id==="undefined" || parameters._id==="") && (typeof parameters.labelId==="undefined" || parameters.labelId==="")
   ) {
     resp.json({
       status: false,
@@ -301,6 +325,7 @@ const getEntity = async(req, resp) => {
       error: true,
       msg: "Please select a valid id or a valid label to continue.",
     });
+    return false;
   }
   let entity = null;
     if (typeof parameters._id!=="undefined" && parameters._id!=="") {
@@ -321,8 +346,32 @@ const getEntity = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /entity Put entity
+* @apiName put entity
+* @apiGroup Entities
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the entity. This should be undefined|null|blank in the creation of a new entity.
+* @apiParam {string} label The label of the new entity.
+* @apiParam {boolean} [locked=false] If future updates are allowed for this entity. For the creation of a new entity this value must be set to false.
+* @apiParam {string} definition The definition of the entity.
+* @apiParam {string} [example] An example of use for this entity.
+* @apiParam {string} [parent] A parent entity for this entity.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","labelId":"TestEntity","createdBy":"260","definition":"This is a test entity.","label":"Test entity","locked":false,"updatedAt":"2020-01-14T12:54:12.873Z","_id":"2257"},"error":[],"msg":"Query results"}
+*/
 const putEntity = async(req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The entity must not be empty",
+    });
+    return false;
+  }
   let now = new Date().toISOString();
   let userId = req.decoded.id;
   if (typeof postData._id==="undefined" || postData._id===null) {
@@ -340,10 +389,32 @@ const putEntity = async(req, resp) => {
     msg: "Query results",
   });
 }
-
+/**
+* @api {delete} /entity Delete entity
+* @apiName delete entity
+* @apiGroup Entities
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the entity for deletion. If labelId is provided _id can be omitted.
+* @apiParam {string} labelId The labelId of the entity for deletion. If _id is provided labelId can be omitted.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"relations":{"nodesCreated":0,"nodesDeleted":0,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0},"node":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"error":[],"msg":"Query results"}
+*/
 const deleteEntity = async(req, resp) => {
   let parameters = req.query;
-  console.log(parameters._id)
+  if (
+    (typeof parameters._id==="undefined" || parameters._id==="") &&
+    (typeof parameters.labelId==="undefined" || parameters.labelId==="")
+  ) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select a valid id or a valid label to continue.",
+    });
+    return false;
+  }
   let entity = new Entity({_id: parameters._id});
   let data = await entity.delete();
   resp.json({

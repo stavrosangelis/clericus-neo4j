@@ -1,13 +1,16 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.11.85",
+  "version": "0.12.0",
   "description": "This is the Clericus API using neo4j as a database",
   "main": "src/app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "NODE_ENV=development ava --verbose",
+    "test:watch": "NODE_ENV=development ava --watch --verbose",
     "start": "NODE_ENV=production pm2 start ./src/app.js --name clericus",
     "dev": "NODE_ENV=development nodemon ./src/app.js",
-    "pm2-dev": "NODE_ENV=development pm2 start ./src/app.js --name clericus-dev"
+    "pm2-dev": "NODE_ENV=development pm2 start ./src/app.js --name clericus-dev",
+    "cover": "NODE_ENV=development nyc npm run test",
+    "docs": "apidoc -f '.*\\.js$' -i src/ -o documentation/"
   },
   "author": "Stavros Angelis",
   "license": "ISC",
@@ -34,5 +37,16 @@
     "passport-local": "^1.0.0",
     "pm2": "^4.1.2",
     "soundex": "^0.2.1"
+  },
+  "devDependencies": {
+    "ava": "^2.4.0",
+    "minami": "^1.2.3",
+    "nyc": "^15.0.0",
+    "supertest": "^4.0.2"
+  },
+  "apidoc": {
+    "description": "This is a comprehensive documentation of all available REST API endpoints for the Clericus project using neo4j as database.",
+    "title": "Clericus-neo4j REST API Documentation",
+    "url" : "http://localhost:5100/api"
   }
 }

@@ -1,25 +1,44 @@
-
 const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
-const dashboardStats = (req, resp) => {
+/**
+* @api {get} /dashboard Dashboard
+* @apiName dashboard
+* @apiGroup Dashboard
+* @apiPermission admin
+*
+* @apiSuccessExample {json} Success-Response:
+{
+    "status": true,
+    "data": {
+        "people": 220,
+        "resources": 220,
+        "organisations": 80,
+        "events": 0
+    },
+    "error": false,
+    "msg": ""
+}
+*/
+const dashboardStats = async (req, resp) => {
   let countPeoplePromise = countPeople();
   let countResourcesPromise = countResources();
   let countOrganisationsPromise = countOrganisations();
   let countEventsPromise = countEvents();
-  return Promise.all([countPeoplePromise, countResourcesPromise,countOrganisationsPromise,countEventsPromise]).then((data)=> {
-    let response = {
-      people: data[0],
-      resources: data[1],
-      organisations: data[2],
-      events: data[3],
-    }
-    resp.json({
-      status: true,
-      data: response,
-      error: false,
-      msg: '',
-    })
+  let stats = await Promise.all([countPeoplePromise, countResourcesPromise,countOrganisationsPromise,countEventsPromise]).then((data)=> {
+    return data;
+  });
+  let response = {
+    people: stats[0],
+    resources: stats[1],
+    organisations: stats[2],
+    events: stats[3],
+  }
+  resp.json({
+    status: true,
+    data: response,
+    error: false,
+    msg: '',
   })
 }
 

@@ -7,7 +7,7 @@ const {promisify} = require('util');
 const formidable = require('formidable');
 
 class Resource {
-  constructor({_id=null,label=null,description=null,fileName=null,metadata=[],paths=null,resourceType=null,systemType=null,uploadedFile=null,status=false,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,description=null,fileName=null,metadata=[],paths=[],resourceType=null,systemType=null,uploadedFile=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -227,6 +227,29 @@ class Resource {
   }
 };
 
+/**
+* @api {get} /resources Get resources
+* @apiName get resources
+* @apiGroup Resources
+*
+* @apiParam {string} [label] A string to match against the resources' labels.
+* @apiParam {string} [systemType] A system type id.
+* @apiParam {string} [description] A string to match against the peoples' description.
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+* @apiSuccessExample {json} Success-Response:
+{
+  "status": true,
+  "data": {
+    "currentPage": 1,
+    "data": [{,…}, {"fileName": "1971.jpg",…}, {"fileName": "1972.jpg",…}, {"fileName": "1974.jpg",…}],
+    "totalItems": "4",
+    "totalPages": 1
+  },
+  "error": [],
+  "msg": "Query results"
+}
+*/
 const getResources = async (req, resp) => {
   let parameters = req.query;
   let label = "";
@@ -352,15 +375,49 @@ const getResourcesQuery = async (query, queryParams, limit) => {
   return result;
 }
 
+/**
+* @api {get} /resource Get resource
+* @apiName get resource
+* @apiGroup Resources
+*
+* @apiParam {string} _id The _id of the requested resource.
+* @apiSuccessExample {json} Success-Response:
+{
+  "status": true,
+  "data": {
+    "_id": "389",
+    "label": "1969-1970",
+    "description": null,
+    "fileName": "1969-1970.jpg",
+    "metadata": {"image": {"default": {"height": 6464, "width": 4808, "extension": "jpg", "x": 0, "y": 0, "rotate": 0},…}},
+    "paths": [{"path":"images/fullsize/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg","pathType":"source"},…],
+    "resourceType": "image",
+    "systemType": {"ref":"87"},
+    "uploadedFile": null,
+    "status": false,
+    "createdBy": null,
+    "createdAt": null,
+    "updatedBy": null,
+    "updatedAt": null,
+    "events": [],
+    "organisations": [],
+    "people": [{"_id": "894", "term": {"label": "depicts", "role": "student", "roleLabel": "student"},…},…],
+    "resources": [{"_id": "916", "term": {"label": "hasPart"}, "ref": {"fileName": "52.jpg",…}},…]
+  },
+  "error": [],
+  "msg": "Query results"
+}
+*/
 const getResource = async(req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" && parameters._id==="") {
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
     resp.json({
       status: false,
       data: [],
       error: true,
       msg: "Please select a valid id to continue.",
     });
+    return false;
   }
 
   let _id = parameters._id;
@@ -374,10 +431,38 @@ const getResource = async(req, resp) => {
   });
 }
 
+/**
+* @api {put} /resource Put resource
+* @apiName put resource
+* @apiGroup Resources
+* @apiPermission admin
+*
+* @apiParam {string} [_id] The _id of the resource. This should be undefined|null|blank in the creation of a new resource.
+* @apiParam {string} label The label of the resource.
+* @apiParam {string} [description] The description of the resource.
+* @apiParam {string} [filename] The filename of the resource. This value is automatically extracted from the uploaded file during the <a href="#api-Resources-post_upload_resource">upload resource</a> step.
+* @apiParam {string} [metadata] The metadata of the resource. This value is automatically extracted from the uploaded file during the <a href="#api-Resources-post_upload_resource">upload resource</a> step.
+* @apiParam {string} [paths] The paths of the resource. This value is automatically extracted from the uploaded file during the <a href="#api-Resources-post_upload_resource">upload resource</a> step.
+* @apiParam {string} [resourceType] The resourceType of the resource. This value is automatically extracted from the uploaded file during the <a href="#api-Resources-post_upload_resource">upload resource</a> step.
+* @apiParam {string} [systemType] The systemType of the resource. The value is selected from the Resource system types taxonomy.
+* @apiParam {file} [uploadedFile] The uploadedFile of the resource. This should be undefined|null|blank in the creation/update of a resource.
+* @apiParam {string} [status='private'] The status of the resource.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"error":[],"status":true,"data":{"fileName":"logo-transparent.png","metadata":"{\"image\":{\"default\":{\"height\":275,\"width\":269,\"extension\":\"png\",\"x\":0,\"y\":0,\"rotate\":0}}}","updatedBy":"260","paths":["{\"path\":\"images/fullsize/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"source\"}","{\"path\":\"images/thumbnails/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"thumbnail\"}"],"systemType":"{\"ref\":\"295\"}","description":"","_id":"2069","label":"logo-transparent.png","updatedAt":"2020-01-14T16:30:00.338Z","resourceType":"image","status":false}},"error":[],"msg":"Query results"}
+*/
 const putResource = async(req, resp) => {
   let postData = await helpers.parseRequestData(req);
   let now = new Date().toISOString();
   let userId = req.decoded.id;
+  if (postData===null || Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The resource must not be empty",
+    });
+    return false;
+  }
   let resourceData = postData.resource;
   if (typeof resourceData._id==="undefined" || resourceData._id===null) {
     resourceData.createdBy = userId;
@@ -396,8 +481,27 @@ const putResource = async(req, resp) => {
   });
 }
 
+/**
+* @api {delete} /resource Delete resource
+* @apiName delete resource
+* @apiGroup Resources
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the resource for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":11,"high":0}}},"error":[],"msg":"Query results"}*/
 const deleteResource = async(req, resp) => {
   let parameters = req.query;
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select a valid id to continue.",
+    });
+    return false;
+  }
   let resource = new Resource({_id: parameters._id});
   let data = await resource.delete();
   resp.json({
@@ -408,8 +512,68 @@ const deleteResource = async(req, resp) => {
   });
 }
 
+/**
+* @api {delete} /resources Delete resources
+* @apiName delete resources
+* @apiGroup Resources
+* @apiPermission admin
+*
+* @apiParam {array} _ids The ids of the resources for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":[{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2404 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":5,"high":0}}}],"error":[],"msg":"Query results"}
+*/
+const deleteResources = async(req, resp) => {
+  let deleteData = req.body;
+  if (typeof deleteData._ids==="undefined" || deleteData._ids.length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select valid ids to continue.",
+    });
+    return false;
+  }
+  let responseData = [];
+  for (let i=0; i<deleteData._ids.length; i++) {
+    let _id = deleteData._ids[i];
+    let resource = new Resource({_id: _id});
+    responseData.push(await resource.delete());
+  }
+  resp.json({
+    status: true,
+    data: responseData,
+    error: [],
+    msg: "Query results",
+  });
+}
+
+
+/**
+* @api {post} /upload-resource Upload resource
+* @apiName post upload resource
+* @apiGroup Resources
+* @apiPermission admin
+* @apiDescription This is a file upload, the parameters should be posted as FormData (<a href="https://developer.mozilla.org/en-US/docs/Web/API/FormData" target="_blank">https://developer.mozilla.org/en-US/docs/Web/API/FormData</a>)
+*
+* @apiParam {file} file The file to be uploaded.
+* @apiParam {string} [_id] The resource _id.
+* @apiParam {string} [label] The resource label. If none is provided the file name is used instead.
+* @apiParam {string} [systemType] The resource systemType.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"fileName":"logo-transparent.png","metadata":"{\"image\":{\"default\":{\"height\":275,\"width\":269,\"extension\":\"png\",\"x\":0,\"y\":0,\"rotate\":0}}}","paths":["{\"path\":\"images/fullsize/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"source\"}","{\"path\":\"images/thumbnails/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"thumbnail\"}"],"systemType":"{\"ref\":\"295\"}","label":"logo-transparent.png","resourceType":"image","status":false,"_id":"2069"},"error":[],"msg":""}
+*/
 const uploadResource = async(req, resp) => {
   let data = await parseFormDataPromise(req);
+  if (Object.keys(data.file).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The uploaded file must not be empty",
+    });
+    return false;
+  }
   let uploadedFile = data.file.file;
   let fields = data.fields;
   let newId = null;
@@ -651,4 +815,5 @@ module.exports = {
   putResource: putResource,
   uploadResource: uploadResource,
   deleteResource: deleteResource,
+  deleteResources: deleteResources,
 };

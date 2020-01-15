@@ -15,6 +15,16 @@ const visionURL = process.env.CLOUD_VISION_ENDPOINT;
 
 var schedule = require('node-schedule');
 
+/**
+* @api {get} /meta-parse-class-piece List classpiece
+* @apiName list classpiece
+* @apiGroup Tools
+* @apiPermission admin
+*
+* @apiParam {string} file The filename of the requested classpiece.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":"Image analysis complete","error":"","msg":""}
+*/
 const parseClassPiece = async(req, resp) => {
   let parameters = req.query;
   let file = parameters.file;

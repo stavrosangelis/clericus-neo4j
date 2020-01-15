@@ -8,6 +8,16 @@ const driver = require("../../config/db-driver");
 const resourcesPath = process.env.RESOURCESPATH;
 const serverURL = process.env.SERVERURL;
 
+/**
+* @api {get} /meta-parse-class-piece Meta-parse classpiece
+* @apiName list classpiece
+* @apiGroup Tools
+* @apiPermission admin
+*
+* @apiParam {string} file The filename of the requested classpiece.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":"Face thumbnails created successfully","error":"","msg":""}
+*/
 const metaParseClassPiece = async(req, resp) => {
   let parameters = req.query;
   let file = parameters.file;
@@ -34,7 +44,6 @@ const metaParseClassPiece = async(req, resp) => {
   // make dir to save the output files
   mkdirSync(outputDir);
 
-  // 01. expand faces boundaries
   var outputFacesFile = outputDir+"images/"+fileName+"-faces-processed.png";
   var identifiedFaces = require(outputDir+"json/"+fileName+"-faces.json");
   var identifiedFacesPath = outputDir+"json/"+fileName+"-faces.json";
@@ -353,6 +362,77 @@ const compareTextPosition = (text, facePosition, i) => {
   return relation;
 }
 
+/**
+* @api {get} /list-class-pieces List classpieces
+* @apiName list classpieces
+* @apiGroup Tools
+* @apiPermission admin
+*
+* @apiSuccessExample {json} Success-Response:
+{
+    "status": true,
+    "data": [
+        {
+            "name": "1969-1970.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1969-1970.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1969-1970.jpg"
+        },
+        {
+            "name": "1971.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1971.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1971.jpg"
+        },
+        {
+            "name": "1972.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1972.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1972.jpg"
+        },
+        {
+            "name": "1973.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1973.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1973.jpg"
+        },
+        {
+            "name": "1974.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1974.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1974.jpg"
+        },
+        {
+            "name": "1975.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1975.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1975.jpg"
+        },
+        {
+            "name": "1976.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1976.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1976.jpg"
+        },
+        {
+            "name": "1977.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1977.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1977.jpg"
+        },
+        {
+            "name": "1978.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1978.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1978.jpg"
+        },
+        {
+            "name": "1979.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1979.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1979.jpg"
+        },
+        {
+            "name": "1980.jpg",
+            "thumbnail": "http://localhost:5100/images/processed/thumbnails/1980.jpg",
+            "fullsize": "http://localhost:5100/images/processed/fullsize/1980.jpg"
+        }
+    ],
+    "error": false,
+    "msg": ""
+}
+*/
+
 const listClassPieces = (req, resp) => {
   let fsPath = resourcesPath+"images/processed/thumbnails";
   let fullsizePath = serverURL+"images/processed/fullsize";
@@ -378,6 +458,16 @@ const listClassPieces = (req, resp) => {
   });
 }
 
+/**
+* @api {get} /list-class-piece List classpiece
+* @apiName list classpiece
+* @apiGroup Tools
+* @apiPermission admin
+*
+* @apiParam {string} file The filename of the requested classpiece.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":[{"name":"1969-1970.jpg","thumbnail":"http://localhost:5100/images/processed/thumbnails/1969-1970.jpg","fullsize":"http://localhost:5100/images/processed/fullsize/1969-1970.jpg","compressed":"http://localhost:5100/images/processed/compressed/1969-1970.jpg","facesThumbnails":true,"faces":"http://localhost:5100/output/1969-1970/json/1969-1970-faces.json","text":"http://localhost:5100/output/1969-1970/json/1969-1970-text.json"}],"error":false,"msg":""}
+*/
 const listClassPiece = (req, resp) => {
   let parameters = req.query;
   let fileName = "";
@@ -458,7 +548,27 @@ const listClassPiece = (req, resp) => {
   });
 }
 
+/**
+* @api {get} /create-thumbnails Create thumbnails
+* @apiName create thumbnails
+* @apiGroup Tools
+* @apiPermission admin
+*
+* @apiParam {boolean} [test=false] If test is true it returns 200 and stops execution.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":"Image analysis complete","error":"","msg":""}
+*/
 const createThumbnails = async(req, resp) => {
+  let parameters = req.query;
+  if (parameters.test==="true") {
+    resp.json({
+      status: true,
+      data: [],
+      error: false,
+      msg: 'Test completed succesfully',
+    });
+    return false;
+  }
   let fullsizeDir = resourcesPath+"images/processed/fullsize";
   let thumbnailsDir = resourcesPath+"images/processed/thumbnails";
   let compressedDir = resourcesPath+"images/processed/compressed";
@@ -478,7 +588,6 @@ const createThumbnails = async(req, resp) => {
       msg: 'Files import completed successfully',
     })
   });
-
 }
 
 const createThumbnail = async(srcPath=null, targetPath=null, fileName=null, customWidth=null, customHeight=null) => {
@@ -601,8 +710,28 @@ const createCompressed = async(srcPath=null, targetPath=null, fileName=null, cus
 
 }
 
+/**
+* @api {post} /update-class-piece-faces Update classpiece faces
+* @apiName update classpiece faces
+* @apiGroup Tools
+* @apiPermission admin
+*
+* @apiParam {string} file The filename of the requested classpiece.
+* @apiParam {string} faces A stringified JSON containing all available information about a classpiece faces.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":"Face selections have been saved successfully","error":"","msg":""}
+*/
 const updateClassPieceFaces = async(req, resp) => {
   let parameters = req.body;
+  if (typeof parameters.file==="undefined" || typeof parameters.faces==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The file or the contents are undefined",
+    });
+    return false;
+  }
   let file = "";
   if (typeof parameters.file!=="undefined") {
     file = parameters.file;
@@ -670,18 +799,36 @@ const rotateCoordinates = (cx,cy,x,y,radians, width, height,rotateDegrees) => {
     newCoordinates.y = ny;
     return newCoordinates;
 }
-
+/**
+* @api {post} /query-texts Query texts
+* @apiName query texts
+* @apiGroup Tools
+* @apiPermission admin
+*
+* @apiParam {array} texts An array of strings.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":[{"word":"Chanting","type":null,"count":null},{"word":"Ocaling","type":null,"count":null},{"word":"ARD","type":"firstName","count":9},{"word":"MACHA","type":"lastName","count":2}],"error":[],"msg":"Word counts results"}
+*/
 const queryTexts = async(req, resp) => {
   let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "The texts must not be empty",
+    });
+    return false;
+  }
   let texts = postData.texts;
 
   let promises = [];
   for (let i=0; i<texts.length; i++) {
     let word = texts[i];
     if (word.length>2) {
-      let honorificPrefix = new Promise((resolve,reject)=>{
+      /*let honorificPrefix = new Promise((resolve,reject)=>{
         resolve(countWordType(word, "honorificPrefix"));
-      });
+      });*/
       let firstName = new Promise((resolve,reject)=>{
         resolve(countWordType(word, "firstName"));
       });
@@ -694,7 +841,7 @@ const queryTexts = async(req, resp) => {
       let diocese = new Promise((resolve,reject)=>{
         resolve(countWordType(word, "diocese"));
       });
-      promises.push(Promise.all([honorificPrefix, firstName, middleName, lastName, diocese]));
+      promises.push(Promise.all([firstName, middleName, lastName, diocese]));
     }
   }
 
@@ -704,7 +851,7 @@ const queryTexts = async(req, resp) => {
   // group results
   let output = results.map(result => {
     let counts = {
-      honorificPrefix: result.find(item=>item.type==="honorificPrefix")['count'],
+      //honorificPrefix: result.find(item=>item.type==="honorificPrefix")['count'],
       firstName: result.find(item=>item.type==="firstName")['count'],
       middleName: result.find(item=>item.type==="middleName")['count'],
       lastName: result.find(item=>item.type==="lastName")['count'],

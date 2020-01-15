@@ -3,10 +3,66 @@ const helpers = require("../../helpers");
 const Resource = require("../resource.ctrl").Resource;
 const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
+/**
+* @api {get} /classpieces Classpieces
+* @apiName classpieces
+* @apiGroup Classpieces
+*
+* @apiParam {string} [label] A string to match against a classpiece label
+* @apiParam {string} [description] A string to match against a classpiece description
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=25] The number of results per page
+*
+* @apiSuccess {number} currentPage The current page of results
+* @apiSuccess {array} data An array of classpieces objects
+* @apiSuccess {number} totalItems The total number of results
+* @apiSuccess {number} totalPages The total number of available pages of results
+*
+* @apiSuccess (classpiece object) {object} Classpiece A classpiece object as part of the data array contains the following fields
+* @apiSuccess (classpiece object) {string} Classpiece[metadata] A stringified JSON object containing the classpiece metadata
+* @apiSuccess (classpiece object) {string} Classpiece[fileName] The file name of the classpiece
+* @apiSuccess (classpiece object) {array} Classpiece[paths] An array containing the path to the fullsize version of the classpiece and to the thumbnail of the classpiece
+* @apiSuccess (classpiece object) {string} Classpiece[systemType] The system type _id
+* @apiSuccess (classpiece object) {string} Classpiece[label] The label of the classpiece
+* @apiSuccess (classpiece object) {string} Classpiece[resourceType] The type of the classpiece, i.e. image
+* @apiSuccess (classpiece object) {string} Classpiece[status] If the classpiece is private or public.
+* @apiSuccess (classpiece object) {string} Classpiece[_id] The classpiece _id
+* @apiSuccess (classpiece object) {array} Classpiece[systemLabels] A list of system tags for the classpiece
+*
+* @apiSuccessExample {json} Success-Response:
+* {
+    "status": true,
+    "data": {
+        "currentPage": 1,
+        "data": [
+            {
+                "metadata": "\"{\\\"image\\\":{\\\"default\\\":{\\\"height\\\":6464,\\\"width\\\":4808,\\\"extension\\\":\\\"jpg\\\",\\\"x\\\":0,\\\"y\\\":0,\\\"rotate\\\":0},\\\"exif\\\":{\\\"image\\\":{\\\"XResolution\\\":240,\\\"YResolution\\\":240,\\\"ResolutionUnit\\\":2,\\\"Software\\\":\\\"Adobe Photoshop Lightroom Classic 7.3.1 (Windows)\\\",\\\"ModifyDate\\\":\\\"2018:07:02 12:56:59\\\",\\\"ExifOffset\\\":172},\\\"thumbnail\\\":{},\\\"exif\\\":{\\\"ExifVersion\\\":{\\\"type\\\":\\\"Buffer\\\",\\\"data\\\":[48,50,51,48]},\\\"ColorSpace\\\":1},\\\"gps\\\":{},\\\"interoperability\\\":{},\\\"makernote\\\":{}},\\\"iptc\\\":{}}}\"",
+                "fileName": "1969-1970.jpg",
+                "paths": [
+                    "{\"path\":\"images/fullsize/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg\",\"pathType\":\"source\"}",
+                    "{\"path\":\"images/thumbnails/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg\",\"pathType\":\"thumbnail\"}"
+                ],
+                "systemType": "{\"ref\":\"87\"}",
+                "label": "1969-1970",
+                "resourceType": "image",
+                "status": false,
+                "_id": "389",
+                "systemLabels": [
+                    "Resource"
+                ]
+            }
+        ],
+        "totalItems": 1,
+        "totalPages": 1
+    },
+    "error": [],
+    "msg": "Query results"
+}
+*/
+
 const getClasspieces = async (req, resp) => {
   let parameters = req.query;
   let label = "";
-  let _id = "";
   let description = "";
   let page = 0;
   let queryPage = 0;
@@ -120,6 +176,7 @@ const getResourcesQuery = async (query, queryParams, limit) => {
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
     let output = countObj['count(*)'];
+    output = parseInt(output,10);
     return output;
   });
   let totalPages = Math.ceil(count/limit)
@@ -131,15 +188,67 @@ const getResourcesQuery = async (query, queryParams, limit) => {
   return result;
 }
 
+
+/**
+* @api {get} /classpiece/:_id Classpiece
+* @apiName classpiece
+* @apiGroup Classpieces
+*
+* @apiParam {string} _id The id of the requested classpiece
+*
+* @apiSuccess (classpiece object) {object} metadata The classpiece metadata
+* @apiSuccess (classpiece object) {string} fileName The file name of the classpiece
+* @apiSuccess (classpiece object) {array} paths An array containing the path to the fullsize version of the classpiece and to the thumbnail of the classpiece
+* @apiSuccess (classpiece object) {string} systemType The system type _id
+* @apiSuccess (classpiece object) {string} label The label of the classpiece
+* @apiSuccess (classpiece object) {string} resourceType The type of the classpiece, i.e. image
+* @apiSuccess (classpiece object) {string} status If the classpiece is private or public
+* @apiSuccess (classpiece object) {string} _id The classpiece _id
+* @apiSuccess (classpiece object) {array} events A list of associated events
+* @apiSuccess (classpiece object) {array} organisations A list of associated organisations
+* @apiSuccess (classpiece object) {array} people A list of associated people
+* @apiSuccess (classpiece object) {array} resources A list of associated resources
+*
+* @apiSuccessExample {json} Success-Response:
+* {
+    "status": true,
+    "data": {
+        "metadata": {},
+        "fileName": "1969-1970.jpg",
+        "paths": [
+            {
+                "path": "images/fullsize/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg",
+                "pathType": "source"
+            },
+            {
+                "path": "images/thumbnails/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg",
+                "pathType": "thumbnail"
+            }
+        ],
+        "systemType": "{\"ref\":\"87\"}",
+        "label": "1969-1970",
+        "resourceType": "image",
+        "status": false,
+        "_id": "389",
+        "events": [],
+        "organisations": [],
+        "people": [],
+        "resources": [],
+      },
+  "error": [],
+  "msg": "Query results"
+}
+*/
 const getClasspiece = async(req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" && parameters._id==="") {
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
     resp.json({
       status: false,
       data: [],
       error: true,
       msg: "Please select a valid id to continue.",
     });
+    return false;
   }
 
   let _id = parameters._id;
