@@ -89,23 +89,31 @@ class User {
       return validateUser;
     }
     else {
+      await this.load();
       let session = driver.session();
-      console.log(this);
-
-      let nodeProperties = helpers.prepareNodeProperties(this);
-      let params = helpers.prepareParams(this);
-
-      console.log(nodeProperties)
-      console.log("/n")
-
-      console.log(params)
-
+      let params = {};
       let query = "";
       if (typeof this._id==="undefined" || this._id===null) {
+        let nodeProperties = helpers.prepareNodeProperties(newData);
+        params = helpers.prepareParams(newData);
         query = "CREATE (n:User "+nodeProperties+") RETURN n";
       }
       else {
-        query = "MATCH (n:User) WHERE id(n)="+this._id+" SET n="+nodeProperties+" RETURN n";
+        let update = "";
+        let i=0;
+        for (let key in newData) {
+          if (i>0) {
+            update +=",";
+          }
+          if (typeof newData[key]==="string") {
+            update += " n."+key+"='"+newData[key]+"'";
+          }
+          else {
+            update += " n."+key+"="+newData[key];
+          }
+          i++;
+        }
+        query = "MATCH (n:User) WHERE id(n)="+this._id+" SET "+update+" RETURN n";
       }
       const resultPromise = await session.run(
         query,
@@ -130,13 +138,13 @@ class User {
       if (resultPromise.status) {
         // add | update user group
         let savedRecord = resultPromise.data;
-        if (newData.usergroup!==null && newData.usergroup!==savedRecord.usergroup._id) {
-          if (typeof savedRecord.usergroup!=="undefined") {
+        if (newData.usergroup!==null && newData.usergroup!==this.usergroup._id) {
+          if (typeof this.usergroup!=="undefined") {
             // 1. remove reference to usergroup
             let existingUsergroupRef = {
               items: [
-                {_id: savedRecord._id, type: "User"},
-                {_id: savedRecord.usergroup, type: "Usergroup"}
+                {_id: this._id, type: "User"},
+                {_id: this.usergroup._id, type: "Usergroup"}
               ],
               taxonomyTermLabel: "belongsToUserGroup",
             }
@@ -146,7 +154,7 @@ class User {
           // 2. add reference to new usergroup
           let newUsergroupRef = {
             items: [
-              {_id: savedRecord._id, type: "User"},
+              {_id: this._id, type: "User"},
               {_id: newData.usergroup, type: "Usergroup"}
             ],
             taxonomyTermLabel: "belongsToUserGroup",
