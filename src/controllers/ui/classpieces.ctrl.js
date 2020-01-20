@@ -29,6 +29,9 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 * @apiSuccess (classpiece object) {string} Classpiece[_id] The classpiece _id
 * @apiSuccess (classpiece object) {array} Classpiece[systemLabels] A list of system tags for the classpiece
 *
+* @apiExample {request} Example:
+* http://localhost:5100/api/classpiece?label=1971&description=test&page=1&limit=25
+*
 * @apiSuccessExample {json} Success-Response:
 * {
     "status": true,
@@ -76,7 +79,6 @@ const getClasspieces = async (req, resp) => {
   await classpieceSystemType.load();
 
   let systemType = classpieceSystemType._id;
-
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
@@ -84,10 +86,10 @@ const getClasspieces = async (req, resp) => {
     }
   }
   if (systemType!=="") {
-    if (queryParams !=="") {
+    if (queryParams!=="") {
       queryParams += " AND ";
     }
-    queryParams = "LOWER(n.systemType) = '{\"ref\":\""+systemType+"\"}'";
+    queryParams += "LOWER(n.systemType) = '{\"ref\":\""+systemType+"\"}'";
   }
   if (typeof parameters.description!=="undefined") {
     description = parameters.description;
@@ -95,10 +97,9 @@ const getClasspieces = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+      queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
     }
   }
-
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
@@ -190,7 +191,7 @@ const getResourcesQuery = async (query, queryParams, limit) => {
 
 
 /**
-* @api {get} /classpiece/:_id Classpiece
+* @api {get} /classpiece Classpiece
 * @apiName classpiece
 * @apiGroup Classpieces
 *
@@ -208,6 +209,9 @@ const getResourcesQuery = async (query, queryParams, limit) => {
 * @apiSuccess (classpiece object) {array} organisations A list of associated organisations
 * @apiSuccess (classpiece object) {array} people A list of associated people
 * @apiSuccess (classpiece object) {array} resources A list of associated resources
+*
+* @apiExample {request} Example:
+* http://localhost:5100/api/classpiece?_id=389
 *
 * @apiSuccessExample {json} Success-Response:
 * {

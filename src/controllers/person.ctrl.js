@@ -137,7 +137,8 @@ class Person {
         }
         this[key] = newAppelations;
       }
-    }// relations
+    }
+    // relations
     let events = await helpers.loadRelations(this._id, "Person", "Event");
     let organisations = await helpers.loadRelations(this._id, "Person", "Organisation");
     let people = await helpers.loadRelations(this._id, "Person", "Person");
@@ -269,11 +270,10 @@ const getPeople = async (req, resp) => {
 
   let query = "";
   let queryParams = "";
-
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
   if (typeof parameters.firstName!=="undefined") {
@@ -282,7 +282,7 @@ const getPeople = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
+      queryParams += "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
     }
   }
   if (typeof parameters.lastName!=="undefined") {
@@ -291,7 +291,7 @@ const getPeople = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.lastName) =~ LOWER('.*"+lastName+".*') ";
+      queryParams += "LOWER(n.lastName) =~ LOWER('.*"+lastName+".*') ";
     }
   }
   if (typeof parameters.fnameSoundex!=="undefined") {
@@ -299,21 +299,21 @@ const getPeople = async (req, resp) => {
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams = "LOWER(n.fnameSoundex) =~ LOWER('.*"+fnameSoundex+".*') ";
+    queryParams += "LOWER(n.fnameSoundex) =~ LOWER('.*"+fnameSoundex+".*') ";
   }
   if (typeof parameters.lnameSoundex!=="undefined") {
     lnameSoundex = helpers.soundex(parameters.lnameSoundex);
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams = "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
+    queryParams += "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
   }
   if (typeof parameters.description!=="undefined") {
     description = parameters.description.toLowerCase();
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams = "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+    queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
   }
 
   if (typeof parameters.page!=="undefined") {

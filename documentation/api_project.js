@@ -3,13 +3,13 @@ define({
   "title": "Clericus-neo4j REST API Documentation",
   "url": "http://localhost:5100/api",
   "name": "clericus-neo4j",
-  "version": "0.12.0",
+  "version": "0.14.5",
   "sampleUrl": false,
   "defaultVersion": "0.0.0",
   "apidoc": "0.3.0",
   "generator": {
     "name": "apidoc",
-    "time": "2020-01-15T17:07:16.427Z",
+    "time": "2020-01-20T10:55:20.910Z",
     "url": "http://apidocjs.com",
     "version": "0.19.1"
   }

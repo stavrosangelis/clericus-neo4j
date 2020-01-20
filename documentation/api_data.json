@@ -20,7 +20,7 @@
   },
   {
     "type": "get",
-    "url": "/classpiece/:_id",
+    "url": "/classpiece",
     "title": "Classpiece",
     "name": "classpiece",
     "group": "Classpieces",
@@ -134,6 +134,13 @@
         }
       ]
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/classpiece?_id=389",
+        "type": "request"
+      }
+    ],
     "version": "0.0.0",
     "filename": "src/controllers/ui/classpieces.ctrl.js",
     "groupTitle": "Classpieces"
@@ -293,6 +300,13 @@
         }
       ]
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/classpiece?label=1971&description=test&page=1&limit=25",
+        "type": "request"
+      }
+    ],
     "version": "0.0.0",
     "filename": "src/controllers/ui/classpieces.ctrl.js",
     "groupTitle": "Classpieces"
@@ -356,6 +370,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/entity?_id=2256",
+        "type": "request"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -397,6 +418,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/entity?page=1&limit=25",
+        "type": "request"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -436,6 +464,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/entity?_id=2256",
+        "type": "request"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -511,6 +546,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\n    \"example\": null,\n    \"label\": \"Test entity\",\n    \"labelId\": \"TestEntity\",\n    \"locked\": false,\n    \"definition\": \"This is a test entity.\",\n    \"parent\": null\n}",
+        "type": "json"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -550,6 +592,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/event?_id=2255",
+        "type": "request"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -589,6 +638,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\n  \"_ids\":[\"2257\",\"2253\"]\n}",
+        "type": "json"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -608,6 +664,13 @@
     "title": "Get event",
     "name": "get_event",
     "group": "Events",
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/event?_id=2255",
+        "type": "request"
+      }
+    ],
     "parameter": {
       "fields": {
         "Parameter": [
@@ -669,6 +732,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/events?label=test&page=1&limit=25",
+        "type": "request"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -729,6 +799,13 @@
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\n  \"label\":\"Test event\",\n  \"description\":\"test event description\",\n  \"eventType\":\"293\",\n  \"temporal\":null,\n  \"spatial\":null,\n  \"_id\":\"2255\"\n}",
+        "type": "json"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -775,6 +852,7 @@
             "type": "boolean",
             "optional": true,
             "field": "events",
+            "defaultValue": "true",
             "description": "<p>Whether to load events data.</p>"
           },
           {
@@ -782,6 +860,7 @@
             "type": "boolean",
             "optional": true,
             "field": "organisations",
+            "defaultValue": "true",
             "description": "<p>Whether to load organisations data.</p>"
           },
           {
@@ -789,6 +868,7 @@
             "type": "boolean",
             "optional": true,
             "field": "people",
+            "defaultValue": "true",
             "description": "<p>Whether to load people data.</p>"
           },
           {
@@ -796,11 +876,19 @@
             "type": "boolean",
             "optional": true,
             "field": "resources",
+            "defaultValue": "true",
             "description": "<p>Whether to load resources data.</p>"
           }
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/graph?events=true&organisations=true&people=true&resources=true",
+        "type": "request"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -838,11 +926,18 @@
             ],
             "optional": true,
             "field": "steps",
-            "description": "<p>The number of steps to take in the graph to get the related nodes</p>"
+            "description": "<p>The number of steps to take in the graph to get the related nodes*</p>"
           }
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/related-nodes?_id=34&steps=1",
+        "type": "request"
+      }
+    ],
     "success": {
       "examples": [
         {
@@ -2212,6 +2307,269 @@
   },
   {
     "type": "delete",
+    "url": "/spatial",
+    "title": "Delete spatial",
+    "name": "delete_spatial",
+    "group": "Spatials",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the spatial for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/spatial?_id=2514",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Spatial) WHERE id(n)=2514 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":30,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/spatial.ctrl.js",
+    "groupTitle": "Spatials"
+  },
+  {
+    "type": "get",
+    "url": "/spatial",
+    "title": "Get spatial",
+    "name": "get_spatial",
+    "group": "Spatials",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested spatial</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/spatial?_id=2514",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"2514\",\"label\":\"test\",\"streetAddress\":\"address\",\"locality\":\"loc\",\"region\":\"reg\",\"postalCode\":\"pc\",\"country\":\"count\",\"latitude\":\"lat\",\"longitude\":\"lon\",\"locationType\":\"type\",\"note\":\"note\",\"createdBy\":null,\"createdAt\":null,\"updatedBy\":\"260\",\"updatedAt\":\"2020-01-17T10:43:13.764Z\",\"events\":[]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/spatial.ctrl.js",
+    "groupTitle": "Spatials"
+  },
+  {
+    "type": "get",
+    "url": "/spatials",
+    "title": "Get spatials",
+    "name": "get_spatials",
+    "group": "Spatials",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A label to match against the spatials' label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/spatials?page=1&limit=25",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"currentPage\":1,\"data\":[{\"note\":\"note\",\"country\":\"count\",\"updatedBy\":\"260\",\"latitude\":\"lat\",\"postalCode\":\"pc\",\"locality\":\"loc\",\"locationType\":\"type\",\"label\":\"test\",\"streetAddress\":\"address\",\"_id\":\"2514\",\"region\":\"reg\",\"longitude\":\"lon\",\"updatedAt\":\"2020-01-17T10:43:13.764Z\",\"systemLabels\":[\"Spatial\"]}],\"totalItems\":\"1\",\"totalPages\":1},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/spatial.ctrl.js",
+    "groupTitle": "Spatials"
+  },
+  {
+    "type": "put",
+    "url": "/spatial",
+    "title": "Put spatial",
+    "name": "put_spatial",
+    "group": "Spatials",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the spatial. This should be undefined|null|blank in the creation of a new spatial.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The spatial's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "streetAddress",
+            "description": "<p>The spatial's street address.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "locality",
+            "description": "<p>The spatial's locality.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "region",
+            "description": "<p>The spatial's region.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "postalCode",
+            "description": "<p>The spatial's region.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "country",
+            "description": "<p>The spatial's country.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "latitude",
+            "description": "<p>The spatial's latitude.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "longitude",
+            "description": "<p>The spatial's longitude.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "locationType",
+            "description": "<p>The spatial's locationType.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "note",
+            "description": "<p>The spatial's note.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "rawData",
+            "description": "<p>The geonames raw data.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\"label\":\"test\",\"streetAddress\":\"address\",\"locality\":\"loc\",\"region\":\"reg\",\"postalCode\":\"pc\",\"country\":\"count\",\"latitude\":\"lat\",\"longitude\":\"lon\",\"locationType\":\"type\",\"note\":\"note\",\"_id\":\"2514\"}",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"error\":[],\"status\":true,\"data\":{\"note\":\"note\",\"country\":\"count\",\"updatedBy\":\"260\",\"latitude\":\"lat\",\"postalCode\":\"pc\",\"locality\":\"loc\",\"locationType\":\"type\",\"label\":\"test\",\"streetAddress\":\"address\",\"_id\":\"2514\",\"region\":\"reg\",\"updatedAt\":\"2020-01-17T11:23:02.934Z\",\"longitude\":\"lon\"}}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/spatial.ctrl.js",
+    "groupTitle": "Spatials"
+  },
+  {
+    "type": "delete",
     "url": "/taxonomy",
     "title": "Delete taxonomy",
     "name": "delete_taxonomy",
@@ -2604,6 +2962,220 @@
     "version": "0.0.0",
     "filename": "src/controllers/taxonomyTerm.ctrl.js",
     "groupTitle": "Taxonomy_terms"
+  },
+  {
+    "type": "delete",
+    "url": "/temporal",
+    "title": "Delete temporal",
+    "name": "delete_temporal",
+    "group": "Temporals",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the temporal for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/temporal?_id=2514",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Temporal) WHERE id(n)=2514 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":1,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/temporal.ctrl.js",
+    "groupTitle": "Temporals"
+  },
+  {
+    "type": "get",
+    "url": "/temporal",
+    "title": "Get temporal",
+    "name": "get_temporal",
+    "group": "Temporals",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested temporal</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/temporal?_id=2514",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"2514\",\"label\":\"00s\",\"startDate\":\"1990\",\"endDate\":\"1999\",\"format\":\"\",\"createdBy\":\"260\",\"createdAt\":\"2020-01-17T10:07:49.237Z\",\"updatedBy\":\"260\",\"updatedAt\":\"2020-01-17T10:07:49.237Z\",\"events\":[]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/temporal.ctrl.js",
+    "groupTitle": "Temporals"
+  },
+  {
+    "type": "get",
+    "url": "/temporals",
+    "title": "Get temporals",
+    "name": "get_temporals",
+    "group": "Temporals",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A label to match against the temporals' label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/temporals?page=1&limit=25",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"currentPage\":1,\"data\":[{\"createdAt\":\"2020-01-17T10:07:49.237Z\",\"updatedBy\":\"260\",\"createdBy\":\"260\",\"endDate\":\"1999\",\"format\":\"\",\"label\":\"00s\",\"startDate\":\"1990\",\"updatedAt\":\"2020-01-17T10:07:49.237Z\",\"_id\":\"2514\",\"systemLabels\":[\"Temporal\"]}],\"totalItems\":\"1\",\"totalPages\":1},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/temporal.ctrl.js",
+    "groupTitle": "Temporals"
+  },
+  {
+    "type": "put",
+    "url": "/temporal",
+    "title": "Put temporal",
+    "name": "put_temporal",
+    "group": "Temporals",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the temporal. This should be undefined|null|blank in the creation of a new temporal.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The temporal's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "startDate",
+            "description": "<p>The temporal's start date.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "endDate",
+            "description": "<p>The temporal's end date.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "format",
+            "description": "<p>The temporal's date format.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\"label\":\"00s\",\"startDate\":\"1990\",\"endDate\":\"1999\",\"format\":\"\"}",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"error\":[],\"status\":true,\"data\":{\"createdAt\":\"2020-01-17T10:07:49.237Z\",\"updatedBy\":\"260\",\"createdBy\":\"260\",\"endDate\":\"1999\",\"format\":\"\",\"label\":\"00s\",\"startDate\":\"1990\",\"updatedAt\":\"2020-01-17T10:07:49.237Z\",\"_id\":\"2514\"}}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/temporal.ctrl.js",
+    "groupTitle": "Temporals"
   },
   {
     "type": "get",

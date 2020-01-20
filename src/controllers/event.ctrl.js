@@ -64,10 +64,14 @@ class Event {
     let organisations = await helpers.loadRelations(this._id, "Event", "Organisation");
     let people = await helpers.loadRelations(this._id, "Event", "Person");
     let resources = await helpers.loadRelations(this._id, "Event", "Resource");
+    let temporal = await helpers.loadRelations(this._id, "Event", "Temporal");
+    let spatial = await helpers.loadRelations(this._id, "Event", "Spatial");
     this.events = events;
     this.organisations = organisations;
     this.people = people;
     this.resources = resources;
+    this.temporal = temporal;
+    this.spatial = spatial;
   }
 
   async save() {
@@ -145,6 +149,10 @@ class Event {
 * @apiParam {string} [label] A string to match against the events labels.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
+*
+* @apiExample {request} Example:
+* http://localhost:5100/api/events?label=test&page=1&limit=25
+*
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"currentPage":1,"data":[{"createdAt":"2020-01-14T14:48:31.753Z","updatedBy":"260","createdBy":"260","description":"test event description","label":"Test event","eventType":"293","updatedAt":"2020-01-14T14:48:31.753Z","_id":"2255","systemLabels":["Event"]}],"totalItems":"1","totalPages":1},"error":[],"msg":"Query results"}
 */
@@ -271,6 +279,9 @@ const getEventsQuery = async (query, queryParams, limit) => {
 * @apiName get event
 * @apiGroup Events
 *
+* @apiExample {request} Example:
+* http://localhost:5100/api/event?_id=2255
+*
 * @apiParam {string} _id The _id of the requested event.
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"_id":"2255","label":"Test event","description":"test event description","eventType":"293","createdBy":null,"createdAt":null,"updatedBy":"260","updatedAt":"2020-01-14T15:00:13.430Z","events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
@@ -307,6 +318,17 @@ const getEvent = async(req, resp) => {
 * @apiParam {string} label The label of the event.
 * @apiParam {string} [description] The description of the event.
 * @apiParam {string} [eventType] The event type.
+*
+* @apiExample {json} Example:
+* {
+  "label":"Test event",
+  "description":"test event description",
+  "eventType":"293",
+  "temporal":null,
+  "spatial":null,
+  "_id":"2255"
+}
+*
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"createdAt":"2020-01-14T14:48:31.753Z","updatedBy":"260","createdBy":"260","description":"test event descriptiomn","label":"Test event","eventType":"293","updatedAt":"2020-01-14T14:48:31.753Z","_id":"2255"},"error":[],"msg":"Query results"}
 */
@@ -347,6 +369,9 @@ const putEvent = async(req, resp) => {
 *
 * @apiParam {string} _id The id of the event for deletion.
 *
+* @apiExample {request} Example:
+* http://localhost:5100/api/event?_id=2255
+*
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Event) WHERE id(n)=569 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":28,"high":0}}},"error":[],"msg":"Query results"}
 */
@@ -378,6 +403,12 @@ const deleteEvent = async(req, resp) => {
 * @apiPermission admin
 *
 * @apiParam {array} _ids The ids of the events for deletion.
+*
+* @apiExample {json} Example:
+* {
+  "_ids":["2257","2253"]
+}
+*
 *
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":[{"records":[],"summary":{"statement":{"text":"MATCH (n:Event) WHERE id(n)=1149 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":6,"high":0}}}],"error":[],"msg":"Query results"}

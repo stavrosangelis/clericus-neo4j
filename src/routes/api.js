@@ -17,8 +17,10 @@ const resourceController = require('../controllers/resource.ctrl');
 const referencesController = require('../controllers/references.ctrl');
 const seedController = require('../seed/');
 const settingsController = require('../controllers/settings.ctrl');
+const spatialController = require('../controllers/spatial.ctrl');
 const taxonomyController = require('../controllers/taxonomy.ctrl');
 const taxonomyTermController = require('../controllers/taxonomyTerm.ctrl');
+const temporalController = require('../controllers/temporal.ctrl');
 const toolsParseController = require('../controllers/tools/meta-parse.ctrl');
 const toolsIngestionController = require('../controllers/tools/prepare-ingestion.ctrl');
 const userController = require('../controllers/user.ctrl');
@@ -95,6 +97,12 @@ server.put('/reference', auth.checkAdminToken, referencesController.putReference
 server.put('/references', auth.checkAdminToken, referencesController.putReferences);
 server.delete('/reference', auth.checkAdminToken, referencesController.deleteReference);
 
+// spatial
+server.put('/spatial', auth.checkAdminToken, spatialController.putSpatial);
+server.get('/spatial', spatialController.getSpatial);
+server.get('/spatials', spatialController.getSpatials);
+server.delete('/spatial', auth.checkAdminToken, spatialController.deleteSpatial);
+
 // taxonomies
 server.put('/taxonomy', auth.checkAdminToken, taxonomyController.putTaxonomy);
 server.get('/taxonomy', taxonomyController.getTaxonomy);
@@ -106,6 +114,12 @@ server.put('/taxonomy-term', auth.checkAdminToken, taxonomyTermController.putTax
 server.get('/taxonomy-term', taxonomyTermController.getTaxonomyTerm);
 server.get('/taxonomy-terms', taxonomyTermController.getTaxonomyTerms);
 server.delete('/taxonomy-term', auth.checkAdminToken, taxonomyTermController.deleteTaxonomyTerm);
+
+// temporal
+server.put('/temporal', auth.checkAdminToken, temporalController.putTemporal);
+server.get('/temporal', temporalController.getTemporal);
+server.get('/temporals', temporalController.getTemporals);
+server.delete('/temporal', auth.checkAdminToken, temporalController.deleteTemporal);
 
 // tools
 server.get('/list-class-pieces', auth.checkAdminToken, toolsParseController.listClassPieces);

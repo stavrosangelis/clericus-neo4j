@@ -149,7 +149,7 @@ const updateReference = async (reference) => {
   let direction = "from";
   if (taxonomyTerm._id === null) {
     taxonomyTermQuery = {
-      inverseLabel: reference.taxonomyTermLabel
+      inverseLabelId: reference.taxonomyTermLabel
     };
     taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
     await taxonomyTerm.load();
@@ -267,7 +267,7 @@ const removeReference = async (reference) => {
   let direction = "from";
   if (taxonomyTerm._id === null) {
     taxonomyTermQuery = {
-      inverseLabel: reference.taxonomyTermLabel
+      inverseLabelId: reference.taxonomyTermLabel
     };
     taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
     await taxonomyTerm.load();

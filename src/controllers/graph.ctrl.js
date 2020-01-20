@@ -6,10 +6,14 @@ const helpers = require("../helpers");
 * @apiName get graph
 * @apiGroup Network graph
 *
-* @apiParam {boolean} [events] Whether to load events data.
-* @apiParam {boolean} [organisations] Whether to load organisations data.
-* @apiParam {boolean} [people] Whether to load people data.
-* @apiParam {boolean} [resources] Whether to load resources data.
+* @apiParam {boolean} [events=true] Whether to load events data.
+* @apiParam {boolean} [organisations=true] Whether to load organisations data.
+* @apiParam {boolean} [people=true] Whether to load people data.
+* @apiParam {boolean} [resources=true] Whether to load resources data.
+*
+* @apiExample {request} Example:
+* http://localhost:5100/api/graph?events=true&organisations=true&people=true&resources=true
+*
 * @apiSuccessExample {json} Success-Response:
 {
 	"status": true,
@@ -234,13 +238,17 @@ const parseReferences = (refs) =>{
 const flattenDeep = (arr1) => {
    return arr1.reduce((acc, val) => Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val), []);
 }
+
 /**
 * @api {get} /related-nodes Get related nodes
 * @apiName get related-nodes
 * @apiGroup Network graph
 *
 * @apiParam {string} _id The id of the source node.
-* @apiParam {number=1..6} [steps] The number of steps to take in the graph to get the related nodes
+* @apiParam {number=1..6} [steps] The number of steps to take in the graph to get the related nodes*
+* @apiExample {request} Example:
+* http://localhost:5100/api/related-nodes?_id=34&steps=1
+*
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":[{"lastName":"Alamain","firstName":"Colm","honorificPrefix":[""],"middleName":"","label":"Colm  Alamain","alternateAppelations":[],"status":false,"_id":"45","systemLabels":["Person"]},{"firstName":"Tomas","lastName":"O Hogain","honorificPrefix":[""],"middleName":"","label":"Tomas  O Hogain","alternateAppelations":[],"status":false,"_id":"187","systemLabels":["Person"]}],"error":[],"msg":"Query results"}*/
 const getRelatedNodes = async(req, resp) => {

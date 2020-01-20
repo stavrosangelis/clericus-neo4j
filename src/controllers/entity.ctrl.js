@@ -197,6 +197,10 @@ class Entity {
 *
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
+*
+* @apiExample {request} Example:
+* http://localhost:5100/api/entity?page=1&limit=25
+*
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"currentPage":1,"data":[{"definition":"This is the model of an event.","label":"Event","labelId":"Event","locked":true,"_id":"49","systemLabels":["Entity"]},{"definition":"This is the model of an organisation.","label":"Organisation","labelId":"Organisation","locked":true,"_id":"450","systemLabels":["Entity"]},{"definition":"This is the model of a person.","label":"Person","labelId":"Person","locked":true,"_id":"402","systemLabels":["Entity"]},{"definition":"This is the model of a resource.","label":"Resource","labelId":"Resource","locked":true,"_id":"261","systemLabels":["Entity"]},{"definition":"This is the model of a spatial object.","label":"Spatial","labelId":"Spatial","locked":true,"_id":"313","systemLabels":["Entity"]},{"definition":"This is the model of a temporal object.","label":"Temporal","labelId":"Temporal","locked":true,"_id":"413","systemLabels":["Entity"]},{"createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","labelId":"TestEntity","createdBy":"260","definition":"This is a test entity.","label":"Test entity","locked":false,"updatedAt":"2020-01-14T12:54:12.873Z","_id":"2257","systemLabels":["Entity"]}],"totalItems":"7","totalPages":1},"error":[],"msg":"Query results"}
 */
@@ -311,6 +315,10 @@ const getEntitiesQuery = async (query, limit) => {
 *
 * @apiParam {string} _id The _id of the requested entity. If labelId is provided _id can be omitted.
 * @apiParam {string} labelId The labelId of the requested entity. If _id is provided labelId can be omitted.
+*
+* @apiExample {request} Example:
+* http://localhost:5100/api/entity?_id=2256
+*
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"_id":"2257","label":"Test entity","labelId":"TestEntity","locked":false,"definition":"This is a test entity.","example":null,"parent":null,"createdBy":"260","createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","updatedAt":"2020-01-14T12:54:12.873Z","properties":[]},"error":[],"msg":"Query results"}
 */
@@ -358,6 +366,17 @@ const getEntity = async(req, resp) => {
 * @apiParam {string} definition The definition of the entity.
 * @apiParam {string} [example] An example of use for this entity.
 * @apiParam {string} [parent] A parent entity for this entity.
+*
+* @apiExample {json} Example:
+* {
+    "example": null,
+    "label": "Test entity",
+    "labelId": "TestEntity",
+    "locked": false,
+    "definition": "This is a test entity.",
+    "parent": null
+}
+*
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","labelId":"TestEntity","createdBy":"260","definition":"This is a test entity.","label":"Test entity","locked":false,"updatedAt":"2020-01-14T12:54:12.873Z","_id":"2257"},"error":[],"msg":"Query results"}
 */
@@ -397,6 +416,9 @@ const putEntity = async(req, resp) => {
 *
 * @apiParam {string} _id The id of the entity for deletion. If labelId is provided _id can be omitted.
 * @apiParam {string} labelId The labelId of the entity for deletion. If _id is provided labelId can be omitted.
+*
+* @apiExample {request} Example:
+* http://localhost:5100/api/entity?_id=2256
 *
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"relations":{"nodesCreated":0,"nodesDeleted":0,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0},"node":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"error":[],"msg":"Query results"}
