@@ -175,6 +175,8 @@ class Spatial {
 * @apiGroup Spatials
 *
 * @apiParam {string} [label] A label to match against the spatials' label.
+* @apiParam {string} [orderField=firstName] The field to order the results by.
+* @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
 *
@@ -188,7 +190,9 @@ const getSpatials = async (req, resp) => {
   let parameters = req.query;
   let systemType = null;
   let page = 0;
+  let orderField = "label";
   let queryPage = 0;
+  let queryOrder = "";
   let limit = 25;
 
   let query = "";
@@ -198,6 +202,15 @@ const getSpatials = async (req, resp) => {
     label = parameters.label;
     if (label!=="") {
       queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+    }
+  }
+  if (typeof parameters.orderField!=="undefined") {
+    orderField = parameters.orderField;
+  }
+  if (orderField!=="") {
+    queryOrder = "ORDER BY n."+orderField;
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+      queryOrder += " DESC";
     }
   }
 
@@ -217,7 +230,7 @@ const getSpatials = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = "MATCH (n:Spatial) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
+  query = "MATCH (n:Spatial) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
   let data = await getSpatialsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({

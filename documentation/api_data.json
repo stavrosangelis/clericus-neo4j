@@ -338,6 +338,61 @@
     "groupTitle": "Dashboard"
   },
   {
+    "type": "get",
+    "url": "/monthly-stats",
+    "title": "Monthly stats",
+    "name": "monthly_stats",
+    "group": "Dashboard",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "year",
+            "defaultValue": "current",
+            "description": "<p>year] The year for the requested data.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "month",
+            "defaultValue": "current",
+            "description": "<p>month] The month for the requested data.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/nmonthly-stats?year=2020&month=1",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"year\":2020,\"month\":1,\"items\":[{\"day\":10,\"count\":35},{\"day\":15,\"count\":3},{\"day\":16,\"count\":1},{\"day\":17,\"count\":3}]},\"error\":false,\"msg\":\"\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dashboard.ctrl.js",
+    "groupTitle": "Dashboard"
+  },
+  {
     "type": "delete",
     "url": "/entity",
     "title": "Delete entity",
@@ -715,6 +770,22 @@
           },
           {
             "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "number",
             "optional": true,
             "field": "page",
@@ -1079,6 +1150,22 @@
           },
           {
             "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "number",
             "optional": true,
             "field": "page",
@@ -1333,6 +1420,22 @@
             "optional": true,
             "field": "description",
             "description": "<p>A string to match against the peoples' description.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
           },
           {
             "group": "Parameter",
@@ -2408,6 +2511,22 @@
           },
           {
             "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "number",
             "optional": true,
             "field": "page",
@@ -3066,6 +3185,22 @@
           },
           {
             "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "number",
             "optional": true,
             "field": "page",
@@ -3665,6 +3800,22 @@
         "Parameter": [
           {
             "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "number",
             "optional": true,
             "field": "page",
@@ -3851,6 +4002,22 @@
     "parameter": {
       "fields": {
         "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
           {
             "group": "Parameter",
             "type": "number",

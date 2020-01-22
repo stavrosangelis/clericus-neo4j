@@ -175,6 +175,8 @@ class Organisation {
 * @apiGroup Organisations
 *
 * @apiParam {string} [label] A string to match against the organisations' labels.
+* @apiParam {string} [orderField=firstName] The field to order the results by.
+* @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
 * @apiSuccessExample {json} Success-Response:
@@ -203,7 +205,9 @@ const getOrganisations = async (req, resp) => {
   let parameters = req.query;
   let label = "";
   let page = 0;
+  let orderField = "label";
   let queryPage = 0;
+  let queryOrder = "";
   let limit = 25;
 
   let query = "";
@@ -213,6 +217,15 @@ const getOrganisations = async (req, resp) => {
     label = parameters.label;
     if (label!=="") {
       queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+    }
+  }
+  if (typeof parameters.orderField!=="undefined") {
+    orderField = parameters.orderField;
+  }
+  if (orderField!=="") {
+    queryOrder = "ORDER BY n."+orderField;
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+      queryOrder += " DESC";
     }
   }
 
@@ -232,7 +245,7 @@ const getOrganisations = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = "MATCH (n:Organisation) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
+  query = "MATCH (n:Organisation) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
   let data = await getOrganisationsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({

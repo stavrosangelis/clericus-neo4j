@@ -48,6 +48,7 @@ server.post('/admin-session', auth.checkAdminToken, authController.activeSession
 
 // dashboard
 server.get('/dashboard', auth.checkAdminToken, dashboardController.dashboardStats);
+server.get('/monthly-stats', auth.checkAdminToken, dashboardController.getMonthlyStats);
 
 // entity
 server.put('/entity', auth.checkAdminToken, entityController.putEntity);

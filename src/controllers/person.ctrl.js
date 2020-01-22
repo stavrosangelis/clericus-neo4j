@@ -239,6 +239,8 @@ class Person {
 * @apiParam {string} [fnameSoundex] A string to match against the peoples' first name soundex.
 * @apiParam {string} [lnameSoundex] A string to match against the peoples' last name soundex.
 * @apiParam {string} [description] A string to match against the peoples' description.
+* @apiParam {string} [orderField=firstName] The field to order the results by.
+* @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
 * @apiSuccessExample {json} Success-Response:
@@ -265,7 +267,9 @@ const getPeople = async (req, resp) => {
   let lnameSoundex = "";
   let description = "";
   let page = 0;
+  let orderField = "firstName";
   let queryPage = 0;
+  let queryOrder = "";
   let limit = 25;
 
   let query = "";
@@ -315,6 +319,15 @@ const getPeople = async (req, resp) => {
     }
     queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
   }
+  if (typeof parameters.orderField!=="undefined") {
+    orderField = parameters.orderField;
+  }
+  if (orderField!=="") {
+    queryOrder = "ORDER BY n."+orderField;
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+      queryOrder += " DESC";
+    }
+  }
 
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
@@ -331,7 +344,7 @@ const getPeople = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = "MATCH (n:Person) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
+  query = "MATCH (n:Person) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
   let data = await getPeopleQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({

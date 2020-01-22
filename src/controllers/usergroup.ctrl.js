@@ -179,6 +179,8 @@ class Usergroup {
 * @apiGroup Usergroups
 * @apiPermission admin
 *
+* @apiParam {string} [orderField=firstName] The field to order the results by.
+* @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
 * @apiSuccessExample {json} Success-Response:
@@ -187,12 +189,23 @@ class Usergroup {
 const getUsergroups = async (req, resp) => {
   let parameters = req.query;
   let page = 0;
+  let orderField = "label";
   let queryPage = 0;
+  let queryOrder = "";
   let limit = 25;
 
   let query = {};
   let $and = [];
 
+  if (typeof parameters.orderField!=="undefined") {
+    orderField = parameters.orderField;
+  }
+  if (orderField!=="") {
+    queryOrder = "ORDER BY n."+orderField;
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+      queryOrder += " DESC";
+    }
+  }
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
@@ -206,7 +219,7 @@ const getUsergroups = async (req, resp) => {
   }
 
   let skip = limit*queryPage;
-  query = "MATCH (n:Usergroup) RETURN n SKIP "+skip+" LIMIT "+limit;
+  query = "MATCH (n:Usergroup) RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
   let data = await getUsergroupsQuery(query, limit);
   if (data.error) {
     resp.json({
