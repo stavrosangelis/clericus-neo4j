@@ -176,8 +176,10 @@ class Event {
 const getEvents = async (req, resp) => {
   let parameters = req.query;
   let label = "";
+  let eventType = "";
   let page = 0;
-  let orderField = "firstName";
+  let orderField = "label";
+  let status = "";
   let queryPage = 0;
   let queryOrder = "";
   let limit = 25;
@@ -191,6 +193,12 @@ const getEvents = async (req, resp) => {
       queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
+  if (typeof parameters.eventType!=="undefined") {
+    eventType = parameters.eventType;
+    if (eventType!=="") {
+      queryParams = `LOWER(n.eventType)= "${eventType}" `;
+    }
+  }
   if (typeof parameters.orderField!=="undefined") {
     orderField = parameters.orderField;
   }
@@ -198,6 +206,15 @@ const getEvents = async (req, resp) => {
     queryOrder = "ORDER BY n."+orderField;
     if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
       queryOrder += " DESC";
+    }
+  }
+  if (typeof parameters.status!=="undefined") {
+    status = parameters.status;
+    if (status!=="") {
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams = "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
     }
   }
 

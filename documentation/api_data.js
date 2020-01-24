@@ -1152,6 +1152,13 @@ define({ "api": [
             "group": "Parameter",
             "type": "string",
             "optional": true,
+            "field": "organisationType",
+            "description": "<p>An organisation type label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
             "field": "orderField",
             "defaultValue": "firstName",
             "description": "<p>The field to order the results by.</p>"

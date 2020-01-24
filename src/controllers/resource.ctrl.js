@@ -269,6 +269,7 @@ const getResources = async (req, resp) => {
   let parameters = req.query;
   let label = "";
   let systemType = "";
+  let status = "";
   let description = "";
   let page = 0;
   let queryPage = 0;
@@ -299,6 +300,15 @@ const getResources = async (req, resp) => {
         queryParams += " AND ";
       }
       queryParams = "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+    }
+  }
+  if (typeof parameters.status!=="undefined") {
+    status = parameters.status;
+    if (status!=="") {
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams = "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
     }
   }
 
