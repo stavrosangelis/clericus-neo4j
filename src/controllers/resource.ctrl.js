@@ -137,6 +137,21 @@ class Resource {
       }
       this.paths = newPaths;
       this.metadata = JSON.stringify(this.metadata);
+
+      // timestamps
+      let now = new Date().toISOString();
+      if (typeof this._id==="undefined" || this._id===null) {
+        if (typeof this._id==="userId" && this.userId!==null) {
+          this.createdBy = this.userId;
+        }
+        this.createdAt = now;
+      }
+      if (typeof this._id==="userId" && this.userId!==null) {
+        this.updatedBy = this.userId;
+        delete this.userId;
+      }
+      this.updatedAt = now;
+
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
       let query = "";
@@ -452,8 +467,8 @@ const getResource = async(req, resp) => {
 */
 const putResource = async(req, resp) => {
   let postData = await helpers.parseRequestData(req);
-  let now = new Date().toISOString();
   let userId = req.decoded.id;
+  postData.userId = userId;
   if (postData===null || Object.keys(postData).length===0) {
     resp.json({
       status: false,
@@ -464,12 +479,6 @@ const putResource = async(req, resp) => {
     return false;
   }
   let resourceData = postData.resource;
-  if (typeof resourceData._id==="undefined" || resourceData._id===null) {
-    resourceData.createdBy = userId;
-    resourceData.createdAt = now;
-  }
-  resourceData.updatedBy = userId;
-  resourceData.updatedAt = now;
 
   let resource = new Resource(resourceData);
   let data = await resource.save();
@@ -678,6 +687,11 @@ const uploadFile = async(uploadedFile=null, hashedName="") => {
   if (uploadedFile===null || hashedName==="") {
     return false;
   }
+  // patch for the case when the archive path is in a different drive
+  let tempPath = process.env.ARCHIVEPATH+'temp/'+hashedName;
+  let movFile = await fs.copyFileSync(uploadedFile.path, tempPath);
+  uploadedFile.path = tempPath;
+
   let sourcePath = uploadedFile.path;
   let targetPath = process.env.ARCHIVEPATH+"images/fullsize/"+hashedName;
   let uploadFilePromise = await new Promise((resolve, reject) => {

@@ -302,6 +302,8 @@ const ingestClasspiece = async(req, resp) => {
     });
     return false;
   }
+
+  let userId = req.decoded.id;
   let data = JSON.parse(postData.data);
 
   let file = data.file;
@@ -315,7 +317,7 @@ const ingestClasspiece = async(req, resp) => {
   if (typeof data.classpiece!=="undefined") {
     classpiece = data.classpiece;
 
-    dbClassPiece = await ingestClasspieceImage(classpiece);
+    dbClassPiece = await ingestClasspieceImage(classpiece, userId);
     classpiece._id = dbClassPiece.data._id;
   }
   // 2. ingest and link faces
@@ -323,7 +325,7 @@ const ingestClasspiece = async(req, resp) => {
     let faces = data.faces;
     let facesPromises = [];
     for (let face of faces) {
-      await ingestPerson(face, classpiece);
+      await ingestPerson(face, classpiece, userId);
     }
   }
 
@@ -551,7 +553,7 @@ var imgDimensions = (imgPath) => {
   });
 }
 
-const ingestClasspieceImage = async (classpiece) => {
+const ingestClasspieceImage = async (classpiece, userId) => {
   let classpieceRef = new TaxonomyTerm({"labelId": "Classpiece"});
   await classpieceRef.load();
 
@@ -581,9 +583,7 @@ const ingestClasspieceImage = async (classpiece) => {
           iptc: classpiece.iptc
         }
       },
-      systemType: {
-        ref: classpieceRef._id
-      },
+      systemType: classpieceRef._id,
       resourceType: 'image',
       paths: [
         {path: fullsizePath, pathType: 'source'},
@@ -591,8 +591,9 @@ const ingestClasspieceImage = async (classpiece) => {
       ]
     }
     classPieceData.metadata = JSON.stringify(classPieceData.metadata);
-    classPieceData.systemType = JSON.stringify(classPieceData.systemType);
     classPieceData.paths = classPieceData.paths.map(path=>JSON.stringify(path));
+    classPieceData.userId = userId;
+
     let newClasspiece = new Resource(classPieceData);
     let output = newClasspiece.save();
     resolve(output);
@@ -603,7 +604,7 @@ const ingestClasspieceImage = async (classpiece) => {
   return classpieceImage;
 }
 
-const ingestPerson = async(person, classpiece) => {
+const ingestPerson = async(person, classpiece, userId) => {
   let newPerson = await new Promise(async(resolve,reject) => {
     // 1. insert/update person
     if (person.firstName==="") {
@@ -637,6 +638,7 @@ const ingestPerson = async(person, classpiece) => {
     if (typeof person._id!=="undefined") {
       personData._id = person._id;
     }
+    personData.userId = userId;
     let newPerson = new Person(personData);
     let ingestPersonPromise = await newPerson.save();
 
@@ -645,10 +647,10 @@ const ingestPerson = async(person, classpiece) => {
       person._id = ingestPersonPromise.data._id;
       person.label = ingestPersonPromise.data.label;
       // 2. insert/update thumbnail
-      let ingestPersonThumbnailPromise = await ingestPersonThumbnail(person, classpiece);
+      let ingestPersonThumbnailPromise = await ingestPersonThumbnail(person, classpiece, userId);
 
       // 3. insert diocese
-      let ingestDiocesePromise = await ingestDiocese(person);
+      let ingestDiocesePromise = await ingestDiocese(person, userId);
 
       // 4. link person to classpiece
       if (classpiece!==null) {
@@ -723,7 +725,7 @@ const ingestPerson = async(person, classpiece) => {
   return newPerson;
 }
 
-const ingestPersonThumbnail = async(person, classpiece) => {
+const ingestPersonThumbnail = async(person, classpiece, userId) => {
   if (classpiece===null) {
     return false;
   }
@@ -774,9 +776,7 @@ const ingestPersonThumbnail = async(person, classpiece) => {
           iptc: iptcData
         }
       },
-      systemType: {
-        ref: thumbnailRef._id
-      },
+      systemType: thumbnailRef._id,
       resourceType: 'image',
       paths: [
         {path: thumbnailsPath, pathType: 'thumbnail'},
@@ -784,8 +784,9 @@ const ingestPersonThumbnail = async(person, classpiece) => {
       ]
     }
     newPersonImageData.metadata = JSON.stringify(newPersonImageData.metadata);
-    newPersonImageData.systemType = JSON.stringify(newPersonImageData.systemType);
     newPersonImageData.paths = newPersonImageData.paths.map(path=>JSON.stringify(path));
+    newPersonImageData.userId = userId;
+
     let newPersonThumbnail = new Resource(newPersonImageData);
     let output = newPersonThumbnail.save();
     resolve(output);
@@ -796,7 +797,7 @@ const ingestPersonThumbnail = async(person, classpiece) => {
   return personThumbnail;
 }
 
-var ingestDiocese = async(person) => {
+var ingestDiocese = async(person, userId) => {
   let organisation = {};
   organisation.label = person.diocese;
   organisation.organisationType = person.dioceseType;
@@ -824,6 +825,7 @@ var ingestDiocese = async(person) => {
     console.log(error)
   });
   if (typeof existingOrganisation==="undefined" || existingOrganisation===null) {
+    organisation.userId = userId;
     let newOrganisation = new Organisation(organisation);
     let savedOrganisation = await newOrganisation.save();
     existingOrganisation = savedOrganisation.data;

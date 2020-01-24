@@ -89,7 +89,7 @@ const getClasspieces = async (req, resp) => {
     if (queryParams!=="") {
       queryParams += " AND ";
     }
-    queryParams += "LOWER(n.systemType) = '{\"ref\":\""+systemType+"\"}'";
+    queryParams += `LOWER(n.systemType) = '${systemType}'`;
   }
   if (typeof parameters.description!=="undefined") {
     description = parameters.description;

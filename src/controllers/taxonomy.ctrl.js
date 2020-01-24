@@ -100,6 +100,21 @@ class Taxonomy {
     }
     else {
       let session = driver.session();
+
+      // timestamps
+      let now = new Date().toISOString();
+      if (typeof this._id==="undefined" || this._id===null) {
+        if (typeof this._id==="userId" && this.userId!==null) {
+          this.createdBy = this.userId;
+        }
+        this.createdAt = now;
+      }
+      if (typeof this._id==="userId" && this.userId!==null) {
+        this.updatedBy = this.userId;
+        delete this.userId;
+      }
+      this.updatedAt = now;
+
       let newData = this;
       // normalize label id
       if (typeof this._id==="undefined" || this._id===null) {
@@ -116,7 +131,6 @@ class Taxonomy {
       }
       let nodeProperties = helpers.prepareNodeProperties(newData);
       let params = helpers.prepareParams(newData);
-
       let query = "";
       if (typeof this._id==="undefined" || this._id===null) {
         query = "CREATE (n:Taxonomy "+nodeProperties+") RETURN n";
@@ -335,14 +349,8 @@ const putTaxonomy = async(req, resp) => {
     });
     return false;
   }
-  let now = new Date().toISOString();
   let userId = req.decoded.id;
-  if (typeof parameters._id==="undefined" || parameters._id===null) {
-    parameters.createdBy = userId;
-    parameters.createdAt = now;
-  }
-  parameters.updatedBy = userId;
-  parameters.updatedAt = now;
+  postData.userId = userId;
   let taxonomy = new Taxonomy(parameters);
   let output = await taxonomy.save();
   resp.json({

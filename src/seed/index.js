@@ -7,6 +7,7 @@ const seedUsergroups = require('./user-groups.js').seedUsergroups;
 const seedUser = require('./user.js').seedUser;
 const seedEntities = require('./entities.js').seedEntities;
 const seedEntitiesProperties = require('./entities-properties.js').seedEntitiesProperties;
+const driver = require("../config/db-driver");
 
 /**
 * @api {post} /seed-db Post seed db
@@ -77,19 +78,33 @@ const seedData = async(req, resp) => {
   // 7 insert entities
   let seedEntitiesPromise = await seedEntities();
   data.entities = seedEntitiesPromise;
-  console.log("step 7.1 complete");
+  console.log("step 7 complete");
 
   // 8 insert entity properties
   let seedEntitiesPropertiesPromise = await seedEntitiesProperties();
   data.entitiesProperties = seedEntitiesPropertiesPromise;
-  console.log("step 7.2 complete");
+  console.log("step 8 complete");
 
   // 9. dissalow any further seeding in the database
   let disallowSeeding = await settings.disallowSeeding();
   data.seeding = disallowSeeding;
-  console.log("step 8 complete");
-  console.log("seeding complete");
+  console.log("step 9 complete");
 
+  // 10. associated all new entities with the default admin user
+  let userId = data.user.user._id;
+  let session = driver.session();
+  let query = "MATCH (n) SET n.createdBy='"+userId+"', n.updatedBy='"+userId+"' RETURN n";
+  let associateToAdmin = await session.run(query,{}).then(result => {
+    session.close();
+    let records = result.records;
+    return records;
+  })
+  .catch((error) => {
+    let output = {error: error, status: false, data: []};
+    return output;
+  });
+  data.associatetoadmin = associateToAdmin;
+  console.log("seeding complete");
 
   resp.json({
     status: status,

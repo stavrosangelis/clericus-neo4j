@@ -114,6 +114,20 @@ class TaxonomyTerm {
     }
     else {
       let session = driver.session();
+      // timestamps
+      let now = new Date().toISOString();
+      if (typeof this._id==="undefined" || this._id===null) {
+        if (typeof this._id==="userId" && this.userId!==null) {
+          this.createdBy = this.userId;
+        }
+        this.createdAt = now;
+      }
+      if (typeof this._id==="userId" && this.userId!==null) {
+        this.updatedBy = this.userId;
+        delete this.userId;
+      }
+      this.updatedAt = now;
+
       let newData = this;
       if (typeof this._id==="undefined" || this._id===null) {
         this.labelId = helpers.normalizeLabelId(this.label);
@@ -389,14 +403,8 @@ const putTaxonomyTerm = async(req, resp) => {
     });
     return false;
   }
-  let now = new Date().toISOString();
   let userId = req.decoded.id;
-  if (typeof postData._id==="undefined" || postData._id===null) {
-    postData.createdBy = userId;
-    postData.createdAt = now;
-  }
-  postData.updatedBy = userId;
-  postData.updatedAt = now;
+  postData.userId = userId;
   let term = new TaxonomyTerm(postData);
   let data = await term.save();
   resp.json({

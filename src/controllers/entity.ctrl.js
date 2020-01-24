@@ -134,6 +134,20 @@ class Entity {
       if (typeof this._id==="undefined" || this._id===null && this.labelId===null) {
         this.labelId = helpers.normalizeLabelId(this.label);
       }
+      // timestamps
+      let now = new Date().toISOString();
+      if (typeof this._id==="undefined" || this._id===null) {
+        if (typeof this._id==="userId" && this.userId!==null) {
+          this.createdBy = this.userId;
+        }
+        this.createdAt = now;
+      }
+      if (typeof this._id==="userId" && this.userId!==null) {
+        this.updatedBy = this.userId;
+        delete this.userId;
+      }
+      this.updatedAt = now;
+
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
 
@@ -393,12 +407,7 @@ const putEntity = async(req, resp) => {
   }
   let now = new Date().toISOString();
   let userId = req.decoded.id;
-  if (typeof postData._id==="undefined" || postData._id===null) {
-    postData.createdBy = userId;
-    postData.createdAt = now;
-  }
-  postData.updatedBy = userId;
-  postData.updatedAt = now;
+  postData.userId = userId;
   let entity = new Entity(postData);
   let output = await entity.save();
   resp.json({

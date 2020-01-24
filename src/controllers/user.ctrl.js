@@ -93,6 +93,21 @@ class User {
       let session = driver.session();
       let params = {};
       let query = "";
+
+      // timestamps
+      let now = new Date().toISOString();
+      if (typeof this._id==="undefined" || this._id===null) {
+        if (typeof this._id==="userId" && this.userId!==null) {
+          this.createdBy = this.userId;
+        }
+        this.createdAt = now;
+      }
+      if (typeof this._id==="userId" && this.userId!==null) {
+        this.updatedBy = this.userId;
+        delete this.userId;
+      }
+      this.updatedAt = now;
+
       if (typeof this._id==="undefined" || this._id===null) {
         let nodeProperties = helpers.prepareNodeProperties(newData);
         params = helpers.prepareParams(newData);
@@ -436,14 +451,8 @@ const putUser = async(req, resp) => {
       }
     }
   }
-  let now = new Date().toISOString();
   let userId = req.decoded.id;
-  if (typeof userData._id==="undefined" || userData._id===null) {
-    userData.createdBy = userId;
-    userData.createdAt = now;
-  }
-  userData.updatedBy = userId;
-  userData.updatedAt = now;
+  userData.userId = userId;
   let user = new User(userData);
   let output = await user.save();
   resp.json(output);
