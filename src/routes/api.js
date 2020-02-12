@@ -4,6 +4,8 @@ const auth = require('./auth');
 const server = express.Router();
 
 // admin controllers
+const articleController = require('../controllers/article.ctrl')
+const articleCategoryController = require('../controllers/articleCategory.ctrl')
 const authController = require('../controllers/authentication.ctrl')
 const cvisionController = require('../controllers/tools/computer-vision.ctrl');
 const dashboardController = require('../controllers/dashboard.ctrl')
@@ -11,6 +13,8 @@ const entityController = require('../controllers/entity.ctrl');
 const eventController = require('../controllers/event.ctrl');
 const graphController = require('../controllers/graph.ctrl');
 const languageCodesController = require('../controllers/language.codes.ctrl');
+const menuController = require('../controllers/menu.ctrl');
+const menuItemController = require('../controllers/menuItem.ctrl');
 const organisationController = require('../controllers/organisation.ctrl');
 const personController = require('../controllers/person.ctrl');
 const resourceController = require('../controllers/resource.ctrl');
@@ -23,6 +27,7 @@ const taxonomyTermController = require('../controllers/taxonomyTerm.ctrl');
 const temporalController = require('../controllers/temporal.ctrl');
 const toolsParseController = require('../controllers/tools/meta-parse.ctrl');
 const toolsIngestionController = require('../controllers/tools/prepare-ingestion.ctrl');
+const uploadedFileController = require('../controllers/uploadedFile.ctrl')
 const userController = require('../controllers/user.ctrl');
 const usergroupController = require('../controllers/usergroup.ctrl');
 
@@ -45,6 +50,19 @@ passport.use('local', authController.passportLocal);
 server.post('/admin-login', authController.loginAdmin);
 server.post('/admin-session', auth.checkAdminToken, authController.activeSession);
 //server.post('/register', authController.registerUser);
+
+// article
+server.put('/article', auth.checkAdminToken, articleController.putArticle);
+server.get('/article', articleController.getArticle);
+server.get('/articles', articleController.getArticles);
+server.get('/articles-list', articleController.getArticlesList);
+server.delete('/article', auth.checkAdminToken, articleController.deleteArticle);
+
+// article categories
+server.put('/article-category', auth.checkAdminToken, articleCategoryController.putArticleCategory);
+server.get('/article-category', articleCategoryController.getArticleCategory);
+server.get('/article-categories', articleCategoryController.getArticleCategories);
+server.delete('/article-category', auth.checkAdminToken, articleCategoryController.deleteArticleCategory);
 
 // dashboard
 server.get('/dashboard', auth.checkAdminToken, dashboardController.dashboardStats);
@@ -69,6 +87,18 @@ server.get('/related-nodes', graphController.getRelatedNodes);
 
 // languageCodes
 server.get('/language-codes', languageCodesController.getLanguageCodes);
+
+// menu
+server.put('/menu', auth.checkAdminToken, menuController.putMenu);
+server.get('/menu', menuController.getMenu);
+server.get('/menus', auth.checkAdminToken, menuController.getMenus);
+server.delete('/menu', auth.checkAdminToken, menuController.deleteMenu);
+
+// menu item
+server.put('/menu-item', auth.checkAdminToken, menuItemController.putMenuItem);
+server.get('/menu-item', auth.checkAdminToken, menuItemController.getMenuItem);
+server.get('/menu-items', auth.checkAdminToken, menuItemController.getMenuItems);
+server.delete('/menu-item', auth.checkAdminToken, menuItemController.deleteMenuItem);
 
 // person
 server.put('/person', auth.checkAdminToken, personController.putPerson);
@@ -133,6 +163,12 @@ server.put('/ingest-classpiece', auth.checkAdminToken, toolsIngestionController.
 server.get('/parse-class-piece', auth.checkAdminToken, cvisionController.parseClassPiece);
 server.get('/create-thumbnails', auth.checkAdminToken, toolsParseController.createThumbnails);
 server.post('/query-texts', auth.checkAdminToken, toolsParseController.queryTexts);
+
+// uploaded file
+server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);
+server.get('/uploaded-file', uploadedFileController.getUploadedFile);
+server.get('/uploaded-files', uploadedFileController.getUploadedFiles);
+server.delete('/uploaded-file', auth.checkAdminToken, uploadedFileController.deleteUploadedFile);
 
 // users
 server.get('/users', auth.checkAdminToken, userController.getUsers);

@@ -8,7 +8,7 @@
     "scopeNote": "A Diocese is a religious administrative location division",
     "label": "Diocese",
     "inverseLabel": "Diocese",
-    "taxonomyRef": "organisationTypes" 
+    "taxonomyRef": "organisationTypes"
   },
   {
     "scopeNote": "A religious order is a religious organisation",
@@ -101,9 +101,9 @@
     "taxonomyRef": "relationsTypes"
   },
   {
-    "scopeNote": "The event of a Person's ordination",
-    "label": "ordained",
-    "inverseLabel": "ordained",
+    "scopeNote": "An ordination event",
+    "label": "ordination",
+    "inverseLabel": "ordination",
     "taxonomyRef": "eventTypes"
   },
   {

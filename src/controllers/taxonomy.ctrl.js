@@ -93,7 +93,7 @@ class Taxonomy {
     this.count = count;
   }
 
-  async save() {
+  async save(userId) {
     let validateTaxonomy = this.validate();
     if (!validateTaxonomy.status) {
       return validateTaxonomy;
@@ -104,15 +104,16 @@ class Taxonomy {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Taxonomy({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       let newData = this;
@@ -195,11 +196,6 @@ const getTaxonomies = async (req, resp) => {
 
   let query = "";
   let queryParams = "";
-
-  if (typeof parameters.systemType!=="undefined") {
-    systemType = parameters.systemType;
-    queryParams.systemType = systemType;
-  }
 
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
@@ -339,8 +335,8 @@ const getTaxonomy = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"createdAt":"2020-01-15T12:56:39.387Z","updatedBy":"260","labelId":"Test","createdBy":"260","systemType":"test","description":"","label":"Test","locked":false,"updatedAt":"2020-01-15T12:56:39.387Z","_id":"2480"},"error":[],"msg":"Query results"}*/
 const putTaxonomy = async(req, resp) => {
-  let parameters = req.body;
-  if (Object.keys(parameters).length===0) {
+  let postData = req.body;
+  if (Object.keys(postData).length===0) {
     resp.json({
       status: false,
       data: [],
@@ -350,9 +346,8 @@ const putTaxonomy = async(req, resp) => {
     return false;
   }
   let userId = req.decoded.id;
-  postData.userId = userId;
-  let taxonomy = new Taxonomy(parameters);
-  let output = await taxonomy.save();
+  let taxonomy = new Taxonomy(postData);
+  let output = await taxonomy.save(userId);
   resp.json({
     status: output.status,
     data: output.data,

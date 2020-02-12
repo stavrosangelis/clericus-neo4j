@@ -89,7 +89,7 @@ class Organisation {
     this.resources = resources;
   }
 
-  async save() {
+  async save(userId) {
     let validateOrganisation = this.validate();
     if (!validateOrganisation.status) {
       return validateOrganisation;
@@ -111,15 +111,16 @@ class Organisation {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Organisation({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       let nodeProperties = helpers.prepareNodeProperties(this);
@@ -246,7 +247,7 @@ const getOrganisations = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.organisationType) =~ LOWER('.*"+organisationType+".*') ";
+      queryParams += "LOWER(n.organisationType) =~ LOWER('.*"+organisationType+".*') ";
     }
   }
   if (orderField!=="") {
@@ -261,7 +262,7 @@ const getOrganisations = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams += "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
     }
   }
 
@@ -427,7 +428,6 @@ const putOrganisation = async(req, resp) => {
     return false;
   }
   let userId = req.decoded.id;
-  postData.userId = userId;
   let organisationData = {};
   for (let key in postData) {
     if (postData[key]!==null) {
@@ -439,7 +439,7 @@ const putOrganisation = async(req, resp) => {
     }
   }
   let organisation = new Organisation(organisationData);
-  let data = await organisation.save();
+  let data = await organisation.save(userId);
   resp.json({
     status: true,
     data: data,

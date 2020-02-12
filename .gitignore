@@ -12,6 +12,9 @@
 # archive
 /archive
 
+# uploads
+/uploads
+
 # passwords and sensitive data
 /tools/Clericus-f242153b0bef.json
 /server/config/.private.key

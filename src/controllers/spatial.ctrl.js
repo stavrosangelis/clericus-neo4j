@@ -96,7 +96,7 @@ class Spatial {
     this.count = count;
   }
 
-  async save() {
+  async save(userId) {
     let validateSpatial = this.validate();
     if (!validateSpatial.status) {
       return validateSpatial;
@@ -109,15 +109,16 @@ class Spatial {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Spatial({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       if (typeof this._id==="undefined" || this._id===null) {
@@ -378,9 +379,8 @@ const putSpatial = async(req, resp) => {
     return false;
   }
   let userId = req.decoded.id;
-  postData.userId = userId;
   let spatial = new Spatial(postData);
-  let output = await spatial.save();
+  let output = await spatial.save(userId);
   resp.json(output);
 }
 

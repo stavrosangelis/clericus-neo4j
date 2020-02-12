@@ -120,7 +120,7 @@ class Resource {
     this.resources = resources;
   }
 
-  async save() {
+  async save(userId) {
     let validateResource = this.validate();
     if (!validateResource.status) {
       return validateResource;
@@ -141,15 +141,16 @@ class Resource {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Resource({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       let nodeProperties = helpers.prepareNodeProperties(this);
@@ -290,7 +291,7 @@ const getResources = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.systemType) =~ LOWER('.*"+systemType+".*') ";
+      queryParams +="LOWER(n.systemType) =~ LOWER('.*"+systemType+".*') ";
     }
   }
   if (typeof parameters.description!=="undefined") {
@@ -299,7 +300,7 @@ const getResources = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+      queryParams +="LOWER(n.description) =~ LOWER('.*"+description+".*') ";
     }
   }
   if (typeof parameters.status!=="undefined") {
@@ -308,7 +309,7 @@ const getResources = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams +="LOWER(n.status) =~ LOWER('.*"+status+".*') ";
     }
   }
 
@@ -329,6 +330,7 @@ const getResources = async (req, resp) => {
     queryParams = "WHERE "+queryParams;
   }
   query = "MATCH (n:Resource) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
+
   let data = await getResourcesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -477,8 +479,6 @@ const getResource = async(req, resp) => {
 */
 const putResource = async(req, resp) => {
   let postData = await helpers.parseRequestData(req);
-  let userId = req.decoded.id;
-  postData.userId = userId;
   if (postData===null || Object.keys(postData).length===0) {
     resp.json({
       status: false,
@@ -490,8 +490,9 @@ const putResource = async(req, resp) => {
   }
   let resourceData = postData.resource;
 
+  let userId = req.decoded.id;
   let resource = new Resource(resourceData);
-  let data = await resource.save();
+  let data = await resource.save(userId);
   resp.json({
     status: true,
     data: data,

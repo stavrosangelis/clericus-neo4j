@@ -123,7 +123,7 @@ class Entity {
     return relations;
   }
 
-  async save() {
+  async save(userId) {
     let validateEntity = this.validate();
     if (!validateEntity.status) {
       return validateEntity;
@@ -137,15 +137,16 @@ class Entity {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Entity({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       let nodeProperties = helpers.prepareNodeProperties(this);
@@ -405,10 +406,8 @@ const putEntity = async(req, resp) => {
     });
     return false;
   }
-  let now = new Date().toISOString();
   let userId = req.decoded.id;
-  postData.userId = userId;
-  let entity = new Entity(postData);
+  let entity = new Entity(userId);
   let output = await entity.save();
   resp.json({
     status: output.status,

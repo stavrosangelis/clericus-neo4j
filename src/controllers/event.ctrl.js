@@ -75,7 +75,7 @@ class Event {
     this.spatial = spatial;
   }
 
-  async save() {
+  async save(userId) {
     let validateEvent = this.validate();
     if (!validateEvent.status) {
       return validateEvent;
@@ -85,15 +85,16 @@ class Event {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Event({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       let nodeProperties = helpers.prepareNodeProperties(this);
@@ -196,7 +197,7 @@ const getEvents = async (req, resp) => {
   if (typeof parameters.eventType!=="undefined") {
     eventType = parameters.eventType;
     if (eventType!=="") {
-      queryParams = `LOWER(n.eventType)= "${eventType}" `;
+      queryParams += `LOWER(n.eventType)= "${eventType}" `;
     }
   }
   if (typeof parameters.orderField!=="undefined") {
@@ -214,7 +215,7 @@ const getEvents = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams += "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
     }
   }
 
@@ -388,12 +389,9 @@ const putEvent = async(req, resp) => {
     });
     return false;
   }
-  let now = new Date().toISOString();
   let userId = req.decoded.id;
-  postData.userId = userId;
-
   let event = new Event(postData);
-  let output = await event.save();
+  let output = await event.save(userId);
   resp.json({
     status: output.status,
     data: output.data,

@@ -89,7 +89,7 @@ class Temporal {
     this.count = count;
   }
 
-  async save() {
+  async save(userId) {
     let validateTemporal = this.validate();
     if (!validateTemporal.status) {
       return validateTemporal;
@@ -101,17 +101,18 @@ class Temporal {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Temporal({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
-      
+
       if (typeof this._id==="undefined" || this._id===null) {
         let nodeProperties = helpers.prepareNodeProperties(this);
         params = helpers.prepareParams(this);
@@ -363,9 +364,8 @@ const putTemporal = async(req, resp) => {
     return false;
   }
   let userId = req.decoded.id;
-  postData.userId = userId;
   let temporal = new Temporal(postData);
-  let output = await temporal.save();
+  let output = await temporal.save(userId);
   resp.json(output);
 }
 

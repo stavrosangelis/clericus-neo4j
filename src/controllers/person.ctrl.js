@@ -149,7 +149,7 @@ class Person {
     this.resources = resources;
   }
 
-  async save() {
+  async save(userId) {
     let validatePerson = this.validate();
     if (!validatePerson.status) {
       return validatePerson;
@@ -169,15 +169,16 @@ class Person {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new Person({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       let nodeProperties = helpers.prepareNodeProperties(this);
@@ -341,7 +342,7 @@ const getPeople = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams = "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams += "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
     }
   }
   if (typeof parameters.orderField!=="undefined") {
@@ -540,8 +541,6 @@ const putPerson = async(req, resp) => {
     });
     return false;
   }
-  let userId = req.decoded.id;;
-  postData.userId = userId;
   let personData = {};
   for (let key in postData) {
     if (postData[key]!==null) {
@@ -555,8 +554,9 @@ const putPerson = async(req, resp) => {
       }
     }
   }
+  let userId = req.decoded.id;
   let person = new Person(personData);
-  let output = await person.save();
+  let output = await person.save(userId);
   resp.json(output);
 }
 

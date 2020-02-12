@@ -21,6 +21,8 @@ app.use('/api', api);
 app.use(express.static(process.env.ARCHIVEPATH));
 // serve resources
 app.use(express.static(process.env.RESOURCESPATH));
+// serve uploads
+app.use(express.static(process.env.UPLOADSPATH));
 // set json & file limit
 app.use(bodyParser.json({limit: '50mb',extended: true}));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 1000}));

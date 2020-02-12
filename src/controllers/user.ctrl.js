@@ -82,7 +82,7 @@ class User {
     delete this.token;
   }
 
-  async save() {
+  async save(userId) {
     let newData = Object.assign({}, this);
     let validateUser = this.validate();
     if (!validateUser.status) {
@@ -97,15 +97,16 @@ class User {
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id==="undefined" || this._id===null) {
-        if (typeof this._id==="userId" && this.userId!==null) {
-          this.createdBy = this.userId;
-        }
+        this.createdBy = userId;
         this.createdAt = now;
       }
-      if (typeof this._id==="userId" && this.userId!==null) {
-        this.updatedBy = this.userId;
-        delete this.userId;
+      else {
+        let original = new User({_id:this._id});
+        await original.load();
+        this.createdBy = original.createdBy;
+        this.createdAt = original.createdAt;
       }
+      this.updatedBy = userId;
       this.updatedAt = now;
 
       if (typeof this._id==="undefined" || this._id===null) {
@@ -452,9 +453,8 @@ const putUser = async(req, resp) => {
     }
   }
   let userId = req.decoded.id;
-  userData.userId = userId;
   let user = new User(userData);
-  let output = await user.save();
+  let output = await user.save(userId);
   resp.json(output);
 }
 

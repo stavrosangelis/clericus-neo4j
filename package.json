@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.15.19",
+  "version": "0.23.31",
   "description": "This is the Clericus API using neo4j as a database",
   "main": "src/app.js",
   "scripts": {
@@ -36,6 +36,7 @@
     "passport": "^0.4.0",
     "passport-local": "^1.0.0",
     "pm2": "^4.1.2",
+    "sanitize-html": "^1.21.1",
     "soundex": "^0.2.1"
   },
   "devDependencies": {
@@ -47,6 +48,6 @@
   "apidoc": {
     "description": "This is a comprehensive documentation of all available REST API endpoints for the Clericus project using neo4j as database.",
     "title": "Clericus-neo4j REST API Documentation",
-    "url" : "http://localhost:5100/api"
+    "url": "http://localhost:5100/api"
   }
 }
