@@ -20,6 +20,356 @@ define({ "api": [
   },
   {
     "type": "get",
+    "url": "/article-categories",
+    "title": "Get article categories",
+    "name": "get_article_categories",
+    "group": "Article_Categories",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Article\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\",\"systemLabels\":[\"Article\"]},{\"createdAt\":\"2020-01-27T17:43:44.578Z\",\"label\":\"Bottom Article\",\"templatePosition\":\"bottom\",\"updatedAt\":\"2020-01-27T17:43:44.578Z\",\"_id\":\"2683\",\"systemLabels\":[\"Article\"]}]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/articleCategory.ctrl.js",
+    "groupTitle": "Article_Categories"
+  },
+  {
+    "type": "get",
+    "url": "/article-category",
+    "title": "Get article category",
+    "name": "get_article_category",
+    "group": "Article_Categories",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested article.category</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/articleCategory.ctrl.js",
+    "groupTitle": "Article_Categories"
+  },
+  {
+    "type": "delete",
+    "url": "/article-category",
+    "title": "Delete article category",
+    "name": "delete_article_category",
+    "group": "Articles_Categories",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the article for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Article) WHERE id(n)=2880 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":3,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/articleCategory.ctrl.js",
+    "groupTitle": "Articles_Categories"
+  },
+  {
+    "type": "put",
+    "url": "/article-category",
+    "title": "Put article category",
+    "name": "put_article_category",
+    "group": "Articles_Categories",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the article category. This should be undefined|null|blank in the creation of a new article category.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The article category's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "parentId",
+            "description": "<p>The article category's parentId.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "status",
+            "description": "<p>The article category's status.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Article\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\"}",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"createdAt\":\"2020-01-30T14:56:30.780Z\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"label\":\"test\",\"_id\":\"2880\",\"category\":0,\"content\":\"<p>test content</p>\",\"status\":\"private\",\"teaser\":\"<p>test teaser</p>\",\"updatedAt\":\"2020-01-30T15:00:44.721Z\"},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/articleCategory.ctrl.js",
+    "groupTitle": "Articles_Categories"
+  },
+  {
+    "type": "delete",
+    "url": "/article",
+    "title": "Delete article",
+    "name": "delete_article",
+    "group": "Articles",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the article for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Article) WHERE id(n)=2880 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":3,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "get",
+    "url": "/article",
+    "title": "Get article",
+    "name": "get_article",
+    "group": "Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested article.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "get",
+    "url": "/articles",
+    "title": "Get articles",
+    "name": "get_articles",
+    "group": "Articles",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Article\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\",\"systemLabels\":[\"Article\"]},{\"createdAt\":\"2020-01-27T17:43:44.578Z\",\"label\":\"Bottom Article\",\"templatePosition\":\"bottom\",\"updatedAt\":\"2020-01-27T17:43:44.578Z\",\"_id\":\"2683\",\"systemLabels\":[\"Article\"]}]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "get",
+    "url": "/images-browser",
+    "title": "Browse images",
+    "name": "images_browser",
+    "group": "Articles",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "dir",
+            "defaultValue": "uploads",
+            "description": "<p>The directory to browse.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "put",
+    "url": "/article",
+    "title": "Put article",
+    "name": "put_article",
+    "group": "Articles",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the article. This should be undefined|null|blank in the creation of a new article.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The article's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "category",
+            "description": "<p>The article's category.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "teaser",
+            "description": "<p>The article's teaser.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "status",
+            "description": "<p>The article's status.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "featuredImage",
+            "description": "<p>The article's featuredImage.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Article\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\"}",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"createdAt\":\"2020-01-30T14:56:30.780Z\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"label\":\"test\",\"_id\":\"2880\",\"category\":0,\"content\":\"<p>test content</p>\",\"status\":\"private\",\"teaser\":\"<p>test teaser</p>\",\"updatedAt\":\"2020-01-30T15:00:44.721Z\"},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "get",
     "url": "/classpiece",
     "title": "Classpiece",
     "name": "classpiece",
@@ -167,6 +517,34 @@ define({ "api": [
             "optional": true,
             "field": "description",
             "description": "<p>A string to match against a classpiece description</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "events",
+            "description": "<p>An array of event ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "organisations",
+            "description": "<p>An array of organisations ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "people",
+            "description": "<p>An array of people ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "resources",
+            "description": "<p>An array of resources ids</p>"
           },
           {
             "group": "Parameter",
@@ -908,6 +1286,357 @@ define({ "api": [
     "version": "0.0.0",
     "filename": "src/controllers/language.codes.ctrl.js",
     "groupTitle": "Language_codes"
+  },
+  {
+    "type": "delete",
+    "url": "/menuItem",
+    "title": "Delete menuItem",
+    "name": "delete_menuItem",
+    "group": "MenuItems",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the menuItem for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:MenuItem) WHERE id(n)=2480 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":1,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menuItem.ctrl.js",
+    "groupTitle": "MenuItems"
+  },
+  {
+    "type": "get",
+    "url": "/menuItem",
+    "title": "Get menuItem",
+    "name": "get_menuItem",
+    "group": "MenuItems",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested menuItem. Either the _id or the systemType should be provided.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"2855\",\"menuId\":\"2822\",\"label\":\"Home\",\"order\":0,\"parentId\":0,\"type\":\"link\",\"objectId\":0,\"link\":\"/\",\"target\":\"\",\"status\":\"private\",\"createdBy\":null,\"createdAt\":null,\"updatedBy\":null,\"updatedAt\":\"2020-01-28T15:51:33.266Z\"},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menuItem.ctrl.js",
+    "groupTitle": "MenuItems"
+  },
+  {
+    "type": "get",
+    "url": "/menuItems",
+    "title": "Get menuItems",
+    "name": "get_menuItems",
+    "group": "MenuItems",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":[{\"link\":\"/\",\"menuId\":\"2822\",\"label\":\"Home\",\"_id\":\"2855\",\"type\":\"link\",\"objectId\":0,\"parentId\":0,\"updatedAt\":\"2020-01-28T15:51:33.266Z\",\"order\":0,\"target\":\"\",\"status\":\"private\",\"systemLabels\":[\"MenuItem\"]},{\"link\":\"\",\"menuId\":\"2822\",\"_id\":\"2877\",\"label\":\"Test\",\"type\":\"link\",\"objectId\":0,\"parentId\":2837,\"updatedAt\":\"2020-01-29T14:23:21.702Z\",\"order\":0,\"target\":\"\",\"status\":\"private\",\"systemLabels\":[\"MenuItem\"]},{\"link\":\"\",\"menuId\":\"2822\",\"_id\":\"2897\",\"label\":\"Research\",\"type\":\"link\",\"objectId\":0,\"parentId\":0,\"updatedAt\":\"2020-01-29T14:23:37.715Z\",\"order\":0,\"target\":\"\",\"status\":\"private\",\"systemLabels\":[\"MenuItem\"]},{\"createdAt\":\"2020-01-29T11:39:59.209Z\",\"link\":\"\",\"menuId\":\"2822\",\"label\":\"test 2\",\"type\":\"link\",\"objectId\":0,\"parentId\":2877,\"updatedAt\":\"2020-01-29T11:39:59.209Z\",\"order\":0,\"target\":\"\",\"status\":\"private\",\"_id\":\"2935\",\"systemLabels\":[\"MenuItem\"]},{\"link\":\"\",\"menuId\":\"2822\",\"_id\":\"2837\",\"label\":\"About\",\"type\":\"link\",\"objectId\":0,\"parentId\":2855,\"updatedAt\":\"2020-01-29T12:40:10.551Z\",\"order\":1,\"target\":\"\",\"status\":\"private\",\"systemLabels\":[\"MenuItem\"]}],\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menuItem.ctrl.js",
+    "groupTitle": "MenuItems"
+  },
+  {
+    "type": "put",
+    "url": "/menuItem",
+    "title": "Put menuItem",
+    "name": "put_menuItem",
+    "group": "MenuItems",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the menu item. This should be undefined|null|blank in the creation of a new menu item.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "menuId",
+            "description": "<p>The _id of the menu this menu item belongs to.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The menuItem's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "order",
+            "defaultValue": "0",
+            "description": "<p>The order of the menu item.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "parentId",
+            "defaultValue": "0",
+            "description": "<p>The hierarchical parent menu item of this menu item.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "type",
+            "defaultValue": "article|category|link",
+            "description": "<p>The type of the menu item.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "objectId",
+            "description": "<p>If the type of the menu item is article or category, the article or category id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "link",
+            "description": "<p>If the type of the menu item is link the link URL.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "target",
+            "description": "<p>If the type of the menu item is link and the link is an external link target should be set to &quot;_blank&quot;.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "accessGroup",
+            "description": "<p>If the menu item is only visible to certain access groups.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "status",
+            "defaultValue": "private",
+            "description": "<p>The status of the  menu item.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\n  \"label\":\"Test\",\n  \"description\":\"test description\"\n}",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"createdAt\":\"2020-01-15T12:56:39.387Z\",\"updatedBy\":\"260\",\"labelId\":\"Test\",\"createdBy\":\"260\",\"systemType\":\"test\",\"description\":\"\",\"label\":\"Test\",\"locked\":false,\"updatedAt\":\"2020-01-15T12:56:39.387Z\",\"_id\":\"2480\"},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menuItem.ctrl.js",
+    "groupTitle": "MenuItems"
+  },
+  {
+    "type": "delete",
+    "url": "/menu",
+    "title": "Delete menu",
+    "name": "delete_menu",
+    "group": "Menus",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the menu for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Menu) WHERE id(n)=2480 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":1,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menu.ctrl.js",
+    "groupTitle": "Menus"
+  },
+  {
+    "type": "get",
+    "url": "/menu",
+    "title": "Get menu",
+    "name": "get_menu",
+    "group": "Menus",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested menu. Either the _id or the systemType should be provided.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menu.ctrl.js",
+    "groupTitle": "Menus"
+  },
+  {
+    "type": "get",
+    "url": "/menus",
+    "title": "Get menus",
+    "name": "get_menus",
+    "group": "Menus",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Menu\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\",\"systemLabels\":[\"Menu\"]},{\"createdAt\":\"2020-01-27T17:43:44.578Z\",\"label\":\"Bottom Menu\",\"templatePosition\":\"bottom\",\"updatedAt\":\"2020-01-27T17:43:44.578Z\",\"_id\":\"2683\",\"systemLabels\":[\"Menu\"]}]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menu.ctrl.js",
+    "groupTitle": "Menus"
+  },
+  {
+    "type": "put",
+    "url": "/menu",
+    "title": "Put menu",
+    "name": "put_menu",
+    "group": "Menus",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the menu. This should be undefined|null|blank in the creation of a new menu.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The menu's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "templatePosition",
+            "description": "<p>The name of the position in the UI template that will hold the menu.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Menu\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\"}",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"label\":\"Top Menu\",\"_id\":\"2822\",\"templatePosition\":\"\",\"updatedAt\":\"2020-01-28T09:39:20.981Z\"},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/menu.ctrl.js",
+    "groupTitle": "Menus"
   },
   {
     "type": "get",
@@ -3710,6 +4439,133 @@ define({ "api": [
     "version": "0.0.0",
     "filename": "src/controllers/tools/meta-parse.ctrl.js",
     "groupTitle": "Tools"
+  },
+  {
+    "type": "delete",
+    "url": "/uploaded-file",
+    "title": "Delete uploaded-file",
+    "name": "delete_uploaded-file",
+    "group": "Uploaded_Files",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the article for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Article) WHERE id(n)=2880 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":3,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/uploadedFile.ctrl.js",
+    "groupTitle": "Uploaded_Files"
+  },
+  {
+    "type": "get",
+    "url": "/uploaded-file",
+    "title": "Get uploaded-file",
+    "name": "get_uploaded-file",
+    "group": "Uploaded_Files",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested uploaded-file.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/uploadedFile.ctrl.js",
+    "groupTitle": "Uploaded_Files"
+  },
+  {
+    "type": "get",
+    "url": "/uploaded-files",
+    "title": "Get uploaded files",
+    "name": "get_uploaded_files",
+    "group": "Uploaded_Files",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Article\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\",\"systemLabels\":[\"Article\"]},{\"createdAt\":\"2020-01-27T17:43:44.578Z\",\"label\":\"Bottom Article\",\"templatePosition\":\"bottom\",\"updatedAt\":\"2020-01-27T17:43:44.578Z\",\"_id\":\"2683\",\"systemLabels\":[\"Article\"]}]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/uploadedFile.ctrl.js",
+    "groupTitle": "Uploaded_Files"
+  },
+  {
+    "type": "post",
+    "url": "/uploaded-file",
+    "title": "Put uploaded-file",
+    "name": "post_uploaded-file",
+    "group": "Uploaded_Files",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "formData",
+            "optional": true,
+            "field": "file",
+            "description": "<p>A form data object with the name &quot;file&quot; containing the filename and the file blob.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "Content-Disposition: form-data; name=\"file\"; filename=\"some-file.jpg\"\nContent-Type: image/jpeg",
+        "type": "formData"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"image\":\"http://localhost:5100/2020/2/images/fac02fb4bfcaabccd3653dc5a5e68e0b.jpg\",\"thumbnail\":\"http://localhost:5100/2020/2/thumbnails/fac02fb4bfcaabccd3653dc5a5e68e0b.jpg\"},\"error\":false,\"msg\":\"\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/uploadedFile.ctrl.js",
+    "groupTitle": "Uploaded_Files"
   },
   {
     "type": "delete",
