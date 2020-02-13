@@ -10,6 +10,11 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 *
 * @apiParam {string} [label] A string to match against a classpiece label
 * @apiParam {string} [description] A string to match against a classpiece description
+* @apiParam {array} [events] An array of event ids
+* @apiParam {array} [organisations] An array of organisations ids
+* @apiParam {array} [people] An array of people ids
+* @apiParam {array} [resources] An array of resources ids
+
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
 *
@@ -67,9 +72,15 @@ const getClasspieces = async (req, resp) => {
   let parameters = req.query;
   let label = "";
   let description = "";
+  let events = [];
+  let organisations = [];
+  let people = [];
+  let resources = [];
   let page = 0;
   let queryPage = 0;
   let limit = 25;
+
+  let match = "(n:Resource)";
 
   let query = "";
   let queryParams = "";
@@ -100,6 +111,40 @@ const getClasspieces = async (req, resp) => {
       queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
     }
   }
+
+  if (typeof parameters.events!=="undefined") {
+    events = parameters.events;
+    match = "(n:Resource)-[revent]-(e:Event)";
+    let eventsJoined = events.map(id=>`AND id(e)=${id} `);
+    queryParams += eventsJoined.join(" ");
+  }
+  if (typeof parameters.organisations!=="undefined") {
+    organisations = parameters.organisations;
+    match = "(n:Resource)-[rorganisation]-(o:Organisation)";
+    if (events.length>0) {
+      match += ", (n:Resource)-[rorganisation]-(o:Organisation)";
+    }
+    let organisationsJoined = organisations.map(id=>`AND id(o)=${id} `);
+    queryParams += organisationsJoined.join(" ");
+  }
+  if (typeof parameters.people!=="undefined") {
+    people = parameters.people;
+    match = "(n:Resource)-[rperson]-(p:Person)";
+    if (events.length>0 || organisations.length>0) {
+      match += ", (n:Resource)-[rperson]-(p:Person)";
+    }
+    let peopleJoined = people.map(id=>`AND id(p)=${id} `);
+    queryParams += peopleJoined.join(" ");
+  }
+  if (typeof parameters.resources!=="undefined") {
+    resources = parameters.resources;
+    match = "(n:Resource)-[rresource]-(re:Resource)";
+    if (events.length>0 || organisations.length>0 || people.length>0) {
+      match += ", (n:Resource)-[rresource]-(re:Resource)";
+    }
+    let resourcesJoined = resources.map(id=>`AND id(re)=${id} `);
+    queryParams += resourcesJoined.join(" ");
+  }
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
@@ -116,8 +161,8 @@ const getClasspieces = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = "MATCH (n:Resource) "+queryParams+" RETURN n ORDER BY n.label SKIP "+skip+" LIMIT "+limit;
-  let data = await getResourcesQuery(query, queryParams, limit);
+  query = `MATCH ${match} ${queryParams} RETURN n ORDER BY n.label SKIP ${skip} LIMIT ${limit}`;
+  let data = await getResourcesQuery(query, match, queryParams, limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -142,7 +187,7 @@ const getClasspieces = async (req, resp) => {
   }
 }
 
-const getResourcesQuery = async (query, queryParams, limit) => {
+const getResourcesQuery = async (query, match, queryParams, limit) => {
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -169,7 +214,7 @@ const getResourcesQuery = async (query, queryParams, limit) => {
   });
 
   let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Resource) "+queryParams+" RETURN count(*)")
+    tx.run(`MATCH ${match} ${queryParams} RETURN count(*)`)
   )
   .then(result=> {
     session.close()

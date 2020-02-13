@@ -52,7 +52,7 @@ class User {
       return false;
     }
     let session = driver.session()
-    let query = "MATCH (n:User)-[r:belongsToUserGroup]-(ug:Usergroup) WHERE id(n)="+this._id+" return n,ug";
+    let query = `MATCH (n:User)-[r:belongsToUserGroup]-(ug:Usergroup) WHERE id(n)=${this._id} return n,ug`;
     let node = await session.writeTransaction(tx=>
       tx.run(query,{})
     )
@@ -160,7 +160,7 @@ class User {
             let existingUsergroupRef = {
               items: [
                 {_id: this._id, type: "User"},
-                {_id: this.usergroup._id, type: "Usergroup"}
+                {_id: this.usergroup, type: "Usergroup"}
               ],
               taxonomyTermLabel: "belongsToUserGroup",
             }
