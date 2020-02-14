@@ -592,10 +592,9 @@ const ingestClasspieceImage = async (classpiece, userId) => {
     }
     classPieceData.metadata = JSON.stringify(classPieceData.metadata);
     classPieceData.paths = classPieceData.paths.map(path=>JSON.stringify(path));
-    classPieceData.userId = userId;
 
     let newClasspiece = new Resource(classPieceData);
-    let output = newClasspiece.save();
+    let output = newClasspiece.save(userId);
     resolve(output);
   })
   .catch((error)=> {
@@ -638,9 +637,9 @@ const ingestPerson = async(person, classpiece, userId) => {
     if (typeof person._id!=="undefined") {
       personData._id = person._id;
     }
-    personData.userId = userId;
+
     let newPerson = new Person(personData);
-    let ingestPersonPromise = await newPerson.save();
+    let ingestPersonPromise = await newPerson.save(userId);
 
     if (ingestPersonPromise.status) {
       // assign id to person object
@@ -785,10 +784,9 @@ const ingestPersonThumbnail = async(person, classpiece, userId) => {
     }
     newPersonImageData.metadata = JSON.stringify(newPersonImageData.metadata);
     newPersonImageData.paths = newPersonImageData.paths.map(path=>JSON.stringify(path));
-    newPersonImageData.userId = userId;
 
     let newPersonThumbnail = new Resource(newPersonImageData);
-    let output = newPersonThumbnail.save();
+    let output = newPersonThumbnail.save(userId);
     resolve(output);
   })
   .catch((error)=> {
@@ -825,9 +823,8 @@ var ingestDiocese = async(person, userId) => {
     console.log(error)
   });
   if (typeof existingOrganisation==="undefined" || existingOrganisation===null) {
-    organisation.userId = userId;
     let newOrganisation = new Organisation(organisation);
-    let savedOrganisation = await newOrganisation.save();
+    let savedOrganisation = await newOrganisation.save(userId);
     existingOrganisation = savedOrganisation.data;
   }
   return existingOrganisation;
