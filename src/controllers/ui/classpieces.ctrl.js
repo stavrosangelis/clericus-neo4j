@@ -114,33 +114,33 @@ const getClasspieces = async (req, resp) => {
 
   if (typeof parameters.events!=="undefined") {
     events = parameters.events;
-    match = "(n:Resource)-[revent]-(e:Event)";
+    match = "(n:Resource)-[revent]->(e:Event)";
     let eventsJoined = events.map(id=>`AND id(e)=${id} `);
     queryParams += eventsJoined.join(" ");
   }
   if (typeof parameters.organisations!=="undefined") {
     organisations = parameters.organisations;
-    match = "(n:Resource)-[rorganisation]-(o:Organisation)";
+    match = "(n:Resource)-[rorganisation]->(o:Organisation)";
     if (events.length>0) {
-      match += ", (n:Resource)-[rorganisation]-(o:Organisation)";
+      match += ", (n:Resource)-[rorganisation]->(o:Organisation)";
     }
     let organisationsJoined = organisations.map(id=>`AND id(o)=${id} `);
     queryParams += organisationsJoined.join(" ");
   }
   if (typeof parameters.people!=="undefined") {
     people = parameters.people;
-    match = "(n:Resource)-[rperson]-(p:Person)";
+    match = "(n:Resource)-[rperson]->(p:Person)";
     if (events.length>0 || organisations.length>0) {
-      match += ", (n:Resource)-[rperson]-(p:Person)";
+      match += ", (n:Resource)-[rperson]->(p:Person)";
     }
     let peopleJoined = people.map(id=>`AND id(p)=${id} `);
     queryParams += peopleJoined.join(" ");
   }
   if (typeof parameters.resources!=="undefined") {
     resources = parameters.resources;
-    match = "(n:Resource)-[rresource]-(re:Resource)";
+    match = "(n:Resource)-[rresource]->(re:Resource)";
     if (events.length>0 || organisations.length>0 || people.length>0) {
-      match += ", (n:Resource)-[rresource]-(re:Resource)";
+      match += ", (n:Resource)-[rresource]->(re:Resource)";
     }
     let resourcesJoined = resources.map(id=>`AND id(re)=${id} `);
     queryParams += resourcesJoined.join(" ");
