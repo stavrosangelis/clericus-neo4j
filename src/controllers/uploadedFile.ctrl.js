@@ -510,7 +510,7 @@ const uploadFile = async(uploadedFile=null, hashedName="") => {
     });
   }
   let uploadFilePromise = await new Promise((resolve, reject) => {
-    fs.rename(sourcePath, targetPath, function (error) {
+    fs.copyFile(sourcePath, targetPath, (error) => {
       let output = {};
       if (error) {
         output.status = false;
@@ -521,6 +521,10 @@ const uploadFile = async(uploadedFile=null, hashedName="") => {
         output.msg = "File "+uploadedFile.name+" uploaded successfully";
         output.path = targetPath;
         output.fileName = hashedName;
+      }
+      if (output.status) {
+        // unlink file
+        fs.unlinkSync(sourcePath);
       }
       resolve(output)
     });
