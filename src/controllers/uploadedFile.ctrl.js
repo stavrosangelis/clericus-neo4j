@@ -68,8 +68,8 @@ class UploadedFile {
       this[key] = node[key];
     }
     let paths = [
-      {path: `${process.env.SERVERURL}${this.year}/${this.month}/images/${this.hashedName}`, pathType: "source"},
-      {path: `${process.env.SERVERURL}${this.year}/${this.month}/thumbnails/${this.hashedName}`, pathType: "thumbnail"}
+      {path: `${process.env.SERVERURL}uploads/${this.year}/${this.month}/images/${this.hashedName}`, pathType: "source"},
+      {path: `${process.env.SERVERURL}uploads/${this.year}/${this.month}/thumbnails/${this.hashedName}`, pathType: "thumbnail"}
     ];
     this.paths = paths;
   }
@@ -120,8 +120,8 @@ class UploadedFile {
           resultRecord = helpers.outputRecord(resultRecord);
 
           let paths = [
-            {path: `${process.env.SERVERURL}${resultRecord.year}/${resultRecord.month}/images/${resultRecord.hashedName}`, pathType: "source"},
-            {path: `${process.env.SERVERURL}${resultRecord.year}/${resultRecord.month}/thumbnails/${resultRecord.hashedName}`, pathType: "thumbnail"}
+            {path: `${process.env.SERVERURL}uploads/${resultRecord.year}/${resultRecord.month}/images/${resultRecord.hashedName}`, pathType: "source"},
+            {path: `${process.env.SERVERURL}uploads/${resultRecord.year}/${resultRecord.month}/thumbnails/${resultRecord.hashedName}`, pathType: "thumbnail"}
           ];
           resultRecord.paths = paths;
           output = {error: [], status: true, data: resultRecord};
@@ -168,8 +168,8 @@ class UploadedFile {
     await file.load();
 
     // 2. delete files from disk
-    let fullsize = `${process.env.SERVERURL}${this.year}/${this.month}/images/${this.hashedName}`;
-    let thumbnail = `${process.env.SERVERURL}${this.year}/${this.month}/thumbnails/${this.hashedName}`;
+    let fullsize = `${process.env.SERVERURL}uploads/${this.year}/${this.month}/images/${this.hashedName}`;
+    let thumbnail = `${process.env.SERVERURL}uploads/${this.year}/${this.month}/thumbnails/${this.hashedName}`;
     let deleteFullsize = this.unlinkFile(fullsize);
     let deleteThumbnail = this.unlinkFile(thumbnail);
 
@@ -307,8 +307,8 @@ const getUploadedFilesQuery = async (query, queryParams, limit) => {
 
   let nodesOutput = nodes.map((node)=>{
     let paths = [
-      {path: `${process.env.SERVERURL}${node.year}/${node.month}/images/${node.hashedName}`, pathType: "source"},
-      {path: `${process.env.SERVERURL}${node.year}/${node.month}/thumbnails/${node.hashedName}`, pathType: "thumbnail"}
+      {path: `${process.env.SERVERURL}uploads/${node.year}/${node.month}/images/${node.hashedName}`, pathType: "source"},
+      {path: `${process.env.SERVERURL}uploads/${node.year}/${node.month}/thumbnails/${node.hashedName}`, pathType: "thumbnail"}
     ];
     node.paths = paths;
     return node;
