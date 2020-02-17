@@ -423,7 +423,7 @@ const postUploadedFile = async(req, resp) => {
       }
     }
 
-    let thumbnailsDir = `${process.env.UPLOADSPATH}${year}/${month}/thumbnails/`;
+    let thumbnailsDir = `${process.env.UPLOADSPATH}/uploads/${year}/${month}/thumbnails/`;
     thumbnailPath = `${thumbnailsDir}${hashedName}`;
 
     let createThumb = await createThumbnail(srcPath, thumbnailPath, hashedName, newWidth, newHeight);
@@ -494,8 +494,8 @@ const uploadFile = async(uploadedFile=null, hashedName="") => {
   let year = date.getFullYear();
 
   let sourcePath = uploadedFile.path;
-  let imagesDir = `${process.env.UPLOADSPATH}${year}/${month}/images/`;
-  let thumbnailsDir = `${process.env.UPLOADSPATH}${year}/${month}/thumbnails/`;
+  let imagesDir = `${process.env.UPLOADSPATH}/uploads/${year}/${month}/images/`;
+  let thumbnailsDir = `${process.env.UPLOADSPATH}/uploads/${year}/${month}/thumbnails/`;
   let targetPath = `${imagesDir}${hashedName}`;
   uploadedFile.path = targetPath;
 
