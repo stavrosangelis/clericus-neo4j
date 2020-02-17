@@ -168,8 +168,8 @@ class UploadedFile {
     await file.load();
 
     // 2. delete files from disk
-    let fullsize = `${process.env.UPLOADSPATH}uploads/${this.year}/${this.month}/images/${this.hashedName}`;
-    let thumbnail = `${process.env.UPLOADSPATH}uploads/${this.year}/${this.month}/thumbnails/${this.hashedName}`;
+    let fullsize = `${process.env.UPLOADSPATH}uploads/${file.year}/${file.month}/images/${file.hashedName}`;
+    let thumbnail = `${process.env.UPLOADSPATH}uploads/${file.year}/${file.month}/thumbnails/${file.hashedName}`;
     let deleteFullsize = this.unlinkFile(fullsize);
     let deleteThumbnail = this.unlinkFile(thumbnail);
 
