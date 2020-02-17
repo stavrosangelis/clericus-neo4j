@@ -353,5 +353,5 @@ module.exports = {
   loadRelations: loadRelations,
   parseRequestData: parseRequestData,
   escapeRegExp: escapeRegExp,
-  prepareRelation: prepareRelation,
+  prepareRelation: prepareRelation
 }

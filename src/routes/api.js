@@ -32,12 +32,13 @@ const userController = require('../controllers/user.ctrl');
 const usergroupController = require('../controllers/usergroup.ctrl');
 
 // ui constrollers
-const analyticsController = require('../controllers/ui/analytics.ctrl')
-const classpiecesController = require('../controllers/ui/classpieces.ctrl')
+const analyticsController = require('../controllers/ui/analytics.ctrl');
+const classpiecesController = require('../controllers/ui/classpieces.ctrl');
 
 // ******* ui endpoints ******** //
 server.get('/generic-stats', analyticsController.genericStats);
 server.get('/classpieces', classpiecesController.getClasspieces);
+server.post('/classpieces-active-filters', classpiecesController.getClasspiecesActiveFilters);
 server.get('/classpiece', classpiecesController.getClasspiece);
 
 /**

@@ -388,6 +388,62 @@ const classpieceResources = async (srcId=null, srcType=null, targetType=null) =>
   return relations;
 }
 
+const getClasspiecesActiveFilters = async(req, resp) => {
+  let parameters = req.body;
+  let _ids = [];
+  if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
+    _ids = parameters._ids;
+  }
+  let query = `MATCH (c:Resource)-->(n) WHERE id(c) IN [${_ids}] AND n:Event OR n:Organisation OR n:Person OR n:Resource return DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    return result.records;
+  });
+
+  let nodes = nodesPromise.map(record=> {
+    helpers.prepareOutput(record);
+    let outputItem = record.toObject();
+    outputItem.type = outputItem.labels[0];
+    delete outputItem.labels;
+    return outputItem;
+  });
+  let events = [];
+  let organisations = [];
+  let people = [];
+  let resources = [];
+  let eventsFind = nodes.filter(n=>n.type==="Event");
+  if (eventsFind!=="undefined") {
+    events = eventsFind;
+  }
+  let organisationsFind = nodes.filter(n=>n.type==="Organisation");
+  if (organisationsFind!=="undefined") {
+    organisations = organisationsFind;
+  }
+  let peopleFind = nodes.filter(n=>n.type==="Person");
+  if (peopleFind!=="undefined") {
+    people = peopleFind;
+  }
+  let resourcesFind = nodes.filter(n=>n.type==="Resource");
+  if (resourcesFind!=="undefined") {
+    resources = resourcesFind;
+  }
+
+  let output = {
+    events: events,
+    organisations: organisations,
+    people: people,
+    resources: resources,
+  }
+  resp.json({
+    status: true,
+    data: output,
+    error: [],
+    msg: "Query results",
+  })
+}
 
 const relatedPerson = async (resourceId=null) => {
   if (resourceId===null) {
@@ -412,5 +468,6 @@ const relatedPerson = async (resourceId=null) => {
 
 module.exports = {
   getClasspieces: getClasspieces,
-  getClasspiece: getClasspiece
+  getClasspiece: getClasspiece,
+  getClasspiecesActiveFilters: getClasspiecesActiveFilters
 };
