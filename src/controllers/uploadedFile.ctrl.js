@@ -170,8 +170,8 @@ class UploadedFile {
     // 2. delete files from disk
     let fullsize = `${process.env.SERVERURL}uploads/${this.year}/${this.month}/images/${this.hashedName}`;
     let thumbnail = `${process.env.SERVERURL}uploads/${this.year}/${this.month}/thumbnails/${this.hashedName}`;
-    let deleteFullsize = this.unlinkFile(fullsize);
-    let deleteThumbnail = this.unlinkFile(thumbnail);
+    let deleteFullsize = await fs.unlinkSync(fullsize);
+    let deleteThumbnail = await fs.unlinkSync(thumbnail);
 
     let query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} DELETE n`;
     let deleteRecord = await session.writeTransaction(tx=>
