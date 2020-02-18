@@ -22,6 +22,7 @@ const referencesController = require('../controllers/references.ctrl');
 const seedController = require('../seed/');
 const settingsController = require('../controllers/settings.ctrl');
 const spatialController = require('../controllers/spatial.ctrl');
+const slideshowController = require('../controllers/slideshow.ctrl');
 const taxonomyController = require('../controllers/taxonomy.ctrl');
 const taxonomyTermController = require('../controllers/taxonomyTerm.ctrl');
 const temporalController = require('../controllers/temporal.ctrl');
@@ -128,6 +129,12 @@ server.get('/references', auth.checkAdminToken, referencesController.getReferenc
 server.put('/reference', auth.checkAdminToken, referencesController.putReference);
 server.put('/references', auth.checkAdminToken, referencesController.putReferences);
 server.delete('/reference', auth.checkAdminToken, referencesController.deleteReference);
+
+// slideshow
+server.put('/slideshow-item', auth.checkAdminToken, slideshowController.putSlideshowItem);
+server.get('/slideshow-item', slideshowController.getSlideshowItem);
+server.get('/slideshow-items', slideshowController.getSlideshowItems);
+server.delete('/slideshow-item', auth.checkAdminToken, slideshowController.deleteSlideshowItem);
 
 // spatial
 server.put('/spatial', auth.checkAdminToken, spatialController.putSpatial);
