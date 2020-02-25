@@ -416,7 +416,7 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
     _ids = parameters._ids;
   }
-  let query = `MATCH (c:Resource)-->(n) WHERE id(c) IN [${_ids}] AND n:Event OR n:Organisation OR n:Person OR n:Resource return DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
+  let query = `MATCH (c:Resource)-->(n) WHERE id(c) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
