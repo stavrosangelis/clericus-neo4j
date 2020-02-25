@@ -216,6 +216,17 @@ const getSlideshowItems = async (req, resp) => {
   });
 
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  let length = nodes.length;
+  for (let n=0;n<length; n++) {
+    let node = nodes[n];
+    // populate featured image
+    node.imageDetails = null;
+    if (typeof node.image!=="undefined" && node.image!=="") {
+      let imageDetails = new UploadedFile({_id:node.image});
+      await imageDetails.load();
+      node.imageDetails = imageDetails;
+    }
+  }
   resp.json({
     status: true,
     data: {

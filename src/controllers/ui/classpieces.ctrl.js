@@ -100,7 +100,7 @@ const getClasspieces = async (req, resp) => {
     if (queryParams!=="") {
       queryParams += " AND ";
     }
-    queryParams += `LOWER(n.systemType) = '${systemType}'`;
+    queryParams += `LOWER(n.systemType) = '${systemType}' `;
   }
   if (typeof parameters.description!=="undefined") {
     description = parameters.description;
@@ -115,35 +115,57 @@ const getClasspieces = async (req, resp) => {
   if (typeof parameters.events!=="undefined") {
     events = parameters.events;
     match = "(n:Resource)-[revent]->(e:Event)";
-    let eventsJoined = events.map(id=>`AND id(e)=${id} `);
-    queryParams += eventsJoined.join(" ");
+    if (events.length===1) {
+      queryParams += `AND id(e)=${events[0]} `;
+    }
+    else {
+      queryParams += `AND id(e) IN [${events}] `;
+    }
   }
   if (typeof parameters.organisations!=="undefined") {
     organisations = parameters.organisations;
-    match = "(n:Resource)-[rorganisation]->(o:Organisation)";
     if (events.length>0) {
       match += ", (n:Resource)-[rorganisation]->(o:Organisation)";
     }
-    let organisationsJoined = organisations.map(id=>`AND id(o)=${id} `);
-    queryParams += organisationsJoined.join(" ");
+    else {
+      match = "(n:Resource)-[rorganisation]->(o:Organisation)";
+    }
+    if (organisations.length===1) {
+      queryParams += `AND id(o)=${organisations[0]} `;
+    }
+    else {
+      queryParams += `AND id(o) IN [${organisations}] `;
+    }
   }
   if (typeof parameters.people!=="undefined") {
     people = parameters.people;
-    match = "(n:Resource)-[rperson]->(p:Person)";
     if (events.length>0 || organisations.length>0) {
       match += ", (n:Resource)-[rperson]->(p:Person)";
     }
-    let peopleJoined = people.map(id=>`AND id(p)=${id} `);
-    queryParams += peopleJoined.join(" ");
+    else {
+      match = "(n:Resource)-[rperson]->(p:Person)";
+    }
+    if (people.length===1) {
+      queryParams += `AND id(p)=${people[0]} `;
+    }
+    else {
+      queryParams += `AND id(p) IN [${people}] `;
+    }
   }
   if (typeof parameters.resources!=="undefined") {
     resources = parameters.resources;
-    match = "(n:Resource)-[rresource]->(re:Resource)";
     if (events.length>0 || organisations.length>0 || people.length>0) {
       match += ", (n:Resource)-[rresource]->(re:Resource)";
     }
-    let resourcesJoined = resources.map(id=>`AND id(re)=${id} `);
-    queryParams += resourcesJoined.join(" ");
+    else {
+      match = "(n:Resource)-[rresource]->(re:Resource)";
+    }
+    if (resources.length===1) {
+      queryParams += `AND id(re)=${resources[0]} `;
+    }
+    else {
+      queryParams += `AND id(re) IN [${resources}] `;
+    }
   }
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
