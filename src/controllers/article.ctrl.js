@@ -7,14 +7,16 @@ const mimeType = require('mime-types')
 const formidable = require('formidable');
 const path = require('path');
 const UploadedFile = require('./uploadedFile.ctrl').UploadedFile;
+const ArticleCategory = require('./articleCategory.ctrl').ArticleCategory;
 
 class Article {
-  constructor({_id=null,label=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,permalink=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
     }
     this.label = label;
+    this.permalink = permalink;
     this.category = category;
     this.content = content;
     this.teaser = teaser;
@@ -47,10 +49,16 @@ class Article {
   }
 
   async load() {
-    if (this._id===null) {
+    if (this._id===null && this.permalink===null) {
       return false;
     }
-    let query = "MATCH (n:Article) WHERE id(n)="+this._id+" return n";
+    let query = "";
+    if (this._id!==null) {
+      query = `MATCH (n:Article) WHERE id(n)=${this._id} return n`;
+    }
+    if (this.permalink!==null) {
+      query = `MATCH (n:Article) WHERE n.permalink="${this.permalink}" return n`;
+    }
     let session = driver.session()
     let node = await session.writeTransaction(tx=>
       tx.run(query,{})
@@ -75,6 +83,18 @@ class Article {
       let featuredImageDetails = new UploadedFile({_id:this.featuredImage});
       await featuredImageDetails.load();
       this.featuredImageDetails = featuredImageDetails;
+    }
+  }
+
+  async makePermalink(label) {
+    let permalink = label.replace(/[^\w\s]/gi, '').replace(/\s+/g, '-').toLowerCase();
+    let article = new Article({permalink: permalink});
+    await article.load();
+    if (article._id===null) {
+      return permalink;
+    }
+    else {
+      await makePermalink(permalink+"-2");
     }
   }
 
@@ -104,12 +124,14 @@ class Article {
       if (typeof this._id==="undefined" || this._id===null) {
         this.createdBy = userId;
         this.createdAt = now;
+        this.permalink = await this.makePermalink(this.label);
       }
       else {
         let original = new Article({_id:this._id});
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
+        this.permalink = original.permalink;
       }
       this.updatedBy = userId;
       this.updatedAt = now;
@@ -195,6 +217,8 @@ class Article {
 const getArticles = async (req, resp) => {
   let parameters = req.query;
   let label = "";
+  let categoryId = "";
+  let categoryName = "";
   let status = "";
   let page = 0;
   let orderField = "label";
@@ -208,6 +232,21 @@ const getArticles = async (req, resp) => {
     label = parameters.label;
     if (label!=="") {
       queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+    }
+  }
+  if (typeof parameters.categoryId!=="undefined") {
+    categoryId = parameters.categoryId;
+    if (categoryId!=="") {
+      queryParams +=`n.category=${categoryId} ` ;
+    }
+  }
+  if (typeof parameters.categoryName!=="undefined") {
+    categoryName = parameters.categoryName;
+    if (categoryName!=="") {
+      let category = new ArticleCategory({label:categoryName});
+      await category.load();
+      categoryId = category._id;
+      queryParams +=`n.category="${categoryId}" ` ;
     }
   }
   if (typeof parameters.status!=="undefined") {
@@ -283,6 +322,17 @@ const getArticlesQuery = async (query, queryParams, limit) => {
 
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
 
+  for (let i=0;i<nodes.length; i++) {
+    let node = nodes[i];
+    if (typeof node.featuredImage!=="undefined" && node.featuredImage!=="") {
+      let featuredImageDetails = new UploadedFile({_id:node.featuredImage});
+      await featuredImageDetails.load();
+      node.featuredImageDetails = featuredImageDetails;
+    }
+    else node.featuredImageDetails = null;
+  }
+
+
   let count = await session.writeTransaction(tx=>
     tx.run("MATCH (n:Article) "+queryParams+" RETURN count(*)")
   )
@@ -355,12 +405,13 @@ const getArticlesList = async (req, resp) => {
 * @apiName get article
 * @apiGroup Articles
 *
-* @apiParam {string} _id The _id of the requested article.
+* @apiParam {string} [_id] The _id of the requested article.
+* @apiParam {string} [permalink] The permalink of the requested article.
 
 */
 const getArticle = async(req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if ((typeof parameters._id==="undefined" || parameters._id==="") && (typeof parameters.permalink==="undefined" || parameters.permalink==="")) {
     resp.json({
       status: false,
       data: [],
@@ -370,10 +421,16 @@ const getArticle = async(req, resp) => {
     return false;
   }
   let _id=null;
+  let permalink=null;
+  let query = null;
   if (typeof parameters._id!=="undefined" && parameters._id!=="") {
     _id = parameters._id;
+    query = {_id: _id};
   }
-  let query = {_id: _id};
+  if (typeof parameters.permalink!=="undefined" && parameters.permalink!=="") {
+    permalink = parameters.permalink;
+    query = {permalink: permalink};
+  }
   let content = new Article(query);
   await content.load();
   resp.json({

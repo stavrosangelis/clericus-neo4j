@@ -3,12 +3,13 @@ const helpers = require("../helpers");
 const Article = require('./article.ctrl').Article;
 
 class ArticleCategory {
-  constructor({_id=null,label=null,parentId=0,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,permalink=null,parentId=0,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
     }
     this.label = label;
+    this.permalink = permalink;
     this.parentId = parentId;
     this.status = status;
     this.createdBy = createdBy;
@@ -37,10 +38,16 @@ class ArticleCategory {
   }
 
   async load() {
-    if (this._id===null) {
+    if (this._id===null && this.label===null) {
       return false;
     }
-    let query = "MATCH (n:ArticleCategory) WHERE id(n)="+this._id+" return n";
+    let query = "";
+    if (this._id!==null) {
+      query = `MATCH (n:ArticleCategory) WHERE id(n)=${this._id} return n`;
+    }
+    if (this.label!==null) {
+      query = `MATCH (n:ArticleCategory) WHERE n.label="${this.label}" return n`;
+    }
     let session = driver.session()
     let node = await session.writeTransaction(tx=>
       tx.run(query,{})
@@ -62,6 +69,18 @@ class ArticleCategory {
     }
   }
 
+  async makePermalink(label) {
+    let permalink = label.replace(/[^\w\s]/gi, '').replace(/\s+/g, '-').toLowerCase();
+    let category = new ArticleCategory({permalink: permalink});
+    await category.load();
+    if (category._id===null) {
+      return permalink;
+    }
+    else {
+      await makePermalink(permalink+"-2");
+    }
+  }
+
   async save(userId) {
     let validateArticleCategory = this.validate();
     if (!validateArticleCategory.status) {
@@ -75,12 +94,14 @@ class ArticleCategory {
       if (typeof this._id==="undefined" || this._id===null) {
         this.createdBy = userId;
         this.createdAt = now;
+        this.permalink = await this.makePermalink(this.label);
       }
       else {
-        let original = new Article({_id:this._id});
+        let original = new ArticleCategory({_id:this._id});
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
+        this.permalink = original.permalink;
       }
       this.updatedBy = userId;
       this.updatedAt = now;
@@ -239,10 +260,16 @@ const getArticleCategory = async(req, resp) => {
     return false;
   }
   let _id=null;
+  let label=null;
+  let query=null;
   if (typeof parameters._id!=="undefined" && parameters._id!=="") {
     _id = parameters._id;
+    query = {_id: _id};
   }
-  let query = {_id: _id};
+  if (typeof parameters.label!=="undefined" && parameters.label!=="") {
+    label = parameters.label;
+    query = {label: label};
+  }
   let content = new ArticleCategory(query);
   await content.load();
   resp.json({

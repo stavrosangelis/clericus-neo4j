@@ -35,12 +35,17 @@ const usergroupController = require('../controllers/usergroup.ctrl');
 // ui constrollers
 const analyticsController = require('../controllers/ui/analytics.ctrl');
 const classpiecesController = require('../controllers/ui/classpieces.ctrl');
+const contentController = require('../controllers/ui/content.ctrl');
 
 // ******* ui endpoints ******** //
 server.get('/generic-stats', analyticsController.genericStats);
 server.get('/classpieces', classpiecesController.getClasspieces);
 server.post('/classpieces-active-filters', classpiecesController.getClasspiecesActiveFilters);
 server.get('/classpiece', classpiecesController.getClasspiece);
+
+// ******* ui content ******** //
+server.get('/content-articles', contentController.getArticles);
+server.get('/content-article', contentController.getArticle);
 
 /**
 * @apiDefine admin This endpoint is only available to users with administrator priviledges

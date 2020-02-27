@@ -15,7 +15,8 @@ const genericStats = async (req, resp) => {
   let countEventsPromise = countNodes("Event");
   let countSpatialPromise = countNodes("Spatial");
   let countTemporalPromise = countNodes("Temporal");
-  let stats = await Promise.all([countPeoplePromise, countResourcesPromise,countOrganisationsPromise,countEventsPromise,countSpatialPromise,countTemporalPromise]).then((data)=> {
+  let countDiocesesPromise = countNodes("Organisation");
+  let stats = await Promise.all([countPeoplePromise, countResourcesPromise,countOrganisationsPromise,countEventsPromise,countSpatialPromise,countTemporalPromise,countDiocesesPromise]).then((data)=> {
     return data;
   });
   let response = {
@@ -25,6 +26,7 @@ const genericStats = async (req, resp) => {
     events: stats[3],
     spatial: stats[4],
     temporal: stats[5],
+    dioceses: stats[6],
   }
   resp.json({
     status: true,
@@ -34,9 +36,12 @@ const genericStats = async (req, resp) => {
   })
 }
 
-const countNodes = async (type) => {
+const countNodes = async (type, systemType=null) => {
   let session = driver.session();
   let query = "MATCH (n:"+type+") RETURN count(*)";
+  if (systemType!==null && type==="Organisation") {
+    query = `MATCH (n:${type}) n.organisationType="${systemType} RETURN count(*)`;
+  }
   let count = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
