@@ -38,7 +38,7 @@ class ArticleCategory {
   }
 
   async load() {
-    if (this._id===null && this.label===null) {
+    if (this._id===null && this.label===null && this.permalink===null) {
       return false;
     }
     let query = "";
@@ -47,6 +47,9 @@ class ArticleCategory {
     }
     if (this.label!==null) {
       query = `MATCH (n:ArticleCategory) WHERE n.label="${this.label}" return n`;
+    }
+    if (this.permalink!==null) {
+      query = `MATCH (n:ArticleCategory) WHERE n.permalink="${this.permalink}" return n`;
     }
     let session = driver.session()
     let node = await session.writeTransaction(tx=>

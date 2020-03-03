@@ -46,6 +46,7 @@ server.get('/classpiece', classpiecesController.getClasspiece);
 // ******* ui content ******** //
 server.get('/content-articles', contentController.getArticles);
 server.get('/content-article', contentController.getArticle);
+server.get('/content-category', contentController.getArticleCategory);
 
 /**
 * @apiDefine admin This endpoint is only available to users with administrator priviledges

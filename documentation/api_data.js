@@ -217,9 +217,16 @@ define({ "api": [
           {
             "group": "Parameter",
             "type": "string",
-            "optional": false,
+            "optional": true,
             "field": "_id",
             "description": "<p>The _id of the requested article.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "permalink",
+            "description": "<p>The permalink of the requested article.</p>"
           }
         ]
       }
@@ -688,6 +695,55 @@ define({ "api": [
     "version": "0.0.0",
     "filename": "src/controllers/ui/classpieces.ctrl.js",
     "groupTitle": "Classpieces"
+  },
+  {
+    "type": "get",
+    "url": "/content-article",
+    "title": "Get article",
+    "name": "get_content_article",
+    "group": "Content_Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the requested article.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "permalink",
+            "description": "<p>The permalink of the requested article.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/content.ctrl.js",
+    "groupTitle": "Content_Articles"
+  },
+  {
+    "type": "get",
+    "url": "/content-articles",
+    "title": "Get articles",
+    "name": "get_content_articles",
+    "group": "Content_Articles",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"currentPage\":1,\"data\":[{\"createdAt\":\"2020-02-26T16:35:27.079Z\",\"updatedBy\":\"437\",\"featuredImage\":\"3138\",\"createdBy\":\"437\",\"_id\":\"3137\",\"label\":\"News item 1\",\"category\":\"3157\",\"permalink\":\"news-item-1\",\"content\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"updatedAt\":\"2020-02-27T14:29:13.915Z\",\"teaser\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"status\":\"public\",\"systemLabels\":[\"Article\"],\"featuredImageDetails\":{\"_id\":\"3138\",\"filename\":\"3.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T16:35:36.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T16:35:36.685Z\"}},{\"createdAt\":\"2020-02-26T16:36:18.249Z\",\"updatedBy\":\"437\",\"featuredImage\":\"3138\",\"createdBy\":\"437\",\"_id\":\"3139\",\"label\":\"News item 2\",\"permalink\":\"news-item-2\",\"category\":\"3157\",\"content\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"updatedAt\":\"2020-02-27T14:29:49.518Z\",\"teaser\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"status\":\"public\",\"systemLabels\":[\"Article\"],\"featuredImageDetails\":{\"_id\":\"3138\",\"filename\":\"3.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T16:35:36.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T16:35:36.685Z\"}},{\"createdAt\":\"2020-02-26T16:36:32.206Z\",\"updatedBy\":\"437\",\"featuredImage\":\"3138\",\"createdBy\":\"437\",\"_id\":\"3158\",\"label\":\"News item 3\",\"permalink\":\"news-item-3\",\"category\":\"3157\",\"content\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"updatedAt\":\"2020-02-27T14:29:56.433Z\",\"teaser\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"status\":\"public\",\"systemLabels\":[\"Article\"],\"featuredImageDetails\":{\"_id\":\"3138\",\"filename\":\"3.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T16:35:36.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T16:35:36.685Z\"}},{\"createdAt\":\"2020-02-26T16:36:53.153Z\",\"updatedBy\":\"437\",\"featuredImage\":\"3138\",\"createdBy\":\"437\",\"_id\":\"3159\",\"label\":\"News item 4\",\"category\":\"3157\",\"permalink\":\"news-item-4\",\"content\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"updatedAt\":\"2020-02-27T14:30:05.642Z\",\"teaser\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"status\":\"public\",\"systemLabels\":[\"Article\"],\"featuredImageDetails\":{\"_id\":\"3138\",\"filename\":\"3.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T16:35:36.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T16:35:36.685Z\"}},{\"createdAt\":\"2020-02-26T16:37:12.836Z\",\"updatedBy\":\"437\",\"featuredImage\":\"3138\",\"createdBy\":\"437\",\"_id\":\"3160\",\"label\":\"News item 5\",\"permalink\":\"news-item-5\",\"category\":\"3157\",\"content\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"updatedAt\":\"2020-02-27T14:30:11.697Z\",\"teaser\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"status\":\"public\",\"systemLabels\":[\"Article\"],\"featuredImageDetails\":{\"_id\":\"3138\",\"filename\":\"3.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T16:35:36.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T16:35:36.685Z\"}},{\"createdAt\":\"2020-02-26T16:37:29.104Z\",\"updatedBy\":\"437\",\"featuredImage\":\"3138\",\"createdBy\":\"437\",\"_id\":\"3140\",\"label\":\"News item 6\",\"permalink\":\"news-item-6\",\"category\":\"3157\",\"content\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"updatedAt\":\"2020-02-27T14:30:17.972Z\",\"teaser\":\"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales aliquet metus dictum viverra. Quisque bibendum, nisi id blandit lobortis.</p>\",\"status\":\"public\",\"systemLabels\":[\"Article\"],\"featuredImageDetails\":{\"_id\":\"3138\",\"filename\":\"3.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/27ab65d4be6f10e88e0b0ee4c533a3ca.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T16:35:36.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T16:35:36.685Z\"}}],\"totalItems\":6,\"totalPages\":1},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/content.ctrl.js",
+    "groupTitle": "Content_Articles"
   },
   {
     "type": "get",
@@ -3143,6 +3199,185 @@ define({ "api": [
     "version": "0.0.0",
     "filename": "src/controllers/settings.ctrl.js",
     "groupTitle": "Settings"
+  },
+  {
+    "type": "delete",
+    "url": "/slideshow-item",
+    "title": "Delete slideshow item",
+    "name": "delete_slideshow_item",
+    "group": "Slideshow",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the slideshow item for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Slideshow) WHERE id(n)=3193 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":50,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/slideshow.ctrl.js",
+    "groupTitle": "Slideshow"
+  },
+  {
+    "type": "get",
+    "url": "/slideshow-item",
+    "title": "Get slideshow item",
+    "name": "get_slideshow_item",
+    "group": "Slideshow",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"3046\",\"label\":\"test 2\",\"caption\":\"caption 2\",\"order\":\"1\",\"url\":\"http://google.com\",\"status\":\"private\",\"image\":\"3079\",\"imageDetails\":{\"_id\":\"3079\",\"filename\":\"slideshow.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"5889d821aae8cf508f1b12b030dc62fd.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T12:27:09.950Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T12:27:09.950Z\"},\"createdBy\":\"437\",\"createdAt\":\"2020-02-19T12:11:02.733Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T12:27:15.260Z\"},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested slideshow item.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/slideshow.ctrl.js",
+    "groupTitle": "Slideshow"
+  },
+  {
+    "type": "get",
+    "url": "/slideshow-items",
+    "title": "Get slideshow items",
+    "name": "get_slideshow_items",
+    "group": "Slideshow",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-02-19T12:11:02.733Z\",\"image\":\"3079\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"caption\":\"caption 2\",\"_id\":\"3046\",\"label\":\"test 2\",\"url\":\"http://google.com\",\"updatedAt\":\"2020-02-26T12:27:15.260Z\",\"status\":\"private\",\"order\":\"1\",\"systemLabels\":[\"Slideshow\"],\"imageDetails\":{\"_id\":\"3079\",\"filename\":\"slideshow.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"5889d821aae8cf508f1b12b030dc62fd.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T12:27:09.950Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T12:27:09.950Z\"}},{\"createdAt\":\"2020-02-19T12:10:43.691Z\",\"image\":\"2942\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"caption\":\"test caption\",\"label\":\"test\",\"url\":\"http://www.google.gr\",\"updatedAt\":\"2020-02-19T12:10:43.691Z\",\"order\":0,\"status\":\"private\",\"_id\":\"2876\",\"systemLabels\":[\"Slideshow\"],\"imageDetails\":{\"_id\":\"2942\",\"filename\":\"IMG_20200218_145701.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"64fead2233879c89f47d8358530d1d41.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/64fead2233879c89f47d8358530d1d41.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/64fead2233879c89f47d8358530d1d41.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-18T16:01:16.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-18T16:01:16.685Z\"}}],\"totalItems\":2},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/slideshow.ctrl.js",
+    "groupTitle": "Slideshow"
+  },
+  {
+    "type": "put",
+    "url": "/slideshow-item",
+    "title": "Put slideshow item",
+    "name": "put_slideshow_item",
+    "group": "Slideshow",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the slideshow item. This should be undefined|null|blank in the creation of a new slideshow item.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The slideshow item's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "caption",
+            "description": "<p>The slideshow item's caption.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "url",
+            "description": "<p>The slideshow item's url.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "order",
+            "description": "<p>The slideshow item's order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "status",
+            "defaultValue": "private",
+            "description": "<p>The slideshow item's status.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "image",
+            "description": "<p>The slideshow item's image id.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "{\"_id\":\"3046\",\"label\":\"test 2\",\"caption\":\"caption 2\",\"order\":\"1\",\"url\":\"http://google.com\",\"status\":\"private\",\"image\":\"3079\"}",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"3046\",\"label\":\"test 2\",\"caption\":\"caption 2\",\"order\":\"1\",\"url\":\"http://google.com\",\"status\":\"private\",\"image\":\"3079\",\"imageDetails\":{\"_id\":\"3079\",\"filename\":\"slideshow.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"5889d821aae8cf508f1b12b030dc62fd.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T12:27:09.950Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T12:27:09.950Z\"},\"createdBy\":\"437\",\"createdAt\":\"2020-02-19T12:11:02.733Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-03-03T11:07:37.507Z\"},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/slideshow.ctrl.js",
+    "groupTitle": "Slideshow"
   },
   {
     "type": "delete",

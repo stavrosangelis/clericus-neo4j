@@ -8,9 +8,10 @@ const formidable = require('formidable');
 const path = require('path');
 const UploadedFile = require('../uploadedFile.ctrl').UploadedFile;
 const ArticleCategory = require('../articleCategory.ctrl').ArticleCategory;
+const User = require('../user.ctrl').User;
 
 class Article {
-  constructor({_id=null,label=null,permalink=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,permalink=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,author=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -23,6 +24,7 @@ class Article {
     this.status = status;
     this.featuredImage = featuredImage;
     this.featuredImageDetails = featuredImageDetails;
+    this.author = author;
     this.createdBy = createdBy;
     this.createdAt = createdAt;
     this.updatedBy = updatedBy;
@@ -65,6 +67,16 @@ class Article {
       await featuredImageDetails.load();
       this.featuredImageDetails = featuredImageDetails;
     }
+    let author = new User({_id: this.updatedBy});
+    await author.load();
+    let authorLabel = "";
+    if (author.firstName!=="") {
+      authorLabel = author.firstName;
+    }
+    if (author.firstName!=="" && author.lastName!=="") {
+      authorLabel += ` ${author.lastName}`;
+    }
+    this.author = authorLabel;
   }
 };
 
@@ -181,6 +193,17 @@ const getArticlesQuery = async (query, queryParams, limit) => {
       node.featuredImageDetails = featuredImageDetails;
     }
     else node.featuredImageDetails = null;
+
+    let author = new User({_id: node.updatedBy});
+    await author.load();
+    let authorLabel = "";
+    if (author.firstName!=="") {
+      authorLabel = author.firstName;
+    }
+    if (author.firstName!=="" && author.lastName!=="") {
+      authorLabel += ` ${author.lastName}`;
+    }
+    node.author = authorLabel;
   }
 
 
@@ -237,15 +260,25 @@ const getArticle = async(req, resp) => {
   }
   let content = new Article(query);
   await content.load();
-  let categories = await getArticleCategoryTree(content.category);
-  categories.reverse();
-  content.categories = categories;
-  resp.json({
-    status: true,
-    data: content,
-    error: [],
-    msg: "Query results",
-  });
+  if (content._id!==null) {
+    let categories = await getArticleCategoryTree(content.category);
+    categories.reverse();
+    content.categories = categories;
+    resp.json({
+      status: true,
+      data: content,
+      error: [],
+      msg: "Query results",
+    });
+  }
+  else {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "This article is not available",
+    });
+  }
 }
 
 async function getArticleCategoryTree(_id) {
@@ -260,8 +293,134 @@ async function getArticleCategoryTree(_id) {
   return tree;
 }
 
+async function getArticleCategoryChildrenTree(_id) {
+  let children = [];
+  let query = `MATCH (n:ArticleCategory) WHERE n.parentId="${_id}" return n`;
+  let session = driver.session()
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  })
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise, "n");
+  for (let i=0;i<nodes.length; i++) {
+    let node = nodes[i];
+    let nodeChildren = await getArticleCategoryChildrenTree(node._id);
+    node.children_categories = nodeChildren;
+  }
+  children = [...nodes, ...children];
+  return children;
+}
+
+const getArticleCategory = async(req, resp)  => {
+  let parameters = req.query;
+  let label = "";
+  let categoryId = "";
+  let permalink = "";
+  let page = 0;
+  let orderField = "label";
+  let queryPage = 0;
+  let queryOrder = "";
+  let limit = 25;
+
+  let query = "";
+  let queryParams = "";
+  if (typeof parameters.label!=="undefined") {
+    label = parameters.label;
+    if (label!=="") {
+      queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+    }
+  }
+  if (typeof parameters.categoryId!=="undefined") {
+    categoryId = parameters.categoryId;
+    if (categoryId!=="") {
+      queryParams +=`n.category=${categoryId} ` ;
+    }
+  }
+  if (typeof parameters.permalink!=="undefined") {
+    permalink = parameters.permalink;
+  }
+  // 1. load category details
+  let categoryQuery = {_id: categoryId};
+  if (permalink!=="") {
+    categoryQuery = {permalink: permalink};
+  }
+  let category = new ArticleCategory(categoryQuery);
+  await category.load();
+  let categories = await getArticleCategoryTree(category._id);
+  categories.reverse();
+  category.categories = categories;
+  category.children_categories = await getArticleCategoryChildrenTree(category._id);
+  categoryId = category._id;
+  queryParams +=`n.category="${categoryId}" ` ;
+
+  if (typeof parameters.orderField!=="undefined") {
+    orderField = parameters.orderField;
+  }
+  if (orderField!=="") {
+    queryOrder = "ORDER BY n."+orderField;
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+      queryOrder += " DESC";
+    }
+  }
+  if (typeof parameters.page!=="undefined") {
+    page = parseInt(parameters.page,10);
+    queryPage = parseInt(parameters.page,10)-1;
+  }
+  if (typeof parameters.limit!=="undefined") {
+    limit = parseInt(parameters.limit,10);
+  }
+  let currentPage = page;
+  if (page===0) {
+    currentPage = 1;
+  }
+  let skip = limit*queryPage;
+  if (queryParams!=="") {
+    queryParams = "WHERE n.status='public' AND "+queryParams;
+  }
+
+  query = "MATCH (n:Article) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+  let data = await getArticlesQuery(query, queryParams, limit);
+  if (data.error) {
+    resp.json({
+      status: false,
+      data: [],
+      error: data.error,
+      msg: data.error.message,
+    })
+  }
+  else if (category.status!=="public") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "This content category is private.",
+    })
+  }
+  else {
+    let responseData = {
+      currentPage: currentPage,
+      data: {
+        category: category,
+        articles: data.nodes
+      },
+      totalItems: data.count,
+      totalPages: data.totalPages,
+    }
+    resp.json({
+      status: true,
+      data: responseData,
+      error: [],
+      msg: "Query results",
+    })
+  }
+}
+
 module.exports = {
   Article: Article,
   getArticles: getArticles,
   getArticle: getArticle,
+  getArticleCategory: getArticleCategory,
 };

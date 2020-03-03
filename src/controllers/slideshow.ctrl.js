@@ -177,6 +177,7 @@ class Slideshow {
 * @apiName get slideshow items
 * @apiGroup Slideshow
 * @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"data":[{"createdAt":"2020-02-19T12:11:02.733Z","image":"3079","updatedBy":"437","createdBy":"437","caption":"caption 2","_id":"3046","label":"test 2","url":"http://google.com","updatedAt":"2020-02-26T12:27:15.260Z","status":"private","order":"1","systemLabels":["Slideshow"],"imageDetails":{"_id":"3079","filename":"slideshow.jpg","year":2020,"month":2,"hashedName":"5889d821aae8cf508f1b12b030dc62fd.jpg","paths":[{"path":"http://localhost:5100/uploads/2020/2/images/5889d821aae8cf508f1b12b030dc62fd.jpg","pathType":"source"},{"path":"http://localhost:5100/uploads/2020/2/thumbnails/5889d821aae8cf508f1b12b030dc62fd.jpg","pathType":"thumbnail"}],"createdBy":"437","createdAt":"2020-02-26T12:27:09.950Z","updatedBy":"437","updatedAt":"2020-02-26T12:27:09.950Z"}},{"createdAt":"2020-02-19T12:10:43.691Z","image":"2942","updatedBy":"437","createdBy":"437","caption":"test caption","label":"test","url":"http://www.google.gr","updatedAt":"2020-02-19T12:10:43.691Z","order":0,"status":"private","_id":"2876","systemLabels":["Slideshow"],"imageDetails":{"_id":"2942","filename":"IMG_20200218_145701.jpg","year":2020,"month":2,"hashedName":"64fead2233879c89f47d8358530d1d41.jpg","paths":[{"path":"http://localhost:5100/uploads/2020/2/images/64fead2233879c89f47d8358530d1d41.jpg","pathType":"source"},{"path":"http://localhost:5100/uploads/2020/2/thumbnails/64fead2233879c89f47d8358530d1d41.jpg","pathType":"thumbnail"}],"createdBy":"437","createdAt":"2020-02-18T16:01:16.685Z","updatedBy":"437","updatedAt":"2020-02-18T16:01:16.685Z"}}],"totalItems":2},"error":[],"msg":"Query results"}
 */
 const getSlideshowItems = async (req, resp) => {
   let parameters = req.query;
@@ -243,6 +244,8 @@ const getSlideshowItems = async (req, resp) => {
 * @api {get} /slideshow-item Get slideshow item
 * @apiName get slideshow item
 * @apiGroup Slideshow
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"3046","label":"test 2","caption":"caption 2","order":"1","url":"http://google.com","status":"private","image":"3079","imageDetails":{"_id":"3079","filename":"slideshow.jpg","year":2020,"month":2,"hashedName":"5889d821aae8cf508f1b12b030dc62fd.jpg","paths":[{"path":"http://localhost:5100/uploads/2020/2/images/5889d821aae8cf508f1b12b030dc62fd.jpg","pathType":"source"},{"path":"http://localhost:5100/uploads/2020/2/thumbnails/5889d821aae8cf508f1b12b030dc62fd.jpg","pathType":"thumbnail"}],"createdBy":"437","createdAt":"2020-02-26T12:27:09.950Z","updatedBy":"437","updatedAt":"2020-02-26T12:27:09.950Z"},"createdBy":"437","createdAt":"2020-02-19T12:11:02.733Z","updatedBy":"437","updatedAt":"2020-02-26T12:27:15.260Z"},"error":[],"msg":"Query results"}
 *
 * @apiParam {string} _id The _id of the requested slideshow item.
 
@@ -287,9 +290,9 @@ const getSlideshowItem = async(req, resp) => {
 * @apiParam {string} [status='private'] The slideshow item's status.
 * @apiParam {number} [image] The slideshow item's image id.
 * @apiExample {json} Example:
-*
+*{"_id":"3046","label":"test 2","caption":"caption 2","order":"1","url":"http://google.com","status":"private","image":"3079"}
 * @apiSuccessExample {json} Success-Response:
-
+{"status":true,"data":{"_id":"3046","label":"test 2","caption":"caption 2","order":"1","url":"http://google.com","status":"private","image":"3079","imageDetails":{"_id":"3079","filename":"slideshow.jpg","year":2020,"month":2,"hashedName":"5889d821aae8cf508f1b12b030dc62fd.jpg","paths":[{"path":"http://localhost:5100/uploads/2020/2/images/5889d821aae8cf508f1b12b030dc62fd.jpg","pathType":"source"},{"path":"http://localhost:5100/uploads/2020/2/thumbnails/5889d821aae8cf508f1b12b030dc62fd.jpg","pathType":"thumbnail"}],"createdBy":"437","createdAt":"2020-02-26T12:27:09.950Z","updatedBy":"437","updatedAt":"2020-02-26T12:27:09.950Z"},"createdBy":"437","createdAt":"2020-02-19T12:11:02.733Z","updatedBy":"437","updatedAt":"2020-03-03T11:07:37.507Z"},"error":[],"msg":"Query results"}
 */
 const putSlideshowItem = async(req, resp) => {
   let postData = req.body;
@@ -322,7 +325,7 @@ const putSlideshowItem = async(req, resp) => {
 * @apiParam {string} _id The id of the slideshow item for deletion.
 *
 * @apiSuccessExample {json} Success-Response:
-
+{"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Slideshow) WHERE id(n)=3193 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":50,"high":0}}},"error":[],"msg":"Query results"}
  */
 const deleteSlideshowItem = async(req, resp) => {
   let postData = req.body;
