@@ -62,7 +62,7 @@ class Article {
       this[key] = node[key];
     }
     // populate featured image
-    if (typeof this.featuredImage!=="undefined" && this.featuredImage!=="") {
+    if (typeof this.featuredImage!=="undefined" && this.featuredImage!==null && this.featuredImage!=="") {
       let featuredImageDetails = new UploadedFile({_id:this.featuredImage});
       await featuredImageDetails.load();
       this.featuredImageDetails = featuredImageDetails;
@@ -282,6 +282,9 @@ const getArticle = async(req, resp) => {
 }
 
 async function getArticleCategoryTree(_id) {
+  if (_id===0) {
+    return [];
+  }
   let tree = [];
   let category = new ArticleCategory({_id:_id});
   await category.load();
