@@ -1,5 +1,6 @@
 const driver = require("../../config/db-driver");
 const helpers = require("../../helpers");
+const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 /**
 * @api {post} /search Generic search
@@ -29,6 +30,7 @@ const search = async (req, resp) => {
   let events = results.filter(n=>n.type==="Event");
   let organisations = results.filter(n=>n.type==="Organisation");
   let people = results.filter(n=>n.type==="Person");
+  let classpieces = results.filter(n=>n.type==="Classpiece");
   let resources = results.filter(n=>n.type==="Resource");
   let spatial = results.filter(n=>n.type==="Spatial");
   let temporal = results.filter(n=>n.type==="Temporal");
@@ -37,6 +39,7 @@ const search = async (req, resp) => {
     events: events,
     organisations: organisations,
     people: people,
+    classpieces: classpieces,
     resources: resources,
     spatial: spatial,
     temporal: temporal,
@@ -62,8 +65,9 @@ RETURN node, node.label, node.description, node.content, score`;
   }).catch((error) => {
     console.log(error)
   });
-
-  let nodes = nodesPromise.map(node=>{
+  let nodes = [];
+  for (let i=0; i<nodesPromise.length; i++) {
+    let node = nodesPromise[i];
     let output = {};
     let record = node.toObject();
     output.label = record['node.label'];
@@ -71,14 +75,22 @@ RETURN node, node.label, node.description, node.content, score`;
     helpers.prepareOutput(record);
     let details = helpers.outputRecord(record.node);
     output.type = record.node.labels[0];
+    if (output.type==="Resource") {
+      let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+      await classpieceSystemType.load();
+      if (details.systemType===classpieceSystemType._id) {
+        output.type = "Classpiece";
+      }
+    }
     output._id = details._id;
     output.status = details.status;
     if (typeof details.permalink!=="undefined") {
       output.permalink = details.permalink;
     }
-    return output;
-  });
-  nodes = nodes.filter(n=>n.status==="public");
+    if (output.status==="public") {
+      nodes.push(output);
+    }
+  }
   return nodes;
 }
 
