@@ -83,7 +83,7 @@ const getClasspieces = async (req, resp) => {
   let match = "(n:Resource)";
 
   let query = "";
-  let queryParams = "";
+  let queryParams = " n.status='public'";
 
   // get classpiece resource type id
   let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
@@ -234,7 +234,6 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
     }
     return nodeOutput;
   });
-
   let count = await session.writeTransaction(tx=>
     tx.run(`MATCH ${match} ${queryParams} RETURN count(*)`)
   )

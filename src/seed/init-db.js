@@ -15,11 +15,14 @@ const initDB = async() => {
 
 const createIndexes = async () => {
   let session = driver.session()
-  let q1 = "CREATE INDEX ON :Person(label, firstName, middleName, lastName)"
-  let q2 = " CREATE INDEX ON :Organisation(label)"
-  let q3 = " CREATE INDEX ON :Resource(label)"
+  let q1 = "CREATE INDEX ON :Person(label, firstName, middleName, lastName, description, alternateAppelations)"
+  let q2 = " CREATE INDEX ON :Organisation(label, description, alternateAppelations)"
+  let q3 = " CREATE INDEX ON :Resource(label, description)"
   let q4 = " CREATE INDEX ON :TaxonomyTerm(label, labelId, inverseLabel)"
-  let q5 = " CREATE INDEX ON :Event(label)"
+  let q5 = " CREATE INDEX ON :Event(label, description)"
+  let q6 = " CREATE INDEX ON :Article(label, content)"
+  // full text indexes
+  let q7 = `CALL db.index.fulltext.createNodeIndex("fulltextSearch",["Article", "Resource", "Person", "Organisation", "Event", "Spatial", "Temporal"],["label", "description", "content", "alternateAppelations"])`;
   const rp1 = await new Promise((resolve, reject)=> {
     let result = session.run(
       q1,
@@ -65,7 +68,25 @@ const createIndexes = async () => {
       resolve(result);
     });
   })
-  return [rp1,rp2,rp3,rp4,rp5];
+  const rp6 = await new Promise((resolve, reject)=> {
+    let result = session.run(
+      q6,
+      {}
+    ).then(result => {
+      session.close();
+      resolve(result);
+    });
+  })
+  const rp7 = await new Promise((resolve, reject)=> {
+    let result = session.run(
+      q7,
+      {}
+    ).then(result => {
+      session.close();
+      resolve(result);
+    });
+  })
+  return [rp1,rp2,rp3,rp4,rp5,rp6,rp7];
 }
 
 const createUniqueConstrains = async () => {
