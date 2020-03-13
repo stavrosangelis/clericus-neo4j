@@ -77,7 +77,9 @@ const getClasspieces = async (req, resp) => {
   let people = [];
   let resources = [];
   let page = 0;
+  let orderField = "label";
   let queryPage = 0;
+  let queryOrder = "";
   let limit = 25;
 
   let match = "(n:Resource)";
@@ -110,6 +112,24 @@ const getClasspieces = async (req, resp) => {
       }
       queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
     }
+  }
+
+  if (typeof parameters.orderField!=="undefined") {
+    orderField = parameters.orderField;
+  }
+  if (orderField!=="") {
+    queryOrder = "ORDER BY n."+orderField;
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+      queryOrder += " DESC";
+    }
+  }
+
+  if (typeof parameters.page!=="undefined") {
+    page = parseInt(parameters.page,10);
+    queryPage = parseInt(parameters.page,10)-1;
+  }
+  if (typeof parameters.limit!=="undefined") {
+    limit = parseInt(parameters.limit,10);
   }
 
   if (typeof parameters.events!=="undefined") {
@@ -323,7 +343,7 @@ const getClasspiece = async(req, resp) => {
 
   let _id = parameters._id;
   let session = driver.session();
-  let query = "MATCH (n:Resource) WHERE id(n)="+_id+" return n";
+  let query = "MATCH (n:Resource) WHERE id(n)="+_id+" AND n.status='public' return n";
   let classpiece = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -415,7 +435,7 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
     _ids = parameters._ids;
   }
-  let query = `MATCH (c:Resource)-->(n) WHERE id(c) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
+  let query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND id(c) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})

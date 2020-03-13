@@ -38,7 +38,7 @@ const genericStats = async (req, resp) => {
 
 const countNodes = async (type, systemType=null) => {
   let session = driver.session();
-  let query = "MATCH (n:"+type+") RETURN count(*)";
+  let query = "MATCH (n:"+type+") WHERE n.status='public' RETURN count(*)";
   if (systemType!==null && type==="Organisation") {
     query = `MATCH (n:${type}) n.organisationType="${systemType} RETURN count(*)`;
   }

@@ -36,11 +36,13 @@ const usergroupController = require('../controllers/usergroup.ctrl');
 const analyticsController = require('../controllers/ui/analytics.ctrl');
 const classpiecesController = require('../controllers/ui/classpieces.ctrl');
 const contentController = require('../controllers/ui/content.ctrl');
+const peopleController = require('../controllers/ui/people.ctrl');
 const searchController = require('../controllers/ui/search.ctrl');
 const uiMenuController = require('../controllers/ui/menu.ctrl');
 
 // ******* ui endpoints ******** //
 server.get('/generic-stats', analyticsController.genericStats);
+
 server.get('/classpieces', classpiecesController.getClasspieces);
 server.post('/classpieces-active-filters', classpiecesController.getClasspiecesActiveFilters);
 server.get('/classpiece', classpiecesController.getClasspiece);
@@ -52,6 +54,11 @@ server.get('/content-category', contentController.getArticleCategory);
 
 // ******* ui menu ******** //
 server.get('/ui-menu', uiMenuController.getMenu);
+
+// ******* ui people  ******** //
+server.get('/ui-people', peopleController.getPeople);
+server.get('/ui-person', peopleController.getPerson);
+server.post('/ui-person-active-filters', peopleController.getPersonActiveFilters);
 
 // ******* ui search ******** //
 server.post('/search', searchController.search);
