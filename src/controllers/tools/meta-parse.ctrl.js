@@ -52,7 +52,7 @@ const metaParseClassPiece = async(req, resp) => {
 
   await highlightFaces(srcPath, identifiedFaces, outputFacesFile, Canvas, outputThumbnailsDir, identifiedFacesPath, outputThumbnailsPathDir);
   msg = 'Finished highlighting faces!';
-  console.log(msg);
+  //console.log(msg);
   // 05. return results
   resp.json({
     status: true,
@@ -218,11 +218,11 @@ var highlightFaces = async(inputFile, faces, outputFile, Canvas, outputDir, face
     return data;
   })
 
-  console.log(cropped)
+  //console.log(cropped)
   // update faces json
   fs.writeFile(facesPath, JSON.stringify(newFaces), 'utf8', (error) => {
     if (error) throw error;
-    console.log('Faces have been updated successfully!');
+    //console.log('Faces have been updated successfully!');
   });
 }
 
@@ -233,7 +233,7 @@ const cropImg = async(i, total, inputFile, initialX, initialY, width, height, ro
   // Open the original image into a canvas
   const img = new Image();
   img.src = image;
-  console.log('loaded image '+i+'\n');
+  //console.log('loaded image '+i+'\n');
   var canvas = Canvas.createCanvas(width, height);
   var ctx = canvas.getContext('2d')
   if (rotate!==0) {
@@ -277,9 +277,9 @@ const cropImg = async(i, total, inputFile, initialX, initialY, width, height, ro
   })
 
   stream.pipe(out);
-  console.log(i+'.jpg cropped successfully!');
+  //console.log(i+'.jpg cropped successfully!');
   if (i===(parseInt(total,10)-1)) {
-    console.log('Images cropping completed successfully!');
+    //console.log('Images cropping completed successfully!');
   }
   return i+'.jpg cropped successfully!'
 }
@@ -315,7 +315,7 @@ const highlightText = async(inputFile, labels, outputFile, Canvas) => {
   });
 
   // Write the result to a file
-  console.log(`Writing to file ${outputFile}`);
+  //console.log(`Writing to file ${outputFile}`);
   const writeStream = fs.createWriteStream(outputFile);
   const pngStream = canvas.pngStream();
 
@@ -641,7 +641,7 @@ const createThumbnail = async(srcPath=null, targetPath=null, fileName=null, cust
 
   stream.pipe(out);
   out.on('finish', function () {
-    console.log(fileName+" resized successfully");
+    //console.log(fileName+" resized successfully");
     return fileName+" resized successfully";
   })
 
@@ -704,7 +704,7 @@ const createCompressed = async(srcPath=null, targetPath=null, fileName=null, cus
 
   stream.pipe(out);
   out.on('finish', function () {
-    console.log(fileName+" compressed successfully");
+    //console.log(fileName+" compressed successfully");
     return fileName+" compressed successfully";
   })
 
@@ -743,12 +743,11 @@ const updateClassPieceFaces = async(req, resp) => {
   if (newFaces!=="") {
     let thumbnailsDir = resourcesPath+"images/processed/thumbnails";
     let fileString = path.parse(thumbnailsDir+"/"+file).name;
-
     let facesJSON = resourcesPath+"output/"+fileString+"/json/"+fileString+"-faces.json";
 
     fs.writeFile(facesJSON, JSON.stringify(newFaces), 'utf8', (error) => {
       if (error) throw error;
-      console.log('Faces have been updated successfully!');
+      //console.log('Faces have been updated successfully!');
     });
 
     resp.json({
