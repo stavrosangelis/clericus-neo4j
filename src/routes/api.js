@@ -135,6 +135,7 @@ server.post('/upload-resource', auth.checkAdminToken, resourceController.uploadR
 server.get('/resource',  resourceController.getResource);
 server.get('/resources', resourceController.getResources);
 server.delete('/resource', auth.checkAdminToken, resourceController.deleteResource);
+server.delete('/delete-classpiece', auth.checkAdminToken, resourceController.deleteClasspiece);
 server.delete('/resources', auth.checkAdminToken, resourceController.deleteResources);
 
 // organisations

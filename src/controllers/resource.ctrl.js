@@ -5,7 +5,7 @@ const fs = require('fs');
 const mimeType = require('mime-types')
 const {promisify} = require('util');
 const formidable = require('formidable');
-
+const personController = require("./person.ctrl");
 class Resource {
   constructor({_id=null,label=null,description=null,fileName=null,metadata=[],paths=[],resourceType=null,systemType=null,uploadedFile=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
@@ -833,6 +833,86 @@ const parseResourceDetails = async(fileType, uploadedFile, newUploadFile, hashed
   return newResourceData;
 }
 
+/**
+* @api {delete} /resource Delete classpiece
+* @apiName delete classpiece
+* @apiGroup Resources
+* @apiPermission admin
+*
+* @apiParam {string} _id The id of the classpiece for deletion.
+*
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":11,"high":0}}},"error":[],"msg":"Query results"}*/
+const deleteClasspiece = async(req, resp) => {
+  let parameters = req.query;
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select a valid id to continue.",
+    });
+    return false;
+  }
+  let _id = parameters._id;
+
+
+  // 1. load classpiece and all related people and thumbnails
+  let resource = new Resource({_id: _id});
+  await resource.load();
+  // 2. delete related people
+  let peopleResponse = [];
+  let people = resource.people;
+  let peopleLength = people.length;
+  for (let p=0;p<peopleLength;p++) {
+    let person = people[p];
+    let personId = person.ref._id;
+    let newPerson = new personController.Person({_id: personId});
+    let deletePerson = await newPerson.delete();
+    let deleteSuccess = deletePerson.summary.counters._stats.nodesDeleted;
+    if (deleteSuccess===1) {
+      peopleResponse.push(`Person with _id "${newPerson._id}" deleted successfully.`);
+    }
+    else {
+      peopleResponse.push(`Person with _id "${newPerson._id}" failed to delete.`);
+    }
+  }
+  // 3. delete related thumbnails
+  let thumbnailsResponse = [];
+  let thumbnails = resource.resources;
+  let thumbnailsLength = thumbnails.length;
+  for (let t=0;t<thumbnailsLength;t++) {
+    let thumbnail = thumbnails[t];
+    let thumbnailId = thumbnail.ref._id;
+    let newThumbnail = new Resource({_id: thumbnailId});
+    let deleteThumbnail = await newThumbnail.delete();
+    let deleteSuccess = deleteThumbnail.summary.counters._stats.nodesDeleted;
+    if (deleteSuccess===1) {
+      thumbnailsResponse.push(`Resource with _id "${newThumbnail._id}" deleted successfully.`);
+    }
+    else {
+      thumbnailsResponse.push(`Resource with _id "${newThumbnail._id}" failed to delete.`);
+    }
+  }
+  // 4. delete classpiece
+  let deleteResource = await resource.delete();
+  let deleteResourceSuccess = deleteResource.summary.counters._stats.nodesDeleted;
+  let deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" deleted successfully.`
+  if (deleteResourceSuccess!==1) {
+    deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" failed to delete.`
+  }
+  let data = {
+    classpiece: deleteResourceResponse,
+    people: peopleResponse,
+    resources: thumbnailsResponse,
+  };
+  resp.json({
+    status: true,
+    data: data,
+    error: [],
+    msg: "Query results",
+  });}
+
 module.exports = {
   Resource: Resource,
   getResources: getResources,
@@ -841,4 +921,5 @@ module.exports = {
   uploadResource: uploadResource,
   deleteResource: deleteResource,
   deleteResources: deleteResources,
+  deleteClasspiece: deleteClasspiece,
 };
