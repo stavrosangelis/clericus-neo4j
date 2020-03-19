@@ -257,7 +257,6 @@ const cropImg = async(i, total, inputFile, initialX, initialY, width, height, ro
 		let cx = initialX + (width*0.5);
 		let cy = initialY + (height*0.5);
 		let newCoordinates = rotateCoordinates(cx,cy,initialX,initialY,radians,width,height,rotateDegrees);
-
 		let newX = newCoordinates.x;
 		let newY = newCoordinates.y;
 
