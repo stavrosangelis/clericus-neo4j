@@ -23,6 +23,7 @@
 # environment variables
 .env.production
 .env.development
+.env.develserver
 
 # nyc coverage reports
 /.nyc_output
