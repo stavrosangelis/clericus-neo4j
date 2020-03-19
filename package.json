@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production pm2 start ./src/app.js --name clericus",
     "dev": "NODE_ENV=development nodemon ./src/app.js",
     "pm2-dev": "NODE_ENV=development pm2 start ./src/app.js --name clericus-dev",
-    "pm2-deverver": "NODE_ENV=devserver pm2 start ./src/app.js --name clericus-devserver",
+    "pm2-devserver": "NODE_ENV=devserver pm2 start ./src/app.js --name clericus-devserver",
     "cover": "NODE_ENV=development nyc npm run test",
     "docs": "apidoc -f '.*\\.js$' -i src/ -o documentation/"
   },
