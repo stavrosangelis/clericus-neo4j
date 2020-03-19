@@ -45,7 +45,10 @@ const metaParseClassPiece = async(req, resp) => {
   mkdirSync(outputDir);
 
   var outputFacesFile = outputDir+"images/"+fileName+"-faces-processed.png";
-  var identifiedFaces = require(outputDir+"json/"+fileName+"-faces.json");
+  var identifiedFaces = await fs.readFileSync(outputDir+"json/"+fileName+"-faces.json", "utf-8");
+  if (typeof identifiedFaces==="string") {
+    identifiedFaces = JSON.parse(identifiedFaces);
+  }
   var identifiedFacesPath = outputDir+"json/"+fileName+"-faces.json";
 
   let msg = 'Highlighting faces...'
@@ -216,14 +219,23 @@ var highlightFaces = async(inputFile, faces, outputFile, Canvas, outputDir, face
 
   let cropped = await Promise.all(facesCropPromises).then(data=> {
     return data;
-  })
+  });
 
   //console.log(cropped)
   // update faces json
-  fs.writeFile(facesPath, JSON.stringify(newFaces), 'utf8', (error) => {
-    if (error) throw error;
-    //console.log('Faces have been updated successfully!');
-  });
+  let fileWriteStatus = true;
+  let fileWriteError = "";
+  try {
+    await fs.writeFileSync(facesPath, JSON.stringify(newFaces), 'utf8');
+  } catch (e) {
+    fileWriteStatus = false;
+    fileWriteError = e;
+  }
+  let output = {
+    status: fileWriteStatus,
+    error: fileWriteError
+  }
+  return output;
 }
 
 const cropImg = async(i, total, inputFile, initialX, initialY, width, height, rotate=0, outputDir) => {
@@ -745,17 +757,32 @@ const updateClassPieceFaces = async(req, resp) => {
     let fileString = path.parse(thumbnailsDir+"/"+file).name;
     let facesJSON = resourcesPath+"output/"+fileString+"/json/"+fileString+"-faces.json";
 
-    fs.writeFile(facesJSON, JSON.stringify(newFaces), 'utf8', (error) => {
-      if (error) throw error;
-      //console.log('Faces have been updated successfully!');
-    });
+    let fileWriteStatus = true;
+    let fileWriteError = "";
 
-    resp.json({
-      status: true,
-      data: 'Face selections have been saved successfully',
-      error: '',
-      msg: '',
-    })
+    try {
+      await fs.writeFileSync(facesJSON, JSON.stringify(newFaces), 'utf8');
+    } catch (e) {
+      fileWriteStatus = false;
+      fileWriteError = e;
+    }
+
+    if (fileWriteStatus) {
+      resp.json({
+        status: true,
+        data: 'Face selections have been saved successfully',
+        error: '',
+        msg: '',
+      })
+    }
+    else {
+      resp.json({
+        status: false,
+        data: [],
+        error: true,
+        msg: fileWriteError,
+      })
+    }
   }
   else {
     resp.json({
