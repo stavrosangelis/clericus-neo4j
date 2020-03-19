@@ -239,6 +239,9 @@ var highlightFaces = async(inputFile, faces, outputFile, Canvas, outputDir, face
 }
 
 const cropImg = async(i, total, inputFile, initialX, initialY, width, height, rotate=0, outputDir) => {
+  if (rotate!==0) {
+    console.log(i, total, inputFile, initialX, initialY, width, height, rotate=0, outputDir)
+  }
   const readFile = promisify(fs.readFile);
   const image = await readFile(inputFile);
   const Image = Canvas.Image;
@@ -257,6 +260,10 @@ const cropImg = async(i, total, inputFile, initialX, initialY, width, height, ro
 		let cx = initialX + (width*0.5);
 		let cy = initialY + (height*0.5);
 		let newCoordinates = rotateCoordinates(cx,cy,initialX,initialY,radians,width,height,rotateDegrees);
+<<<<<<< HEAD
+=======
+    console.log(newCoordinates);
+>>>>>>> c11d9d583307256681b7e825830262c0eef320ac
 		let newX = newCoordinates.x;
 		let newY = newCoordinates.y;
 
