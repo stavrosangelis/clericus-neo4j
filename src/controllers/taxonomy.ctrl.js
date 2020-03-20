@@ -245,7 +245,6 @@ const getTaxonomiesQuery = async (query, queryParams, limit) => {
     tx.run(query,{})
   )
   .then(result=> {
-    session.close();
     return result.records;
   })
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
