@@ -180,13 +180,13 @@ const updateReference = async (reference) => {
 
   let query = "MATCH (n1:" + srcItem.type + ") WHERE id(n1)=" + srcItem._id +
     " MATCH (n2:" + targetItem.type + ") WHERE id(n2)=" + targetItem._id +
-    " CREATE UNIQUE (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" + srcRole +
-    " CREATE UNIQUE (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" + targetRole;
+    " MERGE (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" + srcRole +
+    " MERGE (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" + targetRole;
   if (direction === "to") {
     query = "MATCH (n1:" + targetItem.type + ") WHERE id(n1)=" + targetItem._id +
       " MATCH (n2:" + srcItem.type + ") WHERE id(n2)=" + srcItem._id +
-      " CREATE UNIQUE (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" + srcRole +
-      " CREATE UNIQUE (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" + targetRole;
+      " MERGE (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" + srcRole +
+      " MERGE (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" + targetRole;
   }
   let resultExec = await session.writeTransaction(tx =>
       tx.run(query, {})
