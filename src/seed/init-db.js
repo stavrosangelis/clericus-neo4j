@@ -28,7 +28,6 @@ const createIndexes = async () => {
       q1,
       {}
     ).then(result => {
-      session.close();
       resolve(result);
     });
   })
@@ -37,7 +36,6 @@ const createIndexes = async () => {
       q2,
       {}
     ).then(result => {
-      session.close();
       resolve(result);
     });
   })
@@ -46,7 +44,6 @@ const createIndexes = async () => {
       q3,
       {}
     ).then(result => {
-      session.close();
       resolve(result);
     });
   })
@@ -55,7 +52,6 @@ const createIndexes = async () => {
       q4,
       {}
     ).then(result => {
-      session.close();
       resolve(result);
     });
   })
@@ -64,7 +60,6 @@ const createIndexes = async () => {
       q5,
       {}
     ).then(result => {
-      session.close();
       resolve(result);
     });
   })
@@ -73,7 +68,6 @@ const createIndexes = async () => {
       q6,
       {}
     ).then(result => {
-      session.close();
       resolve(result);
     });
   })
