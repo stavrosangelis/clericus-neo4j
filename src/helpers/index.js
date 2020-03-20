@@ -1,4 +1,4 @@
-const neo4j = require('neo4j-driver').v1;
+const neo4j = require('neo4j-driver');
 const Soundex = require('soundex');
 const fs = require("fs");
 const crypto = require("crypto");

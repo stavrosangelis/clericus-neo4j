@@ -7,7 +7,7 @@ if (process.env.NODE_ENV==="development") {
 if (process.env.NODE_ENV==="devserver") {
   require('dotenv').config({path:'.env.develserver'});
 }
-const neo4j = require('neo4j-driver').v1;
+const neo4j = require('neo4j-driver');
 const cors = require('cors');
 const express = require("express");
 const bodyParser = require('body-parser')
