@@ -5,7 +5,7 @@ const readJSONFile = require('../helpers').readJSONFile;
 const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
-const seedTaxonomyTerms = async() => {
+const seedTaxonomyTerms = async(userId) => {
   const entries = await readJSONFile(process.env.ABSPATH+'src/seed/data/taxonomy-terms.json');
 
   // 1. load taxonomies
@@ -47,7 +47,7 @@ const seedTaxonomyTerms = async() => {
         scopeNote: entry.scopeNote
       };
       let taxonomyTerm = new TaxonomyTerm(newTermData);
-      resolve(await taxonomyTerm.save());
+      resolve(await taxonomyTerm.save(userId));
     });
     taxonomyTermsPromises.push(insertPromise);
   }

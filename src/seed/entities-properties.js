@@ -5,7 +5,7 @@ const updateReference = require('../controllers/references.ctrl').updateReferenc
 const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
-const seedEntitiesProperties = async() => {
+const seedEntitiesProperties = async(userId) => {
   const entries = await readJSONFile(process.env.ABSPATH+'src/seed/data/entities-properties.json');
 
   // 1. load entities

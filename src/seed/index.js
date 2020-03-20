@@ -55,33 +55,34 @@ const seedData = async(req, resp) => {
   data.initdb = initDBPromise;
   console.log("step 2 complete");
 
-  // 3. insert taxonomies
-  let seedTaxonomiesPromise = await seedTaxonomies();
-  data.taxonomies = seedTaxonomiesPromise;
-  console.log("step 3 complete");
-
-  // 4. insert taxonomy terms
-  let seedTaxonomyTermsPromise = await seedTaxonomyTerms();
-  data.taxonomyTerms = seedTaxonomyTermsPromise;
-  console.log("step 4 complete");
-
-  // 5. insert usergroups
+  // 3. insert usergroups
   let seedUsergroupsPromise = await seedUsergroups();
   data.usergroups = seedUsergroupsPromise;
-  console.log("step 5 complete");
+  console.log("step 3 complete");
 
-  // 6. insert default admin account
+  // 4. insert default admin account
   let seedUserPromise = await seedUser(email, password);
   data.user = seedUserPromise;
+  let userId = data.user.user._id;
+  console.log("step 4 complete");
+
+  // 5. insert taxonomies
+  let seedTaxonomiesPromise = await seedTaxonomies(userId);
+  data.taxonomies = seedTaxonomiesPromise;
+  console.log("step 5 complete");
+
+  // 6. insert taxonomy terms
+  let seedTaxonomyTermsPromise = await seedTaxonomyTerms(userId);
+  data.taxonomyTerms = seedTaxonomyTermsPromise;
   console.log("step 6 complete");
 
   // 7 insert entities
-  let seedEntitiesPromise = await seedEntities();
+  let seedEntitiesPromise = await seedEntities(userId);
   data.entities = seedEntitiesPromise;
   console.log("step 7 complete");
 
   // 8 insert entity properties
-  let seedEntitiesPropertiesPromise = await seedEntitiesProperties();
+  let seedEntitiesPropertiesPromise = await seedEntitiesProperties(userId);
   data.entitiesProperties = seedEntitiesPropertiesPromise;
   console.log("step 8 complete");
 
@@ -89,21 +90,6 @@ const seedData = async(req, resp) => {
   let disallowSeeding = await settings.disallowSeeding();
   data.seeding = disallowSeeding;
   console.log("step 9 complete");
-
-  // 10. associated all new entities with the default admin user
-  let userId = data.user.user._id;
-  let session = driver.session();
-  let query = "MATCH (n) SET n.createdBy='"+userId+"', n.updatedBy='"+userId+"' RETURN n";
-  let associateToAdmin = await session.run(query,{}).then(result => {
-    session.close();
-    let records = result.records;
-    return records;
-  })
-  .catch((error) => {
-    let output = {error: error, status: false, data: []};
-    return output;
-  });
-  data.associatetoadmin = associateToAdmin;
   console.log("seeding complete");
 
   resp.json({
