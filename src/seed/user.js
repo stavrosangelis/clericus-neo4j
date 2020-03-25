@@ -35,6 +35,13 @@ const seedUser = async(email, password) => {
 
   await newUser.updatePassword();
 
+  let output = {
+    user: newUser
+  }
+  return output;
+}
+
+const addUserToGroup = async (userId) => {
   // 6. link user to admin userGroup
   // 6.1. load taxonomy term
   let taxTerm = new TaxonomyTerm({labelId: "belongsToUserGroup"});
@@ -47,15 +54,13 @@ const seedUser = async(email, password) => {
   // 6.3. add relation
   let ref = {
     items: [
-      {_id:newUser._id, type: "User", role: ""},
+      {_id:userId, type: "User", role: ""},
       {_id:adminUsergroup._id, type: "Usergroup", role: ""},
     ],
     taxonomyTermId: taxTerm._id
   }
   let addReference = await updateReference(ref);
-
   let output = {
-    user: newUser,
     ref: addReference
   }
   return output;
@@ -63,5 +68,6 @@ const seedUser = async(email, password) => {
 
 
 module.exports = {
-  seedUser: seedUser
+  seedUser: seedUser,
+  addUserToGroup: addUserToGroup,
 }

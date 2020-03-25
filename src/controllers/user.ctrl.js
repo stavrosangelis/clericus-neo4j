@@ -51,24 +51,54 @@ class User {
     if (this._id===null) {
       return false;
     }
-    let session = driver.session()
-    let query = `MATCH (n:User)-[r:belongsToUserGroup]-(ug:Usergroup) WHERE id(n)=${this._id} return n,ug`;
+    let session = driver.session();
+    let query = `MATCH (n:User) WHERE id(n)=${this._id} return n`;
     let node = await session.writeTransaction(tx=>
       tx.run(query,{})
     )
     .then(result=> {
-      session.close();
       let records = result.records;
       if (records.length>0) {
         let record = records[0];
         let user = record.toObject().n;
         user = helpers.outputRecord(user);
-        let userGroup = record.toObject().ug;
-        userGroup = helpers.outputRecord(userGroup);
-        user.usergroup = userGroup;
         return user;
       }
-    })
+    });
+    let query2 = `MATCH (u)-[r:belongsToUserGroup]-(ug) WHERE id(u)=${this._id} return u,ug`;
+    let ug = await session.writeTransaction(tx=>
+      tx.run(query2,{})
+    )
+    .then(result=> {
+      let records = result.records;
+      if (records.length>0) {
+        session.close();
+        let record = records[0];
+        let usergroup = record.toObject().ug;
+        usergroup = helpers.outputRecord(usergroup);
+        return usergroup;
+      }
+    });
+    if (typeof ug==="undefined") {
+      let session = driver.session()
+      let query2 = `MATCH (n:Usergroup) WHERE id(n)=${node.usergroup} return n`;
+      ug = await session.writeTransaction(tx=>
+        tx.run(query2,{})
+      )
+      .then(result=> {
+        let records = result.records;
+        if (records.length>0) {
+          session.close();
+          let record = records[0];
+          let usergroup = record.toObject().n;
+          usergroup = helpers.outputRecord(usergroup);
+          return usergroup;
+        }
+      });
+    }
+    if (typeof ug!=="undefined") {
+      node.usergroup = ug;
+    }
     // assign results to class values
     for (let key in node) {
       this[key] = node[key];
@@ -152,22 +182,12 @@ class User {
         return output;
       });
       if (resultPromise.status) {
+
         // add | update user group
         let savedRecord = resultPromise.data;
-        if (newData.usergroup!==null && newData.usergroup!==this.usergroup._id) {
-          if (typeof this.usergroup!=="undefined") {
-            // 1. remove reference to usergroup
-            let existingUsergroupRef = {
-              items: [
-                {_id: this._id, type: "User"},
-                {_id: this.usergroup, type: "Usergroup"}
-              ],
-              taxonomyTermLabel: "belongsToUserGroup",
-            }
-            referencesController.removeReference(existingUsergroupRef);
-          }
+        if (newData.usergroup!==null) {
 
-          // 2. add reference to new usergroup
+          // update reference to usergroup
           let newUsergroupRef = {
             items: [
               {_id: this._id, type: "User"},

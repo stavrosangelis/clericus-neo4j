@@ -138,12 +138,12 @@ class ArticleCategory {
     }
   }
 
-  async countRelations() {
+  async countChildren() {
     if (this._id===null) {
       return false;
     }
     let session = driver.session();
-    let query = "MATCH (n)-[r]->() WHERE id(n)="+this._id+" RETURN count(*) AS c";
+    let query = `MATCH (n) WHERE n.parentId="${this._id}" RETURN count(*) AS c`;
     let count = await session.writeTransaction(tx=>
       tx.run(query, {})
     )
@@ -159,14 +159,14 @@ class ArticleCategory {
         return output;
       }
     });
-    this.count = count;
+    this.count = parseInt(count,10);
   }
 
   async delete() {
     let session = driver.session();
-    await this.countRelations();
+    await this.countChildren();
     if (parseInt(this.count,10)>0) {
-      let output = {error: ["You must remove the record's relations before deleting"], status: false, data: []};
+      let output = {error: true, msg: ["You must remove the category's children before deleting"], status: false, data: []};
       return output;
     }
 
@@ -177,7 +177,11 @@ class ArticleCategory {
       session.close();
       return result;
     });
-    return deleteRecord;
+    let output = {
+      error: false,
+      msg: ["Item deleted successfully"], status: true, data: deleteRecord.summary.counters._stats
+    }
+    return output;
   }
 };
 /**
@@ -334,13 +338,8 @@ const putArticleCategory = async(req, resp) => {
 const deleteArticleCategory = async(req, resp) => {
   let postData = req.body;
   let content = new ArticleCategory(postData);
-  let data = await content.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
-  });
+  let output = await content.delete();
+  resp.json(output);
 }
 
 module.exports = {

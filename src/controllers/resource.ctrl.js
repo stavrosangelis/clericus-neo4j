@@ -200,7 +200,6 @@ class Resource {
       tx.run(query1,{})
     )
     .then(result => {
-      session.close();
       return result;
     })
     .catch((error) => {
@@ -344,7 +343,7 @@ const getResources = async (req, resp) => {
     let responseData = {
       currentPage: currentPage,
       data: data.nodes,
-      totalItems: data.count,
+      totalItems: parseInt(data.count,10),
       totalPages: data.totalPages,
     }
     resp.json({
@@ -657,8 +656,9 @@ const uploadResource = async(req, resp) => {
   if (newLabel!==null) {
     newResourceData.label = newLabel;
   }
+  let userId = req.decoded.id;
   let newResource = new Resource(newResourceData);
-  let updateResource = await newResource.save();
+  let updateResource = await newResource.save(userId);
   let status = true;
   if (typeof updateResource.status!=="undefined" && updateResource.status===false) {
     // if file save failed delete uploaded file and thumbnail

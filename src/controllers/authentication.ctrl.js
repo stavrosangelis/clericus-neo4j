@@ -52,10 +52,8 @@ const passportAdmin = new LocalStrategy({
   },
   async function(username, password, done) {
     let session = driver.session();
-    let query = "MATCH (u:User {email: $email})-[:belongsToUserGroup]->(ug) RETURN u,ug";
-    let params = {
-      email: username
-    }
+    let query = `MATCH (u:User)-[:belongsToUserGroup]->(ug) WHERE u.email="${username}" RETURN u,ug`;
+    let params = {}
     let user = await session.writeTransaction(tx=>
       tx.run(query,params)
     )
@@ -70,6 +68,9 @@ const passportAdmin = new LocalStrategy({
         outputRecord.usergroup = helpers.outputRecord(userGroupData);
       }
       return outputRecord;
+    })
+    .catch(error => {
+      console.log(error)
     });
     if (user===null) {
       return done('Please provide a valid email address', false, { message: 'Please provide a valid email address' });

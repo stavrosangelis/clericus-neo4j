@@ -34,6 +34,7 @@ const usergroupController = require('../controllers/usergroup.ctrl');
 
 // ui constrollers
 const analyticsController = require('../controllers/ui/analytics.ctrl');
+const carouselController = require('../controllers/ui/carousel.ctrl');
 const classpiecesController = require('../controllers/ui/classpieces.ctrl');
 const contentController = require('../controllers/ui/content.ctrl');
 const peopleController = require('../controllers/ui/people.ctrl');
@@ -43,6 +44,10 @@ const uiMenuController = require('../controllers/ui/menu.ctrl');
 // ******* ui endpoints ******** //
 server.get('/generic-stats', analyticsController.genericStats);
 
+// ******* ui carousel ******** //
+server.get('/carousel', carouselController.getCarousel);
+
+// ******* ui classpieces ******** //
 server.get('/classpieces', classpiecesController.getClasspieces);
 server.post('/classpieces-active-filters', classpiecesController.getClasspiecesActiveFilters);
 server.get('/classpiece', classpiecesController.getClasspiece);
@@ -75,15 +80,15 @@ server.post('/admin-session', auth.checkAdminToken, authController.activeSession
 
 // article
 server.put('/article', auth.checkAdminToken, articleController.putArticle);
-server.get('/article', articleController.getArticle);
-server.get('/articles', articleController.getArticles);
-server.get('/articles-list', articleController.getArticlesList);
+server.get('/article', auth.checkAdminToken, articleController.getArticle);
+server.get('/articles', auth.checkAdminToken, articleController.getArticles);
+server.get('/articles-list', auth.checkAdminToken, articleController.getArticlesList);
 server.delete('/article', auth.checkAdminToken, articleController.deleteArticle);
 
 // article categories
 server.put('/article-category', auth.checkAdminToken, articleCategoryController.putArticleCategory);
-server.get('/article-category', articleCategoryController.getArticleCategory);
-server.get('/article-categories', articleCategoryController.getArticleCategories);
+server.get('/article-category', auth.checkAdminToken, articleCategoryController.getArticleCategory);
+server.get('/article-categories', auth.checkAdminToken, articleCategoryController.getArticleCategories);
 server.delete('/article-category', auth.checkAdminToken, articleCategoryController.deleteArticleCategory);
 
 // dashboard
@@ -153,8 +158,8 @@ server.delete('/reference', auth.checkAdminToken, referencesController.deleteRef
 
 // slideshow
 server.put('/slideshow-item', auth.checkAdminToken, slideshowController.putSlideshowItem);
-server.get('/slideshow-item', slideshowController.getSlideshowItem);
-server.get('/slideshow-items', slideshowController.getSlideshowItems);
+server.get('/slideshow-item', auth.checkAdminToken, slideshowController.getSlideshowItem);
+server.get('/slideshow-items', auth.checkAdminToken, slideshowController.getSlideshowItems);
 server.delete('/slideshow-item', auth.checkAdminToken, slideshowController.deleteSlideshowItem);
 
 // spatial

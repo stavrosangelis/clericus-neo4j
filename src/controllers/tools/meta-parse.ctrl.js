@@ -249,6 +249,12 @@ const cropImg = async(i, total, inputFile, initialX, initialY, width, height, ro
   const img = new Image();
   img.src = image;
   //console.log('loaded image '+i+'\n');
+  if (width<0) {
+    width = Math.abs(width);
+  }
+  if (height<0) {
+    height = Math.abs(height);
+  }
   var canvas = Canvas.createCanvas(width, height);
   var ctx = canvas.getContext('2d')
   if (rotate!==0) {

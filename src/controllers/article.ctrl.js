@@ -367,7 +367,7 @@ const getArticlesList = async (req, resp) => {
     queryParams = "WHERE "+queryParams;
   }
   let session = driver.session();
-  let query = "MATCH (n:Article) "+queryParams+" RETURN n ORDER BY n.label";
+  let query = "MATCH (n:Article) "+queryParams+" WHERE n.status='public' RETURN n ORDER BY n.label";
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )

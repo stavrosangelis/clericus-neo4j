@@ -112,12 +112,12 @@ class Menu {
     }
   }
 
-  async countRelations() {
+  async countMenuItems() {
     if (this._id===null) {
       return false;
     }
     let session = driver.session();
-    let query = "MATCH (n)-[r]->() WHERE id(n)="+this._id+" RETURN count(*) AS c";
+    let query = `MATCH (n:MenuItem) WHERE n.menuId="${this._id}" RETURN count(*) AS c`;
     let count = await session.writeTransaction(tx=>
       tx.run(query, {})
     )
@@ -133,24 +133,28 @@ class Menu {
         return output;
       }
     });
-    this.count = count;
+    this.count = parseInt(count,10);
   }
 
   async delete() {
     let session = driver.session();
-    await this.countRelations();
-    if (parseInt(this.count,10)>0) {
-      let output = {error: ["You must remove the record's relations before deleting"], status: false, data: []};
+    await this.countMenuItems();
+    if (this.count>0) {
+      let output = {error: true, msg: ["You must remove the menu's items before deleting"], status: false, data: [] };
       return output;
     }
-    let query = "MATCH (n:Menu) WHERE id(n)="+this._id+" DELETE n";
+    let query = `MATCH (n:Menu) WHERE id(n)=${this._id} DELETE n`;
     let deleteRecord = await session.writeTransaction(tx=>
       tx.run(query,{})
     ).then(result => {
       session.close();
       return result;
     });
-    return deleteRecord;
+    let output = {
+      error: false,
+      msg: ["Menu deleted successfully"], status: true, data: deleteRecord.summary.counters._stats
+    }
+    return output;
   }
 };
 /**
@@ -276,13 +280,8 @@ const putMenu = async(req, resp) => {
 const deleteMenu = async(req, resp) => {
   let postData = req.body;
   let menu = new Menu(postData);
-  let data = await menu.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
-  });
+  let output = await menu.delete();
+  resp.json(output);
 }
 
 const getMenuItems = async(_id) =>{

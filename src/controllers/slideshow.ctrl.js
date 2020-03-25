@@ -101,6 +101,7 @@ class Slideshow {
       this.updatedBy = userId;
       this.updatedAt = now;
 
+      this.order = parseInt(this.order,10);
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
       let query = "";

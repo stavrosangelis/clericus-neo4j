@@ -136,7 +136,6 @@ class Event {
       tx.run(query1,{})
     )
     .then(result => {
-      session.close();
       return result;
     })
     .catch((error) => {

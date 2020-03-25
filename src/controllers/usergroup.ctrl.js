@@ -115,7 +115,6 @@ class Usergroup {
           queryDefault,
           {}
         ).then(result => {
-          session.close();
           return result;
         })
         .catch((error) => {

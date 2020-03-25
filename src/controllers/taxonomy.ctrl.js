@@ -163,7 +163,7 @@ class Taxonomy {
     let session = driver.session();
     await this.countRelations();
     if (parseInt(this.count,10)>0) {
-      let output = {error: ["You must remove the record's relations before deleting"], status: false, data: []};
+      let output = {error: true, msg: ["You must remove the record's relations before deleting"], status: false, data: []};
       return output;
     }
     let query = "MATCH (n:Taxonomy) WHERE id(n)="+this._id+" DELETE n";
@@ -173,7 +173,11 @@ class Taxonomy {
       session.close();
       return result;
     });
-    return deleteRecord;
+    let output = {
+      error: false,
+      msg: ["Item deleted successfully"], status: true, data: deleteRecord.summary.counters._stats
+    }
+    return output;
   }
 };
 /**
@@ -368,12 +372,12 @@ const putTaxonomy = async(req, resp) => {
 const deleteTaxonomy = async(req, resp) => {
   let postData = req.body;
   let taxonomy = new Taxonomy(postData);
-  let data = await taxonomy.delete();
+  let output = await taxonomy.delete();
   resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
+    status: output.status,
+    data: output.data,
+    error: output.error,
+    msg: output.msg,
   });
 }
 

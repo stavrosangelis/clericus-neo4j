@@ -152,7 +152,7 @@ class MenuItem {
     let session = driver.session();
     await this.countChildren();
     if (parseInt(this.count,10)>0) {
-      let output = {error: ["You must remove the record's relations before deleting"], status: false, data: []};
+      let output = {error: true, msg: ["You must remove the menu item's children before deleting"], status: false, data: []};
       return output;
     }
     let query = "MATCH (n:MenuItem) WHERE id(n)="+this._id+" DELETE n";
@@ -162,7 +162,11 @@ class MenuItem {
       session.close();
       return result;
     });
-    return deleteRecord;
+    let output = {
+      error: false,
+      msg: ["Item deleted successfully"], status: true, data: deleteRecord.summary.counters._stats
+    }
+    return output;
   }
 };
 /**
@@ -296,13 +300,8 @@ const putMenuItem = async(req, resp) => {
 const deleteMenuItem = async(req, resp) => {
   let postData = req.body;
   let menuItem = new MenuItem(postData);
-  let data = await menuItem.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
-  });
+  let output = await menuItem.delete();
+  resp.json(output);
 }
 module.exports = {
   MenuItem: MenuItem,
