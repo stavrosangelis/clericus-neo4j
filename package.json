@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.36.77",
+  "version": "0.36.79",
   "description": "This is the Clericus API using neo4j as a database",
   "main": "src/app.js",
   "scripts": {

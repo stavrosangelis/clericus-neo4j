@@ -214,7 +214,7 @@ const getEvents = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams += "n.status='"+status+"' ";
     }
   }
 
@@ -297,7 +297,16 @@ const getEventsQuery = async (query, queryParams, limit) => {
     return result.records;
   });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  let nodes = [];
+  let nodesOutput = helpers.normalizeRecordsOutput(nodesPromise);
+  for (let i=0;i<nodesOutput.length; i++) {
+    let node = nodesOutput[i];
+    let temporal = await helpers.loadRelations(node._id, "Event", "Temporal");
+    let spatial = await helpers.loadRelations(node._id, "Event", "Spatial");
+    node.temporal = temporal;
+    node.spatial = spatial;
+    nodes.push(node);
+  }
 
   let count = await session.writeTransaction(tx=>
     tx.run("MATCH (n:Event) "+queryParams+" RETURN count(*)")

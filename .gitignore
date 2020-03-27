@@ -27,3 +27,5 @@
 
 # nyc coverage reports
 /.nyc_output
+
+/backup-container.txt

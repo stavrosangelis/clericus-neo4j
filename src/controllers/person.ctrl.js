@@ -254,6 +254,7 @@ class Person {
 * @apiParam {string} [fnameSoundex] A string to match against the peoples' first name soundex.
 * @apiParam {string} [lnameSoundex] A string to match against the peoples' last name soundex.
 * @apiParam {string} [description] A string to match against the peoples' description.
+* @apiParam {number} [classpieceId] The id of a related classpiece.
 * @apiParam {string} [orderField=firstName] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
@@ -281,6 +282,7 @@ const getPeople = async (req, resp) => {
   let fnameSoundex = "";
   let lnameSoundex = "";
   let description = "";
+  let classpieceId = 0;
   let status = "";
   let page = 0;
   let orderField = "firstName";
@@ -353,6 +355,9 @@ const getPeople = async (req, resp) => {
       queryOrder += " DESC";
     }
   }
+  if (typeof parameters.classpieceId!=="undefined") {
+    classpieceId = parseInt(parameters.classpieceId,10);
+  }
 
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
@@ -366,11 +371,22 @@ const getPeople = async (req, resp) => {
     currentPage = 1;
   }
   let skip = limit*queryPage;
-  if (queryParams!=="") {
+  if (classpieceId===0 && queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = "MATCH (n:Person) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
-  let data = await getPeopleQuery(query, queryParams, limit);
+  if (classpieceId===0) {
+    query = "MATCH (n:Person) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+  }
+  else {
+    if (queryParams!=="") {
+      queryParams = `WHERE id(r)=${classpieceId} AND ${queryParams}`;
+    }
+    else {
+      queryParams = `WHERE id(r)=${classpieceId}`;
+    }
+    query = "MATCH (n:Person)-->(r:Resource) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+  }
+  let data = await getPeopleQuery(query, queryParams, limit, classpieceId);
   if (data.error) {
     resp.json({
       status: false,
@@ -395,7 +411,7 @@ const getPeople = async (req, resp) => {
   }
 }
 
-const getPeopleQuery = async (query, queryParams, limit) => {
+const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -426,8 +442,6 @@ const getPeopleQuery = async (query, queryParams, limit) => {
     console.log(error)
   });
 
-
-
   let nodesPopulated = nodes.map(node=> {
     let resources = [];
     let nodeResources = nodesResourcesRelations.find(relation=>relation.nodeId===node._id);
@@ -455,8 +469,15 @@ const getPeopleQuery = async (query, queryParams, limit) => {
     node.resources = nodeResources.resources;
     return node;
   });
+
+  let queryCount = `MATCH (n:Person) ${queryParams} RETURN count(*)`;
+  if (classpieceId>0) {
+    queryCount = `MATCH (n:Person)-->(r:Resource) ${queryParams} RETURN count(*)`;
+    console.log(queryCount)
+  }
+
   let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Person) "+queryParams+" RETURN count(*)")
+    tx.run(queryCount)
   )
   .then(result=> {
     session.close();
@@ -466,6 +487,7 @@ const getPeopleQuery = async (query, queryParams, limit) => {
     let output = countObj['count(*)'];
     return output;
   });
+
   let totalPages = Math.ceil(count/limit)
   let result = {
     nodes: nodesPopulated,
