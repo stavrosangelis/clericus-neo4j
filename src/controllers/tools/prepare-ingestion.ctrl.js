@@ -797,14 +797,14 @@ const ingestPersonThumbnail = async(person, classpiece, userId) => {
 
 var ingestDiocese = async(person, userId) => {
   let organisation = {};
-  organisation.label = person.diocese;
+  organisation.label = helpers.addslashes(person.diocese);
   organisation.organisationType = person.dioceseType;
 
   // check if organisation exists
   let session = driver.session();
-  let query = "MATCH (n:Organisation) WHERE n.label='"+organisation.label+"' RETURN n";
+  let query = `MATCH (n:Organisation) WHERE n.label='${organisation.label}' RETURN n`;
   if (organisation.organisationType!=="")  {
-    query = "MATCH (n:Organisation) WHERE n.label='"+organisation.label+"' AND n.organisationType='"+organisation.organisationType+"' RETURN n";
+    query = `MATCH (n:Organisation) WHERE n.label='${organisation.label}' AND n.organisationType='${organisation.organisationType}' RETURN n`;
   }
   let existingOrganisation = await session.writeTransaction(tx=>
     tx.run(query,{})
