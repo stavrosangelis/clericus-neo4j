@@ -797,6 +797,9 @@ const ingestPersonThumbnail = async(person, classpiece, userId) => {
 
 var ingestDiocese = async(person, userId) => {
   let organisation = {};
+  if (person.diocese==="") {
+    return ;
+  }
   organisation.label = helpers.addslashes(person.diocese);
   organisation.organisationType = person.dioceseType;
 

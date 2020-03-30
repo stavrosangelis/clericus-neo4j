@@ -58,37 +58,37 @@ class Person {
   validate() {
     let status = true;
     let errors = [];
-    if (this.firstName!==null && this.firstName.length<2) {
+    if (this.firstName!==null && this.firstName.length<1) {
       status = false;
-      errors.push({field: "firstName", msg: "First name must contain at least 2 characters"});
+      errors.push({field: "firstName", msg: "First name must contain at least 1 characters"});
     }
-    if (this.firstName!==null && this.middleName!=="" && this.firstName.length<2) {
+    if (this.firstName!==null && this.middleName!=="" && this.firstName.length<1) {
       status = false;
-      errors.push({field: "middleName", msg: "If middle name is entered it must contain at least 2 characters"});
+      errors.push({field: "middleName", msg: "If middle name is entered it must contain at least 1 characters"});
     }
-    if (this.firstName!==null && this.lastName.length<2) {
+    if (this.firstName!==null && this.lastName.length<1) {
       status = false;
-      errors.push({field: "lastName", msg: "Last name must contain at least 2 characters"});
+      errors.push({field: "lastName", msg: "Last name must contain at least 1 characters"});
     }
     if (this.firstName!==null && this.alternateAppelations.length>0) {
       for (let key in this.alternateAppelations) {
         let alternateAppelation = this.alternateAppelations[key];
         let label = "";
-        if (alternateAppelation.appelation!=="" && alternateAppelation.appelation.length<2) {
+        if (alternateAppelation.appelation!=="" && alternateAppelation.appelation.length<1) {
           status = false;
-          errors.push({field: "appelation", msg: "Appelation must contain at least 2 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
+          errors.push({field: "appelation", msg: "Appelation must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
-        if (alternateAppelation.appelation==="" && alternateAppelation.firstName.length<2) {
+        if (alternateAppelation.appelation==="" && alternateAppelation.firstName.length<1) {
           status = false;
-          errors.push({field: "firstName", msg: "First name must contain at least 2 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
+          errors.push({field: "firstName", msg: "First name must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
-        if (alternateAppelation.appelation==="" && alternateAppelation.middleName!=="" && this.firstName.length<2) {
+        if (alternateAppelation.appelation==="" && alternateAppelation.middleName!=="" && this.firstName.length<1) {
           status = false;
-          errors.push({field: "middleName", msg: "If middle name is entered it must contain at least 2 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
+          errors.push({field: "middleName", msg: "If middle name is entered it must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
-        if (alternateAppelation.appelation==="" && alternateAppelation.lastName.length<2) {
+        if (alternateAppelation.appelation==="" && alternateAppelation.lastName.length<1) {
           status = false;
-          errors.push({field: "lastName", msg: "Last name must contain at least 2 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
+          errors.push({field: "lastName", msg: "Last name must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
       }
     }

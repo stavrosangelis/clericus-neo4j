@@ -240,7 +240,7 @@ var highlightFaces = async(inputFile, faces, outputFile, Canvas, outputDir, face
 
 const cropImg = async(i, total, inputFile, initialX, initialY, width, height, rotate=0, outputDir) => {
   if (rotate!==0) {
-    console.log(i, total, inputFile, initialX, initialY, width, height, rotate=0, outputDir)
+    //console.log(i, total, inputFile, initialX, initialY, width, height, rotate=0, outputDir)
   }
   const readFile = promisify(fs.readFile);
   const image = await readFile(inputFile);
