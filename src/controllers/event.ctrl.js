@@ -15,7 +15,8 @@ class Event {
     this.createdBy = createdBy;
     this.createdAt = createdAt;
     this.updatedBy = updatedBy;
-    this.updatedAt = updatedAt;
+    this.updatedAt
+    = updatedAt;
   }
 
   validate() {
@@ -162,6 +163,8 @@ class Event {
 * @apiGroup Events
 *
 * @apiParam {string} [label] A string to match against the events labels.
+* @apiParam {string} [temporal] A temporal value.
+* @apiParam {string} [spatial] A spatial label.
 * @apiParam {string} [orderField=firstName] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
@@ -176,6 +179,8 @@ class Event {
 const getEvents = async (req, resp) => {
   let parameters = req.query;
   let label = "";
+  let temporal = "";
+  let spatial = "";
   let eventType = "";
   let page = 0;
   let orderField = "label";
@@ -192,6 +197,12 @@ const getEvents = async (req, resp) => {
     if (label!=="") {
       queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
+  }
+  if (typeof parameters.temporal!=="undefined") {
+    temporal = parameters.temporal;
+  }
+  if (typeof parameters.spatial!=="undefined") {
+    spatial = parameters.spatial;
   }
   if (typeof parameters.eventType!=="undefined") {
     eventType = parameters.eventType;
@@ -229,12 +240,40 @@ const getEvents = async (req, resp) => {
   if (page===0) {
     currentPage = 1;
   }
-
   let skip = limit*queryPage;
+
   if (queryParams!=="") {
-    queryParams = "WHERE "+queryParams;
+    if (temporal==="" && spatial==="") {
+      queryParams = `WHERE ${queryParams}`;
+    }
   }
-  query = "MATCH (n:Event) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+
+  query = `MATCH (n:Event) ${queryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+  if (temporal!=="" || spatial!=="") {
+    let newQueryParams = queryParams;
+    if (newQueryParams!=="") {
+      newQueryParams = `AND ${newQueryParams}`;
+    }
+    let matchTemporal = "";
+    let queryTemporalParams = "";
+    let matchSpatial = "";
+    let querySpatialParams = "";
+    if (temporal!=="") {
+      matchTemporal = `(n:Event)-[r1]->(t:Temporal)`;
+      queryTemporalParams = `t.startDate=~'${temporal}'`;
+    }
+    if (spatial!=="") {
+      if (temporal!=="") {
+        matchSpatial = `,`;
+      }
+      matchSpatial += `(n)-[r2]->(s:Spatial)`;
+      if (queryTemporalParams!=="") {
+        querySpatialParams = `AND `;
+      }
+      querySpatialParams += `LOWER(s.label)=~LOWER('.*${spatial}.*')`;
+    }
+    query = `MATCH ${matchTemporal} ${matchSpatial} WHERE ${queryTemporalParams} ${querySpatialParams} ${newQueryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+  }
   let data = await getEventsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -259,7 +298,6 @@ const getEvents = async (req, resp) => {
     })
   }
 }
-
 const prepareRelations = (records) => {
   let relations = [];
   for (let key in records) {
@@ -307,9 +345,10 @@ const getEventsQuery = async (query, queryParams, limit) => {
     node.spatial = spatial;
     nodes.push(node);
   }
-
+  let query2 = query.substring(0, query.indexOf('RETURN n'));
+  query2 = query2 + " RETURN count(*)";
   let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Event) "+queryParams+" RETURN count(*)")
+    tx.run(query2)
   )
   .then(result=> {
     session.close()
