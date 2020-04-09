@@ -113,7 +113,7 @@ class TaxonomyTerm {
       return false;
     }
     let session = driver.session();
-    let query = `MATCH (s)-[r:${this.labelId}]->(t) RETURN s,t SKIP 0 LIMIT 25`;
+    let query = `MATCH (s)-[r:${this.labelId}]->(t) RETURN s,t ORDER BY s.labels[0] SKIP 0 LIMIT 25`;
     let relations = await session.writeTransaction(tx=>
       tx.run(query, {})
     )
@@ -127,13 +127,36 @@ class TaxonomyTerm {
           let targetKey = record.keys[1];
           let output = record.toObject();
           helpers.prepareOutput(output);
+          let sourceItem = output[sourceKey];
+          let source = sourceItem.properties;
+          source.nodeType = sourceItem.labels[0];
+          if(typeof source._id==="undefined") {
+            source._id = sourceItem.identity;
+          }
+          let targetItem = output[targetKey];
+          let target = targetItem.properties;
+          target.nodeType = targetItem.labels[0];
+          if(typeof target._id==="undefined") {
+            target._id = targetItem.identity;
+          }
           output = {
-            source: output[sourceKey],
-            target: output[targetKey]
+            source: source,
+            target: target
           }
           return output;
         });
       }
+      outputRecords.sort((a, b) =>{
+        let akey = a.source.nodeType;
+        let bkey = b.source.nodeType;
+        if (akey<bkey) {
+          return 1;
+        }
+        if (bkey<bkey) {
+          return -1;
+        }
+        return 0;
+      });
       return outputRecords;
     });
     this.relations = relations;
