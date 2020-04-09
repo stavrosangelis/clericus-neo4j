@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class TaxonomyTerm {
-  constructor({_id=null,label=null,labelId=null,locked=false,inverseLabel=null,inverseLabelId=null,scopeNote=null,count=0,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,labelId=null,locked=false,inverseLabel=null,inverseLabelId=null,scopeNote=null,count=0,relations=[],createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -81,6 +81,7 @@ class TaxonomyTerm {
       this[key] = node[key];
     }
     await this.countRelations();
+    await this.loadRelations();
   }
 
   async countRelations() {
@@ -105,6 +106,37 @@ class TaxonomyTerm {
       }
     });
     this.count = count;
+  }
+
+  async loadRelations() {
+    if (this._id===null || this.labelId==="") {
+      return false;
+    }
+    let session = driver.session();
+    let query = `MATCH (s)-[r:${this.labelId}]->(t) RETURN s,t SKIP 0 LIMIT 25`;
+    let relations = await session.writeTransaction(tx=>
+      tx.run(query, {})
+    )
+    .then(result=> {
+      session.close()
+      let records = result.records;
+      let outputRecords = [];
+      if (records.length>0) {
+        outputRecords = records.map(record=>{
+          let sourceKey = record.keys[0];
+          let targetKey = record.keys[1];
+          let output = record.toObject();
+          helpers.prepareOutput(output);
+          output = {
+            source: output[sourceKey],
+            target: output[targetKey]
+          }
+          return output;
+        });
+      }
+      return outputRecords;
+    });
+    this.relations = relations;
   }
 
   async save(userId) {
@@ -178,7 +210,7 @@ class TaxonomyTerm {
     let session = driver.session()
     await this.load();
     if (parseInt(this.count,10)>0) {
-      let output = {error: ["You must remove the record's relations before deleting"], status: false, data: []};
+      let output = {error: true, msg: ["You must remove the record's relations before deleting"], status: false, data: []};
       return output;
     }
     // 1. disassociate with the taxonomy
@@ -429,12 +461,19 @@ const deleteTaxonomyTerm = async(req, resp) => {
   let postData = req.body;
   let term = new TaxonomyTerm(postData);
   let data = await term.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: "Query results",
-  });
+  let output = {};
+  if (data.error) {
+    output = data;
+  }
+  else {
+    output = {
+      status: true,
+      data: data,
+      error: [],
+      msg: "Query results",
+    }
+  }
+  resp.json(output);
 }
 
 module.exports = {
