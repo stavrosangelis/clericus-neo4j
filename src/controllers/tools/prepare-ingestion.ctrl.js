@@ -862,15 +862,15 @@ const patchRotate = async (req, resp) => {
   let start = parameters.start;
   let end = parameters.end;
   let path = `${resourcesPath}output/`;
-  const dir = await fs.promises.opendir(path);
+  const dir = await fs.readdirSync(path);
   let directories = [];
   for await (const dirent of dir) {
-    if (dirent.isDirectory()) {
-      directories.push(dirent.name);
+    let stat = await fs.lstatSync(path+dirent);
+    if (stat.isDirectory()) {
+      directories.push(dirent);
     }
   }
   directories.sort();
-
   const stringToJson = (string) => {
     if (typeof string==="string") {
       string = JSON.parse(string);
@@ -901,7 +901,7 @@ const patchRotate = async (req, resp) => {
       if (faces.length>0) {
         let file = {name: dir, count: faces.length, faces: faces};
         files.push(file);
-      }      
+      }
     }
   }
 
