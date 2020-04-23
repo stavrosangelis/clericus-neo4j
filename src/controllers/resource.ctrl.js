@@ -6,6 +6,10 @@ const mimeType = require('mime-types')
 const {promisify} = require('util');
 const formidable = require('formidable');
 const personController = require("./person.ctrl");
+const TaxonomyTerm = require('./taxonomyTerm.ctrl').TaxonomyTerm;
+const referencesController = require('./references.ctrl')
+const archivePath = process.env.ARCHIVEPATH;
+
 class Resource {
   constructor({_id=null,label=null,description=null,fileName=null,metadata=[],paths=[],resourceType=null,systemType=null,uploadedFile=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
@@ -191,7 +195,7 @@ class Resource {
     // 2. delete files from disk
     for (let key in resource.paths) {
       let path = resource.paths[key];
-      let deleteFile = this.unlinkFile(process.env.ARCHIVEPATH+path.path);
+      let deleteFile = this.unlinkFile(archivePath+path.path);
     }
 
     // 3. delete relations
@@ -567,7 +571,6 @@ const deleteResources = async(req, resp) => {
   });
 }
 
-
 /**
 * @api {post} /upload-resource Upload resource
 * @apiName post upload resource
@@ -611,18 +614,25 @@ const uploadResource = async(req, resp) => {
   if (extension==="jpeg") {
     extension = "jpg";
   }
-  let hashedName = helpers.hashFileName(uploadedFile.name)+"."+extension;
-  let newDimensions = null;
-  if (typeof data.dimensions!=="undefined") {
-    newDimensions = data.dimensions;
+  let allowedExtensions = ["jpg", "png", "gif", "pdf"];
+  if (allowedExtensions.indexOf(extension)===-1) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: [`The file extension "${extension}" is not allowed.`],
+    });
+    return false;
   }
+  let hashedName = helpers.hashFileName(uploadedFile.name)+"."+extension;
 
   // 1. upload file
-  let newUploadFile = await uploadFile(uploadedFile,hashedName);
+  let newUploadFile = await uploadFile(uploadedFile,hashedName,extension);
   // 2. if image create thumbnail
-  let fileType = uploadedFile.type.split("/")[0];
+  let fileType0 = uploadedFile.type.split("/")[0];
+  let fileType1 = uploadedFile.type.split("/")[1];
   let thumbnailPath = '';
-  if (fileType==="image" && newUploadFile.status) {
+  if (fileType0==="image" && newUploadFile.status) {
     let newWidth = null;
     let newHeight = null;
     if (newDimensions!==null) {
@@ -635,12 +645,12 @@ const uploadResource = async(req, resp) => {
     }
     let fileName = uploadedFile.fileName;
     let srcPath = newUploadFile.path;
-    thumbnailPath = process.env.ARCHIVEPATH+"images/thumbnails/"+hashedName;
+    thumbnailPath = archivePath+"images/thumbnails/"+hashedName;
 
     createThumb = await createThumbnail(srcPath, thumbnailPath, hashedName, newWidth, newHeight);
   }
   // 3. insert/update resource
-  let parseResourceDetailsPromise = await parseResourceDetails(fileType, uploadedFile, newUploadFile, hashedName);
+  let parseResourceDetailsPromise = await parseResourceDetails(fileType0, fileType1, uploadedFile, newUploadFile, hashedName);
   let newResourceData = {};
   if (newId!==null) {
     newResourceData._id = newId;
@@ -694,17 +704,23 @@ const parseFormDataPromise = (req) => {
   });
 }
 
-const uploadFile = async(uploadedFile=null, hashedName="") => {
-  if (uploadedFile===null || hashedName==="") {
+const uploadFile = async(uploadedFile=null, hashedName="", extension=null) => {
+  if (uploadedFile===null || hashedName==="" && extension!==null) {
     return false;
   }
   // patch for the case when the archive path is in a different drive
-  let tempPath = process.env.ARCHIVEPATH+'temp/'+hashedName;
+  let tempPath = archivePath+'temp/'+hashedName;
   let movFile = await fs.copyFileSync(uploadedFile.path, tempPath);
   uploadedFile.path = tempPath;
 
   let sourcePath = uploadedFile.path;
-  let targetPath = process.env.ARCHIVEPATH+"images/fullsize/"+hashedName;
+  let targetPath = "";
+  if (extension!=="pdf") {
+    targetPath = archivePath+"images/fullsize/"+hashedName;
+  }
+  else {
+    targetPath = archivePath+"documents/"+hashedName;
+  }
   let uploadFilePromise = await new Promise((resolve, reject) => {
     fs.rename(sourcePath, targetPath, function (error) {
         let output = {};
@@ -729,8 +745,8 @@ const createThumbnail = async(srcPath=null,targetPath=null,fileName=null,customW
     return false;
   }
   const readFile = promisify(fs.readFile);
-  const imageSrc = await readFile(srcPath);
-  const newTumbnail = new Promise((resolve, reject) => {
+  const imageSrc = await readFile(srcPath).catch(error=>{console.log(error)});
+  const newThumbnail = new Promise((resolve, reject) => {
     const Image = Canvas.Image;
     const img = new Image();
     let output = {};
@@ -781,7 +797,6 @@ const createThumbnail = async(srcPath=null,targetPath=null,fileName=null,customW
         output.status = true;
         output.msg = fileName+" resized successfully";
         output.errors = errors;
-
         resolve(output);
       });
     }
@@ -791,12 +806,15 @@ const createThumbnail = async(srcPath=null,targetPath=null,fileName=null,customW
       output.errors = errors;
       resolve(output);
     }
-  });
+  })
+  .catch(function (error) {
+    console.log(error)
+  });;
 }
 
-const parseResourceDetails = async(fileType, uploadedFile, newUploadFile, hashedName) => {
+const parseResourceDetails = async(fileType0, fileType1, uploadedFile, newUploadFile, hashedName) => {
   let newResourceData = {};
-  if (fileType==="image") {
+  if (fileType0==="image") {
     let newFilePath = newUploadFile.path;
     let imageDefault = await helpers.imgDimensions(newFilePath);
     imageDefault.x=0;
@@ -828,6 +846,19 @@ const parseResourceDetails = async(fileType, uploadedFile, newUploadFile, hashed
         {path: "images/thumbnails/"+hashedName, pathType: 'thumbnail'},
       ],
       resourceType: 'image'
+    };
+  }
+  else if (fileType1==="pdf") {
+    let newLabel = uploadedFile.name.replace(/\.[^/.]+$/, "");
+    newResourceData = {
+      label: newLabel,
+      fileName: uploadedFile.name,
+      hashedName: hashedName,
+      metadata: null,
+      paths: [
+        {path: "documents/"+hashedName, pathType: 'source'},
+      ],
+      resourceType: 'document'
     };
   }
   return newResourceData;
@@ -913,6 +944,231 @@ const deleteClasspiece = async(req, resp) => {
     msg: "Query results",
   });}
 
+
+const updateAnnotationImage = async(req, resp) => {
+  let postData = req.body;
+  if (Object.keys(postData).length===0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: ["Please provide the appropriate post data"],
+    });
+    return false;
+  }
+  let resourceId = postData.itemId;
+  let sourceId = postData.sourceId;
+
+  // resource
+  let resource = new Resource({_id:resourceId});
+  await resource.load();
+  let resourceMeta = resource.metadata.image.default;
+  let width = resourceMeta.width;
+  let height = resourceMeta.height;
+  let extension = resourceMeta.extension;
+  let x = resourceMeta.x;
+  let y = resourceMeta.y;
+  let rotate = resourceMeta.rotate;
+  let resourcePaths = resource.paths;
+  let resourceThumbnailPath = "";
+  let resourceImagePath = "";
+  let hashedName = "";
+
+  if (typeof resource.paths!=="undefined" && resource.paths.length>0) {
+    let resourcePath = resourcePaths.find(p=>{
+      let path = p;
+      if (typeof p==="string") {
+        path = JSON.parse(path);
+      }
+      if (typeof path==="string") {
+        path = JSON.parse(path);
+      }
+      if (path.pathType==="source") {
+        return true;
+      }
+    });
+    if (typeof resourcePath==="string") {
+      resourcePath = JSON.parse(resourcePath);
+    }
+    if (typeof resourcePath==="string") {
+      resourcePath = JSON.parse(resourcePath);
+    }
+    resourceImagePath = resourcePath.path;
+    let resourceThumbPath = resourcePaths.find(p=>{
+      let path = p;
+      if (typeof p==="string") {
+        path = JSON.parse(path);
+      }
+      if (typeof path==="string") {
+        path = JSON.parse(path);
+      }
+      if (path.pathType==="thumbnail") {
+        return true;
+      }
+    });
+    if (typeof resourceThumbPath==="string") {
+      resourceThumbPath = JSON.parse(resourceThumbPath);
+    }
+    if (typeof resourceThumbPath==="string") {
+      resourceThumbPath = JSON.parse(resourceThumbPath);
+    }
+    resourceThumbnailPath = resourceThumbPath.path;
+  }
+  else {
+    hashedName = helpers.hashFileName(resource.label)+"."+extension;
+    resourceThumbnailPath = `images/thumbnails/${hashedName}`;
+    resourceImagePath = `images/fullsize/${hashedName}`;
+  }
+  // source
+  let source = new Resource({_id:sourceId});
+  await source.load();
+  let sourcePaths = source.paths;
+  let sourcePath = sourcePaths.find(p=>{
+    let path = p;
+    if (typeof p==="string") {
+      path = JSON.parse(path);
+    }
+    if (typeof path==="string") {
+      path = JSON.parse(path);
+    }
+    if (path.pathType==="source") {
+      return true;
+    }
+  });
+  if (typeof sourcePath==="string") {
+    sourcePath = JSON.parse(sourcePath);
+  }
+  if (typeof sourcePath==="string") {
+    sourcePath = JSON.parse(sourcePath);
+  }
+  /// create/update cropped image
+  const readFile = promisify(fs.readFile);
+  const image = await readFile(archivePath+sourcePath.path);
+  let outputDir = archivePath+resourceImagePath;
+  const cropImg = await new Promise((resolve,reject)=> {
+    const Image = Canvas.Image;
+    // Open the original image into a canvas
+    const img = new Image();
+    img.src = image;
+    if (width<0) {
+      width = Math.abs(width);
+    }
+    if (height<0) {
+      height = Math.abs(height);
+    }
+    var canvas = Canvas.createCanvas(width, height);
+    var ctx = canvas.getContext('2d')
+    if (rotate!==0) {
+      let rotateDegrees = rotate;
+      let radians = degreesToRadians(rotateDegrees);
+      let imageWidth = image.width;
+      let imageHeight = image.height;
+
+      let cx = x + (width*0.5);
+      let cy = y + (height*0.5);
+      let newCoordinates = rotateCoordinates(cx,cy,x,y,radians,width,height,rotateDegrees);
+      let newX = newCoordinates.x;
+      let newY = newCoordinates.y;
+
+      let newWidth = newCoordinates.width;
+      let newHeight = newCoordinates.height;
+
+      canvas.width=width;
+      canvas.height=height;
+
+      let left = (width - newWidth)-12;
+      let top = (width - newWidth)-5;
+      if (rotateDegrees<180) {
+        top = 0;
+      }
+      else {
+        left = 0;
+      }
+      ctx.rotate(radians);
+      ctx.drawImage(img, newX, newY, newWidth, newHeight, left, top, newWidth, newHeight);
+    }
+    else {
+      ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
+    }
+    var out = fs.createWriteStream(outputDir);
+    var stream = canvas.createJPEGStream({
+      bufsize: 2048,
+      quality: 90
+    });
+    stream.pipe(out);
+    out.on('finish', () => {
+      //console.log('File created successfully');
+      resolve("success");
+    });
+  })
+  .catch(function (error) {
+    console.log(error)
+  });
+  // update thumbnail
+  let createThumb = await createThumbnail(outputDir, archivePath+resourceThumbnailPath, hashedName, width, height);
+  // add paths to resource
+  if (typeof resource.paths==="undefined" || resource.paths.length===0) {
+    resource.paths = [
+      {path: resourceImagePath, pathType:"source"},
+      {path: resourceThumbnailPath, pathType:"thumbnail"},
+    ];
+    let userId = req.decoded.id;
+    await resource.save(userId);
+  }
+
+  let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasPart"});
+  await classpieceThumbnailTaxonomyTerm.load();
+
+  let classpieceThumbnailReference = {
+    items: [
+      {_id: sourceId, type: "Resource"},
+      {_id: resourceId, type: "Resource"}
+    ],
+    taxonomyTermId: classpieceThumbnailTaxonomyTerm._id,
+  }
+
+  let insertClasspieceThumbnailReference = await referencesController.updateReference(classpieceThumbnailReference);
+
+  resp.json({
+    status: true,
+    data: resource,
+    error: [],
+    msg: "Query results",
+  });
+}
+
+const degreesToRadians = (degrees) => {
+	let radians = 0;
+	if (degrees>0) {
+		radians = degrees * Math.PI / 180;
+	}
+	else {
+		radians = degrees * Math.PI /  180;
+	}
+	return -radians;
+}
+
+const rotateCoordinates = (cx,cy,x,y,radians, width, height,rotateDegrees) => {
+    let cos = Math.cos(radians);
+    let sin = Math.sin(radians);
+    let newCoordinates = {};
+    let nx = (cos * (x - cx)) + (sin * (y - cy)) + cx;
+    let ny = (cos * (y - cy)) + (sin * (x - cx)) + cy;
+    let newWidth = height * sin + width * cos;
+    let newHeight = height * cos + width * sin ;
+    if (rotateDegrees<180) {
+    	nx = (cos * (x - cx)) - (sin * (y - cy)) + cx;
+    	ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
+    	newWidth = height * sin - width * cos;
+    	newHeight = height * cos - width * sin ;
+    }
+    newCoordinates.width = Math.abs(newWidth);
+    newCoordinates.height = Math.abs(newHeight);
+    newCoordinates.x = nx;
+    newCoordinates.y = ny;
+    return newCoordinates;
+}
+
 module.exports = {
   Resource: Resource,
   getResources: getResources,
@@ -922,4 +1178,5 @@ module.exports = {
   deleteResource: deleteResource,
   deleteResources: deleteResources,
   deleteClasspiece: deleteClasspiece,
+  updateAnnotationImage: updateAnnotationImage,
 };

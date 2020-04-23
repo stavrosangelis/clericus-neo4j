@@ -107,7 +107,7 @@ class Entity {
       return false;
     }
     let session = driver.session();
-    let query = "MATCH (n:Entity)-[r]->(re:Entity) WHERE id(n)="+this._id+" RETURN n,r,re";
+    let query = `MATCH (n:Entity)-[r]->(re:Entity) WHERE id(n)=${this._id} RETURN n,r,re`;
     let relations = await session.writeTransaction(tx=>
       tx.run(query,{})
     )

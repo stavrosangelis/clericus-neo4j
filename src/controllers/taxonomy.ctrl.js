@@ -295,12 +295,15 @@ const getTaxonomy = async(req, resp) => {
     });
     return false;
   }
-  let _id=null, systemType=null;
+  let _id=null, systemType=null, flat=false;
   if (typeof parameters._id!=="undefined" && parameters._id!=="") {
     _id = parameters._id;
   }
   if (typeof parameters.systemType!=="undefined" && parameters.systemType!=="") {
     systemType = parameters.systemType;
+  }
+  if (typeof parameters.flat!=="undefined" && parameters.flat!=="") {
+    flat = parameters.flat;
   }
   let query = {};
   if (_id!==null) {
@@ -311,7 +314,13 @@ const getTaxonomy = async(req, resp) => {
   }
   let taxonomy = new Taxonomy(query);
   await taxonomy.load();
-  taxonomy.taxonomyterms = await getTaxonomyTerms(taxonomy._id);
+  if (flat) {
+    taxonomy.taxonomyterms = await getTaxonomyTerms(taxonomy._id);
+  }
+  else {
+    taxonomy.taxonomyterms = await getTaxonomyTermsTree(taxonomy._id);
+  }
+  
   resp.json({
     status: true,
     data: taxonomy,
@@ -381,16 +390,39 @@ const deleteTaxonomy = async(req, resp) => {
   });
 }
 
-const getTaxonomyTerms = async(_id) =>{
+const getTaxonomyTermsTree = async(_id, parentId=null) =>{
   let session = driver.session();
-  let query = "MATCH (t:Taxonomy) WHERE id(t)="+_id+" MATCH (n:TaxonomyTerm)-[r:isChildOf]->(t) RETURN n ORDER BY n.label";
+  let query = `MATCH (t:Taxonomy) WHERE id(t)=${_id} MATCH (n:TaxonomyTerm)-[r:isChildOf]->(t) WHERE NOT (n)-[:isChildOf]->(:TaxonomyTerm) RETURN n ORDER BY n.label`;
+  if (parentId!==null) {
+    parentId = parseInt(parentId,10);
+    query = `MATCH (t:Taxonomy) WHERE id(t)=${_id} MATCH (p:TaxonomyTerm) WHERE id(p)=${parentId} MATCH (n:TaxonomyTerm)-[r:isChildOf]->(t) WHERE (n)-[:isChildOf]->(p) RETURN n ORDER BY n.label`;
+  }
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
   .then(result=> {
     session.close();
     return result.records;
-  })
+  });
+  let taxonomyTerms = helpers.normalizeRecordsOutput(nodesPromise, "n");
+  for (let i=0; i<taxonomyTerms.length; i++) {
+    let taxonomyTerm = taxonomyTerms[i];
+    let children = await getTaxonomyTermsTree(_id, taxonomyTerm._id);
+    taxonomyTerm.children = children;
+  }
+  return taxonomyTerms;
+}
+
+const getTaxonomyTerms = async(_id) =>{
+  let session = driver.session();
+  let query = `MATCH (t:Taxonomy) WHERE id(t)=${_id} MATCH (n:TaxonomyTerm)-[r:isChildOf]->(t) RETURN n ORDER BY n.label`;
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  });
   let taxonomyTerms = helpers.normalizeRecordsOutput(nodesPromise, "n");
   return taxonomyTerms;
 }
@@ -399,7 +431,6 @@ module.exports = {
   Taxonomy: Taxonomy,
   getTaxonomies: getTaxonomies,
   getTaxonomy: getTaxonomy,
-  getTaxonomyTerms: getTaxonomyTerms,
   putTaxonomy: putTaxonomy,
   deleteTaxonomy: deleteTaxonomy,
 };

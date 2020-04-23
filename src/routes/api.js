@@ -142,6 +142,7 @@ server.get('/resources', resourceController.getResources);
 server.delete('/resource', auth.checkAdminToken, resourceController.deleteResource);
 server.delete('/delete-classpiece', auth.checkAdminToken, resourceController.deleteClasspiece);
 server.delete('/resources', auth.checkAdminToken, resourceController.deleteResources);
+server.put('/update-annotation-image', auth.checkAdminToken, resourceController.updateAnnotationImage);
 
 // organisations
 server.put('/organisation', auth.checkAdminToken, organisationController.putOrganisation);
@@ -194,6 +195,7 @@ server.post('/update-class-piece-faces', auth.checkAdminToken, toolsParseControl
 server.get('/prepare-classpiece-ingestion', auth.checkAdminToken, toolsIngestionController.preIngestionReportClassPiece);
 server.put('/prepare-classpiece-identify-duplicates', auth.checkAdminToken, toolsIngestionController.classPieceIdentifyDuplicates);
 server.put('/ingest-classpiece', auth.checkAdminToken, toolsIngestionController.ingestClasspiece);
+server.get('/patch-rotate', auth.checkAdminToken, toolsIngestionController.patchRotate);
 server.get('/parse-class-piece', auth.checkAdminToken, cvisionController.parseClassPiece);
 server.get('/create-thumbnails', auth.checkAdminToken, toolsParseController.createThumbnails);
 server.post('/query-texts', auth.checkAdminToken, toolsParseController.queryTexts);

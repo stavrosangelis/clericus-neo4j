@@ -637,7 +637,6 @@ const ingestPerson = async(person, classpiece, userId) => {
     if (typeof person._id!=="undefined") {
       personData._id = person._id;
     }
-
     let newPerson = new Person(personData);
     let ingestPersonPromise = await newPerson.save(userId);
 
@@ -763,6 +762,7 @@ const ingestPersonThumbnail = async(person, classpiece, userId) => {
       extension: person.default.extension,
       x: person.default.x,
       y: person.default.y,
+      rotate: person.default.rotate
     }
 
     let newPersonImageData = {
@@ -857,9 +857,65 @@ var copyFile = (src=null, target=null) => {
   }
 }
 
+const patchRotate = async (req, resp) => {
+  let parameters = req.query;
+  let start = parameters.start;
+  let end = parameters.end;
+  let path = `${resourcesPath}output/`;
+  const dir = await fs.promises.opendir(path);
+  let directories = [];
+  for await (const dirent of dir) {
+    if (dirent.isDirectory()) {
+      directories.push(dirent.name);
+    }
+  }
+  directories.sort();
+
+  const stringToJson = (string) => {
+    if (typeof string==="string") {
+      string = JSON.parse(string);
+    }
+    return string;
+  }
+  const parseJSONFile = async(filePath) => {
+    let jsonFile = await helpers.readJSONFile(filePath);
+    if (typeof jsonFile==="undefined") {
+      return false;
+    }
+    let jsonData = stringToJson(jsonFile.data);
+    let faces = jsonData.filter(f=>{
+      if (typeof f.rotate!=="undefined" && f.rotate!==0) {
+        return true;
+      }
+      return false;
+    });
+    return faces;
+  }
+
+  let files = [];
+  for (let i=0; i<directories.length; i++) {
+    if (i>=start && i<=end) {
+      let dir = directories[i];
+      let filePath = `${path}${dir}/json/${dir}-faces.json`;
+      let faces = await parseJSONFile(filePath);
+      if (faces.length>0) {
+        let file = {name: dir, count: faces.length, faces: faces};
+        files.push(file);
+      }      
+    }
+  }
+
+  resp.json({
+    status: true,
+    data: files,
+    error: [],
+    msg: "Query results",
+  })
+}
 
 module.exports = {
   preIngestionReportClassPiece: preIngestionReportClassPiece,
   classPieceIdentifyDuplicates: classPieceIdentifyDuplicates,
   ingestClasspiece: ingestClasspiece,
+  patchRotate: patchRotate,
 }

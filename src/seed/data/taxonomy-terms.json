@@ -113,7 +113,12 @@
     "taxonomyRef": "eventTypes"
   },
 
-
+  {
+    "scopeNote": null,
+    "label": "Document",
+    "inverseLabel": "Document",
+    "taxonomyRef": "resourceSystemTypes"
+  },
   {
     "scopeNote": null,
     "label": "Classpiece",

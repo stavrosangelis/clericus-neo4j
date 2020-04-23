@@ -245,9 +245,9 @@ const loadRelations = async (srcId=null, srcType=null, targetType=null) => {
     return false;
   }
   let session = driver.session()
-  let query = "MATCH (n:"+srcType+")-[r]->(rn) WHERE id(n)="+srcId+" return n, r, rn";
+  let query = "MATCH (n:"+srcType+")-[r]->(rn) WHERE id(n)="+srcId+" return n, r, rn ORDER BY id(r)";
   if (targetType!==null) {
-    query = "MATCH (n:"+srcType+")-[r]->(rn:"+targetType+") WHERE id(n)="+srcId+" return n, r, rn";
+    query = "MATCH (n:"+srcType+")-[r]->(rn:"+targetType+") WHERE id(n)="+srcId+" return n, r, rn ORDER BY id(r)";
   }
   let relations = await session.writeTransaction(tx=>
     tx.run(query,{})

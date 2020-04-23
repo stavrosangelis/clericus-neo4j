@@ -82,6 +82,7 @@ class TaxonomyTerm {
     }
     await this.countRelations();
     await this.loadRelations();
+    await this.loadParentRef();
   }
 
   async countRelations() {
@@ -162,6 +163,31 @@ class TaxonomyTerm {
     this.relations = relations;
   }
 
+  async loadParentRef() {
+    if (this._id===null || this.labelId==="") {
+      return false;
+    }
+    let session = driver.session();
+    let query = `MATCH (n:TaxonomyTerm)-[r:hasChild]->(t:TaxonomyTerm) WHERE id(t)=${this._id} RETURN n`;
+    let parentNode = await session.writeTransaction(tx=>
+      tx.run(query, {})
+    )
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0];
+        let key = record.keys[0];
+        let output = record.toObject()[key];
+        output = helpers.outputRecord(output);
+        return output;
+      }
+    });
+    if(typeof parentNode!=="undefined") {
+      this.parentRef = parentNode._id;
+    }
+  }
+
   async save(userId) {
     let validateTaxonomyTerm = this.validate();
     if (!validateTaxonomyTerm.status) {
@@ -213,7 +239,6 @@ class TaxonomyTerm {
         query,
         params
       ).then(result => {
-        session.close();
         let records = result.records;
         let output = {error: ["The record cannot be updated"], status: false, data: []};
         if (records.length>0) {
@@ -224,6 +249,13 @@ class TaxonomyTerm {
           output = {error: [], status: true, data: resultRecord};
         }
         return output;
+      });
+
+      // remove hasChild ref
+      let termId = parseInt(resultPromise.data._id,10);
+      let removeParentRefQuery = `MATCH (t:TaxonomyTerm) WHERE id(t)=${termId} MATCH (p:TaxonomyTerm)-[r1:hasChild]->(t) MATCH (t)-[r2:isChildOf]->(p) DELETE r1, r2`;
+      let removeParent = await session.run(removeParentRefQuery,{}).then(result => {
+        session.close();
       });
       return resultPromise;
     }
