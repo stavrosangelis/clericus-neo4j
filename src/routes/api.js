@@ -133,7 +133,7 @@ server.get('/person', personController.getPerson);
 server.get('/people', personController.getPeople);
 server.delete('/person', auth.checkAdminToken, personController.deletePerson);
 server.delete('/people', auth.checkAdminToken, personController.deletePeople);
-server.get('/patch-unknown', auth.checkAdminToken, personController.patchUnknown);
+//server.get('/patch-unknown', auth.checkAdminToken, personController.patchUnknown);
 
 // resources
 server.put('/resource', auth.checkAdminToken, resourceController.putResource);
