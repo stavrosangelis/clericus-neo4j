@@ -58,7 +58,7 @@ class Person {
   validate() {
     let status = true;
     let errors = [];
-    if (this.firstName!==null && this.firstName.length<1) {
+    if (this.firstName!==null && this.firstName!=="" && this.firstName.length<1) {
       status = false;
       errors.push({field: "firstName", msg: "First name must contain at least 1 characters"});
     }
@@ -66,7 +66,7 @@ class Person {
       status = false;
       errors.push({field: "middleName", msg: "If middle name is entered it must contain at least 1 characters"});
     }
-    if (this.firstName!==null && this.lastName.length<1) {
+    if (this.lastName!==null && this.lastName!=="" && this.lastName.length<1) {
       status = false;
       errors.push({field: "lastName", msg: "Last name must contain at least 1 characters"});
     }
@@ -647,6 +647,72 @@ const deletePeople = async(req, resp) => {
   });
 }
 
+const patchUnknown = async(req, resp) => {
+  // 1. firstname
+  let queryFN = `match (n:Person) where n.firstName="Unknown" set n.firstName="" return n`;
+  let session = driver.session();
+  let transactionFN = await session.writeTransaction(tx=>
+    tx.run(queryFN,{})
+  )
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+
+  // 2. lastname
+  let queryLN = `match (n:Person) where n.lastName="Unknown" set n.lastName="" return n`;
+  let transactionLN = await session.writeTransaction(tx=>
+    tx.run(queryLN,{})
+  )
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+
+  // 3. label
+  let queryLabel = `match (n:Person) where LOWER(n.label) =~ LOWER('.*Unknown.*') return n`;
+  let transactionLabel = await session.writeTransaction(tx=>
+    tx.run(queryLabel,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let nodes = helpers.normalizeRecordsOutput(transactionLabel);
+  let normalizedNodes = [];
+  let results = [];
+  for await (const n of nodes) {
+    if (n.label.includes("Unknown")) {
+      n.label = n.label.replace(/Unknown/g, '');
+      n.label = n.label.trim();
+    }
+    normalizedNodes.push(n);
+
+    let node = new Person(n);
+    let userId = req.decoded.id;
+    let output = await node.save(userId);
+    results.push(output);
+  }
+
+  //
+  resp.json({
+    status: true,
+    data: {
+      firstname: transactionFN,
+      lastname: transactionLN,
+      queryLabelCount: normalizedNodes.length,
+      queryLabel: normalizedNodes,
+      queryLabelUpdates: results
+    },
+    error: [],
+    msg: "Query results",
+  });
+}
+
 module.exports = {
   Person: Person,
   getPeople: getPeople,
@@ -654,4 +720,5 @@ module.exports = {
   putPerson: putPerson,
   deletePerson: deletePerson,
   deletePeople: deletePeople,
+  patchUnknown: patchUnknown,
 };
