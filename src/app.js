@@ -7,6 +7,7 @@ if (process.env.NODE_ENV==="development") {
 if (process.env.NODE_ENV==="devserver") {
   require('dotenv').config({path:'.env.develserver'});
 }
+const compression = require("compression");
 const neo4j = require('neo4j-driver');
 const cors = require('cors');
 const express = require("express");
@@ -14,6 +15,7 @@ const bodyParser = require('body-parser')
 const port = process.env.PORT;
 const api = require('./routes/api');
 const app = express();
+app.use(compression());
 const Promise = require("bluebird");
 
 app.use(cors());

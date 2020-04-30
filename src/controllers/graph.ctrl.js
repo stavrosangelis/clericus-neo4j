@@ -1,6 +1,5 @@
 const driver = require("../config/db-driver");
 const helpers = require("../helpers");
-
 /**
 * @api {get} /graph Get graph
 * @apiName get graph
@@ -43,6 +42,7 @@ const getGraphData = async (req, resp) => {
   if (typeof params.resources!=="undefined") {
     resourcesLoad = params.resources;
   }
+
   let events = [];
   let eventsRelations = [];
   let organisations = [];
@@ -52,39 +52,66 @@ const getGraphData = async (req, resp) => {
   let resources = [];
   let resourcesRelations = [];
   if (eventsLoad==="true") {
-    let eventsPromise = await loadNodes("MATCH (n:Event), (n)-[r]-() RETURN n, count(r) as count");
-    events = helpers.normalizeGraphRecordsOutput(eventsPromise.records);
-    eventsRelations = await loadNodes("MATCH (n:Event)-[r]-() RETURN r");
-    if (typeof eventsRelations.records!=="undefined")
-      eventsRelations = helpers.normalizeRelationsOutput(eventsRelations.records);
+		// nodes
+		let eventsQuery = `MATCH (n:Event), (n)-[r]-() WHERE n.status='public' RETURN n, count(r) as count`;
+		let eventsCount = await countNodes(`MATCH (n:Event) WHERE n.status='public' RETURN count(n) as count`);
+		let eventsPromise = await loadBatch(eventsQuery, eventsCount);
+  	events = helpers.normalizeGraphRecordsOutput(eventsPromise);
+
+		// relations
+		let eventsRQuery = `MATCH (n:Event)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let eventsRCount = await countNodes(`MATCH (n:Event)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+    eventsRelations = await loadBatch(eventsRQuery,eventsRCount);
+    eventsRelations = helpers.normalizeRelationsOutput(eventsRelations);
   }
   if (organisationsLoad==="true") {
-    let organisationsPromise = await loadNodes("MATCH (n:Organisation), (n)-[r]-() RETURN n, count(r) as count");
-    organisations = helpers.normalizeGraphRecordsOutput(organisationsPromise.records);
-    organisationsRelations = await loadNodes("MATCH (n:Organisation)-[r]-() RETURN r");
-    if (typeof organisationsRelations.records!=="undefined")
-      organisationsRelations = helpers.normalizeRelationsOutput(organisationsRelations.records);
+		// nodes
+		let organisationsQuery = `MATCH (n:Organisation), (n)-[r]-() WHERE n.status='public' RETURN n, count(r) as count`;
+		let organisationsCount = await countNodes(`MATCH (n:Organisation) WHERE n.status='public' RETURN count(n) as count`);
+    let organisationsPromise = await loadBatch(organisationsQuery, organisationsCount);
+    organisations = helpers.normalizeGraphRecordsOutput(organisationsPromise);
+
+		// relations
+		let organisationsRQuery = `MATCH (n:Organisation)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let organisationsRCount = await countNodes(`MATCH (n:Organisation)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+    organisationsRelations = await loadBatch(organisationsRQuery, organisationsRCount);
+    organisationsRelations = helpers.normalizeRelationsOutput(organisationsRelations);
   }
   if (peopleLoad==="true") {
-    peoplePromise = await loadNodes("MATCH (n:Person), (n)-[r]-() RETURN n, count(r) as count");
-    people = helpers.normalizeGraphRecordsOutput(peoplePromise.records);
-    peopleRelations = await loadNodes("MATCH (n:Person)-[r]-() RETURN r");
-    if (typeof peopleRelations.records!=="undefined")
-      peopleRelations = helpers.normalizeRelationsOutput(peopleRelations.records);
+		// nodes
+		let peopleQuery = `MATCH (n:Person), (n)-[r]-() WHERE n.status='public' RETURN n, count(r) as count`;
+		let peopleCount = await countNodes(`MATCH (n:Person) WHERE n.status='public' RETURN count(n) as count`);
+    let peoplePromise = await loadBatch(peopleQuery, peopleCount);
+  	people = helpers.normalizeGraphRecordsOutput(peoplePromise);
+
+		// relations
+		let peopleRQuery = `MATCH (n:Person)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let peopleRCount = await countNodes(`MATCH (n:Person)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+    peopleRelations = await loadBatch(peopleRQuery, peopleRCount);
+    peopleRelations = helpers.normalizeRelationsOutput(peopleRelations);
   }
   if (resourcesLoad==="true") {
-    let resourcesPromise = await loadNodes("MATCH (n:Resource), (n)-[r]-() RETURN n, count(r) as count");
-    resources = helpers.normalizeGraphRecordsOutput(resourcesPromise.records);
-    resourcesRelations = await loadNodes("MATCH (n:Resource)-[r]-() RETURN r");
-    if (typeof resourcesRelations.records!=="undefined")
-      resourcesRelations = helpers.normalizeRelationsOutput(resourcesRelations.records);
+		// nodes
+		let resourcesQuery = `MATCH (n:Resource), (n)-[r]-() WHERE n.status='public' RETURN n, count(r) as count`;
+		let resourcesCount = await countNodes(`MATCH (n:Resource) WHERE n.status='public' RETURN count(n) as count`);
+    let resourcesPromise = await loadBatch(resourcesQuery, resourcesCount);
+    resources = helpers.normalizeGraphRecordsOutput(resourcesPromise);
+
+		// relations
+		let resourcesRQuery = `MATCH (n:Resource)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let resourcesRCount = await countNodes(`MATCH (n:Resource)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+    resourcesRelations = await loadBatch(resourcesRQuery, resourcesRCount);
+    resourcesRelations = helpers.normalizeRelationsOutput(resourcesRelations);
   }
+
   let nodes = [];
   let links = [];
   let linksRecords = [];
   let nodesIds = [];
-  let eventNodes = events.map(item=> {
-    let count = item.count;
+  let eventNodes = [];
+	for (let i=0;i<events.length; i++) {
+		let item = events[i];
+		let count = item.count;
     let size = 100 + (100*count);
     let newNode = {
       id: item._id,
@@ -101,10 +128,12 @@ const getGraphData = async (req, resp) => {
     if (nodesIds.indexOf(item._id)===-1) {
       nodesIds.push(item._id)
     }
-    return newNode;
-  });
+		eventNodes.push(newNode);
+	}
 
-  let organisationNodes = organisations.map(item=> {
+  let organisationNodes = [];
+	for (let i=0;i<organisations.length; i++) {
+		let item = organisations[i];
     let count = item.count;
     let size = 100 + (100*count);
     let newNode = {
@@ -122,10 +151,12 @@ const getGraphData = async (req, resp) => {
     if (nodesIds.indexOf(item._id)===-1) {
       nodesIds.push(item._id)
     }
-    return newNode;
-  });
+	  organisationNodes.push(newNode);
+	}
 
-  let peopleNodes = people.map(item=> {
+  let peopleNodes = [];
+	for (let i=0;i<people.length; i++) {
+		let item = people[i];
     let count = item.count;
     let size = 100 + (100*count);
     let label = item.label;
@@ -144,10 +175,12 @@ const getGraphData = async (req, resp) => {
     if (nodesIds.indexOf(item._id)===-1) {
       nodesIds.push(item._id)
     }
-    return newNode;
-  });
+    peopleNodes.push(newNode);
+	}
 
-  let resourcesNodes = resources.map(item=> {
+  let resourcesNodes = [];
+	for (let i=0;i<resources.length; i++) {[];
+		let item = resources[i];
     let count = item.count;
     let size = 100 + (100*count);
     let newNode = {
@@ -165,19 +198,16 @@ const getGraphData = async (req, resp) => {
     if (nodesIds.indexOf(item._id)===-1) {
       nodesIds.push(item._id)
     }
-    return newNode;
-  });
+    resourcesNodes.push(newNode);
+	}
 
-  nodes.push(eventNodes);
-  nodes.push(organisationNodes);
-  nodes.push(peopleNodes);
-  nodes.push(resourcesNodes);
-  nodes = flattenDeep(nodes)
+  nodes = [...eventNodes, ...organisationNodes, ...peopleNodes, ...resourcesNodes];
 
   eventsRelations = eventsRelations.filter(rel=> {
     if (nodesIds.indexOf(rel.start)>-1 && nodesIds.indexOf(rel.end)>-1)
     return rel;
   })
+
   organisationsRelations = organisationsRelations.filter(rel=> {
     if (nodesIds.indexOf(rel.start)>-1 && nodesIds.indexOf(rel.end)>-1)
     return rel;
@@ -190,23 +220,67 @@ const getGraphData = async (req, resp) => {
     if (nodesIds.indexOf(rel.start)>-1 && nodesIds.indexOf(rel.end)>-1)
     return rel;
   });
+	linksRecords = [...eventsRelations, ...organisationsRelations, ...peopleRelations, ...resourcesRelations];
 
-  linksRecords.push(eventsRelations);
-  linksRecords.push(organisationsRelations);
-  linksRecords.push(peopleRelations);
-  linksRecords.push(resourcesRelations);
-  linksRecords = flattenDeep(linksRecords);
   links = parseReferences(linksRecords);
+
   let responseData = {
     nodes: nodes,
     links: links
   }
+
   resp.json({
     status: true,
-    data: responseData,
+    data: JSON.stringify(responseData),
     error: [],
     msg: "Query results",
   })
+}
+
+const loadBatch = async (query=null, count=0) => {
+	if (query===null || count===0) {
+		return [];
+	}
+	let skip = 0;
+	let limit = 500;
+	let results = [];
+	let result = await loadNodes(query+` SKIP ${skip} LIMIT ${limit}`);
+	if (typeof result.records!=="undefined") {
+		results.push(result.records)
+	}
+	if (count>limit) {
+		for (var i=0; i<count; i+=limit) {
+			if (i>=limit) {
+				skip = skip+limit;
+				limit = limit+limit;
+				if (limit>count) {
+					limit=count
+				}
+				let query2 = query+` SKIP ${skip} LIMIT ${limit}`;
+				let result2 = await loadNodes(query2);
+				if (typeof result2.records!=="undefined") {
+					results.push(result2.records);
+				}
+			}
+		}
+	}
+	return flattenDeep(results);
+}
+
+const countNodes = async (query) => {
+	let session = driver.session();
+  let count = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+		let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['count'];
+    return parseInt(output,10);
+  });
+  return count;
 }
 
 const loadNodes = async (query) => {
@@ -272,7 +346,7 @@ const getRelatedNodes = async(req, resp) => {
   }
   // 1. query for node
   let session = driver.session();
-  let query = "MATCH (n)-[*.."+steps+"]->(rn) WHERE id(n)="+_id+" AND NOT id(rn)="+_id+" RETURN distinct rn ORDER BY rn.label";
+  let query = "MATCH (n)-[*.."+steps+"]->(rn) WHERE id(n)="+_id+" AND n.status='public' AND rn.status='public' AND NOT id(rn)="+_id+" RETURN distinct rn ORDER BY rn.label";
 
   let results = await session.writeTransaction(tx=>
     tx.run(query,{})

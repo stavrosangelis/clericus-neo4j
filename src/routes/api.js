@@ -37,6 +37,8 @@ const analyticsController = require('../controllers/ui/analytics.ctrl');
 const carouselController = require('../controllers/ui/carousel.ctrl');
 const classpiecesController = require('../controllers/ui/classpieces.ctrl');
 const contentController = require('../controllers/ui/content.ctrl');
+const eventsUiController = require('../controllers/ui/events.ctrl');
+const organisationsUiController = require('../controllers/ui/organisations.ctrl');
 const peopleController = require('../controllers/ui/people.ctrl');
 const searchController = require('../controllers/ui/search.ctrl');
 const uiMenuController = require('../controllers/ui/menu.ctrl');
@@ -57,8 +59,18 @@ server.get('/content-articles', contentController.getArticles);
 server.get('/content-article', contentController.getArticle);
 server.get('/content-category', contentController.getArticleCategory);
 
+// ******* ui events ******** //
+server.get('/ui-events', eventsUiController.getEvents);
+server.get('/ui-event', eventsUiController.getEvent);
+server.post('/ui-events-active-filters', eventsUiController.getEventsActiveFilters);
+
 // ******* ui menu ******** //
 server.get('/ui-menu', uiMenuController.getMenu);
+
+// ******* ui organisations ******** //
+server.get('/ui-organisations', organisationsUiController.getOrganisations);
+server.get('/ui-organisation', organisationsUiController.getOrganisation);
+server.post('/ui-organisations-active-filters', organisationsUiController.getOrganisationsActiveFilters);
 
 // ******* ui people  ******** //
 server.get('/ui-people', peopleController.getPeople);
@@ -103,8 +115,8 @@ server.delete('/entity', auth.checkAdminToken, entityController.deleteEntity);
 
 // events
 server.put('/event', auth.checkAdminToken, eventController.putEvent);
-server.get('/event', eventController.getEvent);
-server.get('/events', eventController.getEvents);
+server.get('/event', auth.checkAdminToken, eventController.getEvent);
+server.get('/events', auth.checkAdminToken, eventController.getEvents);
 server.delete('/event', auth.checkAdminToken, eventController.deleteEvent);
 server.delete('/events', auth.checkAdminToken, eventController.deleteEvents);
 
@@ -147,8 +159,8 @@ server.put('/update-annotation-image', auth.checkAdminToken, resourceController.
 
 // organisations
 server.put('/organisation', auth.checkAdminToken, organisationController.putOrganisation);
-server.get('/organisation', organisationController.getOrganisation);
-server.get('/organisations', organisationController.getOrganisations);
+server.get('/organisation', auth.checkAdminToken, organisationController.getOrganisation);
+server.get('/organisations', auth.checkAdminToken, organisationController.getOrganisations);
 server.delete('/organisation', auth.checkAdminToken, organisationController.deleteOrganisation);
 server.delete('/organisations', auth.checkAdminToken, organisationController.deleteOrganisations);
 

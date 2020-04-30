@@ -114,6 +114,7 @@ const getPeople = async (req, resp) => {
     limit = parseInt(parameters.limit,10);
   }
 
+  let events=[], organisations=[], people=[], resources=[];
   if (typeof parameters.events!=="undefined") {
     events = parameters.events;
     match = "(n:Person)-[revent]->(e:Event)";
