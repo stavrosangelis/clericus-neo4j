@@ -320,7 +320,7 @@ const getTaxonomy = async(req, resp) => {
   else {
     taxonomy.taxonomyterms = await getTaxonomyTermsTree(taxonomy._id);
   }
-  
+
   resp.json({
     status: true,
     data: taxonomy,

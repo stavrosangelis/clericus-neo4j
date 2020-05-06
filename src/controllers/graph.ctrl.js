@@ -59,8 +59,8 @@ const getGraphData = async (req, resp) => {
   	events = helpers.normalizeGraphRecordsOutput(eventsPromise);
 
 		// relations
-		let eventsRQuery = `MATCH (n:Event)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
-		let eventsRCount = await countNodes(`MATCH (n:Event)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+		let eventsRQuery = `MATCH (n:Event)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let eventsRCount = await countNodes(`MATCH (n:Event)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
     eventsRelations = await loadBatch(eventsRQuery,eventsRCount);
     eventsRelations = helpers.normalizeRelationsOutput(eventsRelations);
   }
@@ -72,8 +72,8 @@ const getGraphData = async (req, resp) => {
     organisations = helpers.normalizeGraphRecordsOutput(organisationsPromise);
 
 		// relations
-		let organisationsRQuery = `MATCH (n:Organisation)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
-		let organisationsRCount = await countNodes(`MATCH (n:Organisation)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+		let organisationsRQuery = `MATCH (n:Organisation)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let organisationsRCount = await countNodes(`MATCH (n:Organisation)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
     organisationsRelations = await loadBatch(organisationsRQuery, organisationsRCount);
     organisationsRelations = helpers.normalizeRelationsOutput(organisationsRelations);
   }
@@ -85,8 +85,8 @@ const getGraphData = async (req, resp) => {
   	people = helpers.normalizeGraphRecordsOutput(peoplePromise);
 
 		// relations
-		let peopleRQuery = `MATCH (n:Person)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
-		let peopleRCount = await countNodes(`MATCH (n:Person)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+		let peopleRQuery = `MATCH (n:Person)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let peopleRCount = await countNodes(`MATCH (n:Person)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
     peopleRelations = await loadBatch(peopleRQuery, peopleRCount);
     peopleRelations = helpers.normalizeRelationsOutput(peopleRelations);
   }
@@ -98,8 +98,8 @@ const getGraphData = async (req, resp) => {
     resources = helpers.normalizeGraphRecordsOutput(resourcesPromise);
 
 		// relations
-		let resourcesRQuery = `MATCH (n:Resource)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN r`;
-		let resourcesRCount = await countNodes(`MATCH (n:Resource)-[r]-(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
+		let resourcesRQuery = `MATCH (n:Resource)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN r`;
+		let resourcesRCount = await countNodes(`MATCH (n:Resource)-[r]->(o) WHERE n.status='public' AND o.status='public' RETURN count(r) as count`);
     resourcesRelations = await loadBatch(resourcesRQuery, resourcesRCount);
     resourcesRelations = helpers.normalizeRelationsOutput(resourcesRelations);
   }
@@ -118,7 +118,6 @@ const getGraphData = async (req, resp) => {
       label: item.label,
       itemId: item._id,
       type: 'event',
-      symbolType: 'circle',
       color: '#f9cd1b',
       strokeColor: '#c9730a',
       labelProperty: 'label',
@@ -141,7 +140,6 @@ const getGraphData = async (req, resp) => {
       label: item.label,
       itemId: item._id,
       type: 'organisation',
-      symbolType: 'diamond',
       color: '#9b8cf2',
       strokeColor: '#5343b7',
       labelProperty: 'label',
@@ -165,7 +163,6 @@ const getGraphData = async (req, resp) => {
       label: label,
       itemId: item._id,
       type: 'person',
-      symbolType: 'wye',
       color: '#5dc910',
       strokeColor: '#519b1b',
       labelProperty: 'label',
@@ -188,7 +185,6 @@ const getGraphData = async (req, resp) => {
       label: item.label,
       itemId: item._id,
       type: 'resource',
-      symbolType: 'square',
       color: '#00cbff',
       strokeColor: '#0982a0',
       labelProperty: 'label',
@@ -295,17 +291,18 @@ const loadNodes = async (query) => {
 }
 
 const parseReferences = (refs) =>{
-  let output = refs.map(ref=> {
-    let newRef = {
+	let output = [];
+	for (let i=0; i<refs.length; i++) {
+		let ref = refs[i];
+		let newRef = {
       source: ref.start,
       target: ref.end,
       refId: ref.identity,
       label: ref.type,
       labelProperty: 'refLabel',
-      renderLabel: true
     };
-    return newRef;
-  });
+		output.push(newRef);
+	}
   return output;
 }
 

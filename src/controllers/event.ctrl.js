@@ -524,6 +524,40 @@ const deleteEvents = async(req, resp) => {
   });
 }
 
+const updateStatus = async(req, resp) => {
+  let postData = req.body;
+  if (typeof postData._ids==="undefined" || postData._ids.length===0 || typeof postData.status==="undefined" || postData.status==="") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select valid ids and new status to continue.",
+    });
+    return false;
+  }
+  let userId = req.decoded.id;
+  let responseData = [];
+  let session = driver.session();
+  for (let i=0; i<postData._ids.length; i++) {
+    let _id = postData._ids[i];
+    let now = new Date().toISOString();
+    let updatedBy = userId;
+    let updatedAt = now;
+    let query = `MATCH (n:Event) WHERE id(n)=${_id} SET n.status="${postData.status}", n.updatedBy="${updatedBy}", n.updatedAt="${updatedAt}"`;
+    let update = await session.run(query,{}).then(result => {
+      return result;
+    });
+    responseData.push(update);
+  }
+  session.close();
+  resp.json({
+    status: true,
+    data: responseData,
+    error: [],
+    msg: "Query results",
+  });
+}
+
 module.exports = {
   Event: Event,
   getEvents: getEvents,
@@ -531,4 +565,5 @@ module.exports = {
   putEvent: putEvent,
   deleteEvent: deleteEvent,
   deleteEvents: deleteEvents,
+  updateStatus: updateStatus,
 };

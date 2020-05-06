@@ -408,5 +408,5 @@ module.exports = {
   getTemporals: getTemporals,
   getTemporal: getTemporal,
   putTemporal: putTemporal,
-  deleteTemporal: deleteTemporal,
+  deleteTemporal: deleteTemporal
 };

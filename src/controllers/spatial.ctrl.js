@@ -418,6 +418,7 @@ const deleteSpatial = async(req, resp) => {
   });
 }
 
+
 module.exports = {
   Spatial: Spatial,
   getSpatials: getSpatials,

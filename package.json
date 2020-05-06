@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.36.83",
+  "version": "0.40.93",
   "description": "This is the Clericus API using neo4j as a database",
   "main": "src/app.js",
   "scripts": {
@@ -17,13 +17,14 @@
   "license": "ISC",
   "dependencies": {
     "argon2": "^0.24.0",
-    "axios": "^0.19.0",
+    "axios": "^0.19.2",
     "bluebird": "^3.7.2",
     "body-parser": "^1.19.0",
     "canvas": "^2.6.0",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "crypto-js": "^3.1.9-1",
+    "csv-parser": "^2.3.2",
     "dotenv": "^8.2.0",
     "exif": "^0.6.0",
     "express": "^4.17.1",

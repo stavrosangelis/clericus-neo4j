@@ -28,6 +28,7 @@ const taxonomyTermController = require('../controllers/taxonomyTerm.ctrl');
 const temporalController = require('../controllers/temporal.ctrl');
 const toolsParseController = require('../controllers/tools/meta-parse.ctrl');
 const toolsIngestionController = require('../controllers/tools/prepare-ingestion.ctrl');
+const toolsDiocesesLocationsController = require('../controllers/tools/dioceses-locations.ctrl');
 const uploadedFileController = require('../controllers/uploadedFile.ctrl')
 const userController = require('../controllers/user.ctrl');
 const usergroupController = require('../controllers/usergroup.ctrl');
@@ -42,6 +43,7 @@ const organisationsUiController = require('../controllers/ui/organisations.ctrl'
 const peopleController = require('../controllers/ui/people.ctrl');
 const searchController = require('../controllers/ui/search.ctrl');
 const uiMenuController = require('../controllers/ui/menu.ctrl');
+const visualisationsController = require('../controllers/ui/visualisations.ctrl');
 
 // ******* ui endpoints ******** //
 server.get('/generic-stats', analyticsController.genericStats);
@@ -79,6 +81,11 @@ server.post('/ui-person-active-filters', peopleController.getPersonActiveFilters
 
 // ******* ui search ******** //
 server.post('/search', searchController.search);
+
+// ******* ui visualisations ******** //
+server.get('/heatmap', visualisationsController.getHeatmap);
+
+
 /**
 * @apiDefine admin This endpoint is only available to users with administrator priviledges
 */
@@ -119,6 +126,7 @@ server.get('/event', auth.checkAdminToken, eventController.getEvent);
 server.get('/events', auth.checkAdminToken, eventController.getEvents);
 server.delete('/event', auth.checkAdminToken, eventController.deleteEvent);
 server.delete('/events', auth.checkAdminToken, eventController.deleteEvents);
+server.post('/event-update-status', auth.checkAdminToken, eventController.updateStatus);
 
 //graph
 server.get('/graph', graphController.getGraphData);
@@ -145,6 +153,7 @@ server.get('/person', personController.getPerson);
 server.get('/people', personController.getPeople);
 server.delete('/person', auth.checkAdminToken, personController.deletePerson);
 server.delete('/people', auth.checkAdminToken, personController.deletePeople);
+server.post('/person-update-status', auth.checkAdminToken, personController.updateStatus);
 //server.get('/patch-unknown', auth.checkAdminToken, personController.patchUnknown);
 
 // resources
@@ -156,6 +165,7 @@ server.delete('/resource', auth.checkAdminToken, resourceController.deleteResour
 server.delete('/delete-classpiece', auth.checkAdminToken, resourceController.deleteClasspiece);
 server.delete('/resources', auth.checkAdminToken, resourceController.deleteResources);
 server.put('/update-annotation-image', auth.checkAdminToken, resourceController.updateAnnotationImage);
+server.post('/resource-update-status', auth.checkAdminToken, resourceController.updateStatus);
 
 // organisations
 server.put('/organisation', auth.checkAdminToken, organisationController.putOrganisation);
@@ -163,6 +173,7 @@ server.get('/organisation', auth.checkAdminToken, organisationController.getOrga
 server.get('/organisations', auth.checkAdminToken, organisationController.getOrganisations);
 server.delete('/organisation', auth.checkAdminToken, organisationController.deleteOrganisation);
 server.delete('/organisations', auth.checkAdminToken, organisationController.deleteOrganisations);
+server.post('/organisation-update-status', auth.checkAdminToken, organisationController.updateStatus);
 
 // references
 server.get('/references', auth.checkAdminToken, referencesController.getReferences);
@@ -212,6 +223,8 @@ server.get('/patch-rotate', auth.checkAdminToken, toolsIngestionController.patch
 server.get('/parse-class-piece', auth.checkAdminToken, cvisionController.parseClassPiece);
 server.get('/create-thumbnails', auth.checkAdminToken, toolsParseController.createThumbnails);
 server.post('/query-texts', auth.checkAdminToken, toolsParseController.queryTexts);
+server.get('/prepare-dioceses-data', auth.checkAdminToken, toolsDiocesesLocationsController.prepareData);
+server.get('/dioceses-allocate-locations', auth.checkAdminToken, toolsDiocesesLocationsController.allocateLocations);
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);
