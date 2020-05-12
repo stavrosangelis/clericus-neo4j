@@ -84,6 +84,9 @@ server.post('/search', searchController.search);
 
 // ******* ui visualisations ******** //
 server.get('/heatmap', visualisationsController.getHeatmap);
+server.get('/item-network', visualisationsController.getItemNetwork);
+server.get('/item-network-related-nodes', visualisationsController.getRelatedNodes);
+server.get('/item-network-related-paths', visualisationsController.getRelatedPaths);
 
 
 /**
@@ -225,6 +228,8 @@ server.get('/create-thumbnails', auth.checkAdminToken, toolsParseController.crea
 server.post('/query-texts', auth.checkAdminToken, toolsParseController.queryTexts);
 server.get('/prepare-dioceses-data', auth.checkAdminToken, toolsDiocesesLocationsController.prepareData);
 server.get('/dioceses-allocate-locations', auth.checkAdminToken, toolsDiocesesLocationsController.allocateLocations);
+server.get('/ocr-document', auth.checkAdminToken, cvisionController.analyseDocument);
+server.get('/read-document', auth.checkAdminToken, cvisionController.readDocumentResults);
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);

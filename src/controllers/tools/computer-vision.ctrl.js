@@ -7,8 +7,10 @@ const axios = require('axios');
 const ExifImage = require('exif').ExifImage;
 const iptc = require('node-iptc');
 const path = require('path');
+const helpers = require("../../helpers");
 
 const resourcesPath = process.env.RESOURCESPATH;
+const archivePath = process.env.ARCHIVEPATH;
 
 const visionKey = process.env.CLOUD_VISION_KEY;
 const visionURL = process.env.CLOUD_VISION_ENDPOINT;
@@ -166,7 +168,6 @@ const parseClassPiece = async(req, resp) => {
     msg: '',
   })
 }
-
 
 const getTextAnalysis = async(imagesDir,jsonDir,fileName) => {
   console.log("cron job starts")
@@ -365,8 +366,295 @@ var highlightText = async(inputFile, text, outputFile, Canvas) => {
   });
 }
 
+const analyseDocument = async (req,resp) => {
+  let srcPath = `${archivePath}documents/1-prepared.jpg`;
+  var readFile = promisify(fs.readFile);
+  let textFile = await readFile(srcPath);
+  let textParams = {
+    mode: "Printed"
+  }
+  const ocrText = await axios({
+    method: "post",
+    url: visionURL+"vision/v2.0/ocr",
+    data: textFile,
+    params: textParams,
+    crossDomain: false,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Ocp-Apim-Subscription-Key': visionKey
+    }
+  })
+  .then(response=>{
+    return response.data;
+  })
+  .catch(error => {
+    console.log("error")
+    console.log(error.response.data);
+  });
+  let targetFile = `${archivePath}documents/1-prepared-output.json`;
+  await fs.writeFile(targetFile, JSON.stringify(ocrText), 'utf8', (error) => {
+    if (error) throw err;
+    console.log('Text status saved successfully!');
+  });
+  resp.json({
+    status: true,
+    data: [],
+    error: false,
+    msg: '',
+  })
+}
+
+const getDocumentAnalysis = async(targetFile, outputFile) => {
+  console.log("cron job starts")
+  // 1. check if text analysis is complete
+  var readFile = promisify(fs.readFile);
+  var json = await readFile(targetFile);
+  let jsonData = JSON.parse(json);
+  if (jsonData.completed===false) {
+    const textData = await axios({
+      method: "get",
+      url: jsonData.url,
+      crossDomain: false,
+      headers: {
+        'Ocp-Apim-Subscription-Key': visionKey
+      }
+    })
+    .then(response=>{
+      return response;
+    })
+    .catch(error => {
+      console.log("error")
+      console.log(error.response.data);
+    });
+    if (typeof textData.data.status!=="undefined" && textData.data.status==="Succeeded") {
+      // get results and create a new image with the highlights
+      var outputTextFile = outputFile;
+
+      await fs.writeFile(outputTextFile, JSON.stringify(textData.data.recognitionResult), 'utf8', (error) => {
+        if (error) throw err;
+        console.log('Text has been saved successfully!');
+      });
+      return true;
+    }
+    return false;
+  }
+  else {
+    return false;
+  }
+}
+
+const readDocumentResults = async(req,resp) => {
+  let colsDimensions = req.query.columns;
+  let path = `${archivePath}documents/1-prepared-output.json`;
+  let csvPath = `${archivePath}documents/1-prepared-output.csv`;
+  let json = await helpers.readJSONFile(path);
+  let regions = json.data.regions;
+
+  let c0 = [];
+  let c0Values = colsDimensions[0].split(",")
+  let c0x = Number(c0Values[0]);
+  let c0w = Number(c0Values[1])-Number(c0Values[0]);
+  let c1 = [];
+  let c1Values = colsDimensions[1].split(",")
+  let c1x = Number(c1Values[0]);
+  let c1w = Number(c1Values[1])-Number(c1Values[0]);
+  let c2 = [];
+  let c2Values = colsDimensions[2].split(",")
+  let c2x = Number(c2Values[0]);
+  let c2w = Number(c2Values[1])-Number(c2Values[0]);
+  let c3 = [];
+  let c3Values = colsDimensions[3].split(",")
+  let c3x = Number(c3Values[0]);
+  let c3w = Number(c3Values[1])-Number(c3Values[0]);
+  let c4 = [];
+  let c4Values = colsDimensions[4].split(",")
+  let c4x = Number(c4Values[0]);
+  let c4w = Number(c4Values[1])-Number(c4Values[0]);
+  let c5 = [];
+  let c5Values = colsDimensions[5].split(",")
+  let c5x = Number(c5Values[0]);
+  let c5w = Number(c5Values[1])-Number(c5Values[0]);
+
+  for (let i=0; i<regions.length; i++) {
+    let r = regions[i];
+    for (let j=0;j<r.lines.length; j++) {
+      let l = r.lines[j];
+      let bbox = l.boundingBox.split(",");
+      let x = Number(bbox[0]);
+      let y = Number(bbox[1]);
+      let w = Number(bbox[2]);
+      let words = l.words.map(w=>{
+        return w.text;
+      }).join(" ");
+
+      let output = {text: words, x:x, y:y};
+      if (x>c0x && w<c0w && x+w<c1x)
+        c0.push(output);
+      if (x>c1x && w<c1w && x+w<c2x)
+        c1.push(output);
+      if (x>c2x && w<c2w && x+w<c3x)
+        c2.push(output);
+      if (x>c3x && w<c3w && x+w<c4x)
+        c3.push(output);
+      if (x>c4x && w<c4w && x+w<c5x)
+        c4.push(output);
+      if (x>c5x && w<c5w)
+        c5.push(output);
+    }
+  }
+
+  // sort by y
+  c0.sort((a, b) =>{
+    let akey = a.y;
+    let bkey = b.y;
+    if (akey<bkey) {
+      return -1;
+    }
+    if (bkey<bkey) {
+      return 1;
+    }
+    return 0;
+  });
+  c1.sort((a, b) =>{
+    let akey = a.y;
+    let bkey = b.y;
+    if (akey<bkey) {
+      return -1;
+    }
+    if (bkey<bkey) {
+      return 1;
+    }
+    return 0;
+  });
+  c2.sort((a, b) =>{
+    let akey = a.y;
+    let bkey = b.y;
+    if (akey<bkey) {
+      return -1;
+    }
+    if (bkey<bkey) {
+      return 1;
+    }
+    return 0;
+  });
+  c3.sort((a, b) =>{
+    let akey = a.y;
+    let bkey = b.y;
+    if (akey<bkey) {
+      return -1;
+    }
+    if (bkey<bkey) {
+      return 1;
+    }
+    return 0;
+  });
+  c4.sort((a, b) =>{
+    let akey = a.y;
+    let bkey = b.y;
+    if (akey<bkey) {
+      return -1;
+    }
+    if (bkey<bkey) {
+      return 1;
+    }
+    return 0;
+  });
+  c5.sort((a, b) =>{
+    let akey = a.y;
+    let bkey = b.y;
+    if (akey<bkey) {
+      return -1;
+    }
+    if (bkey<bkey) {
+      return 1;
+    }
+    return 0;
+  });
+
+  // fix lines
+  const rowText = (row, col) => {
+    let result = "";
+    let y = row.y;
+    let threshold = 21;
+    let newText = col.filter(i=>{
+      let iy = i.y;
+      if (i.y<y+threshold && i.y>y-threshold) {
+        return true;
+      }
+      return false;
+    });
+    if (row.text==="BOYLE Patrick") {
+      console.log(row.y)
+    }
+    if (typeof newText!=="undefined") {
+      newText.sort((a, b) =>{
+        let akey = a.x;
+        let bkey = b.x;
+        if (akey<bkey) {
+          return -1;
+        }
+        if (bkey<bkey) {
+          return 1;
+        }
+        return 0;
+      });
+      for (let t=0;t<newText.length; t++) {
+        result += newText[t].text;
+      }
+    }
+    return result;
+  }
+
+  let csv = "";
+  for (let i=0; i<c0.length;i++) {
+    let row = c0[i];
+    let text = row.text;
+    text+=","+rowText(row,c1);
+    text+=","+rowText(row,c2);
+    text+=","+rowText(row,c3);
+    text+=","+rowText(row,c4);
+    text+=","+rowText(row,c5)+"\n";
+    csv += text;
+  }
+
+
+
+  /*c0 = c0.map(i=>i.text);
+  c1 = c1.map(i=>i.text);
+  c2 = c2.map(i=>i.text);
+  c3 = c3.map(i=>i.text);
+  c4 = c4.map(i=>i.text);
+  c5 = c5.map(i=>i.text);
+  let cols = [
+    c0,c1,c2,c3,c4,c5
+  ]
+  let output = {
+    regions: regions.length,
+    cols: cols,
+    csv: csv
+  }*/
+  let writeFile = await new Promise ((resolve,reject)=> {
+    fs.writeFile(csvPath, csv, 'utf8', function(err) {
+      if (err) {
+        reject('Some error occured - file either not saved or corrupted file saved.');
+      } else {
+        resolve(`CSV created successfully at the path "${csvPath}"`);
+      }
+    });
+  });
+  resp.json({
+    status: true,
+    data: writeFile,
+    error: false,
+    msg: '',
+  })
+}
+
+
 module.exports = {
   parseClassPiece: parseClassPiece,
   imageExif: imageExif,
   imageIptc: imageIptc,
+  analyseDocument: analyseDocument,
+  readDocumentResults: readDocumentResults,
 }
