@@ -229,7 +229,7 @@ const getPeopleQuery = async (query, match, queryParams, limit) => {
     let newPromise = new Promise(async (resolve,reject)=> {
       let relations = {};
       relations.nodeId = node._id;
-      relations.resources = await helpers.loadRelations(node._id, "Person", "Resource");
+      relations.resources = await helpers.loadRelations(node._id, "Person", "Resource", true);
       resolve(relations);
     })
     return newPromise;
@@ -329,10 +329,10 @@ const getPerson = async(req, resp) => {
   }).catch((error) => {
     console.log(error)
   });
-  let events = await helpers.loadRelations(_id, "Person", "Event");
-  let organisations = await helpers.loadRelations(_id, "Person", "Organisation");
-  let people = await helpers.loadRelations(_id, "Person", "Person");
-  let resources = await helpers.loadRelations(_id, "Person", "Resource");
+  let events = await helpers.loadRelations(_id, "Person", "Event", true);
+  let organisations = await helpers.loadRelations(_id, "Person", "Organisation", true);
+  let people = await helpers.loadRelations(_id, "Person", "Person", true);
+  let resources = await helpers.loadRelations(_id, "Person", "Resource", true);
   person.events = events;
   person.organisations = organisations;
   person.people = people;

@@ -374,10 +374,10 @@ const getClasspiece = async(req, resp) => {
     });
   }
 
-  let events = await helpers.loadRelations(_id, "Resource", "Event");
-  let organisations = await helpers.loadRelations(_id, "Resource", "Organisation");
-  let people = await helpers.loadRelations(_id, "Resource", "Person");
-  let resources = await classpieceResources(_id, "Resource", "Resource");
+  let events = await helpers.loadRelations(_id, "Resource", "Event", true);
+  let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
+  let people = await helpers.loadRelations(_id, "Resource", "Person", true);
+  let resources = await classpieceResources(_id, "Resource", "Resource", true);
   classpiece.events = events;
   classpiece.organisations = organisations;
   classpiece.people = people;
@@ -390,14 +390,22 @@ const getClasspiece = async(req, resp) => {
   });
 }
 
-const classpieceResources = async (srcId=null, srcType=null, targetType=null) => {
+const classpieceResources = async (srcId=null, srcType=null, targetType=null, status=false) => {
   if (srcId===null || srcType===null) {
     return false;
   }
   let session = driver.session()
   let query = "MATCH (n:"+srcType+")-[r]->(rn) WHERE id(n)="+srcId+" return n, r, rn";
+  if (status) {
+    query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
+    OPTIONAL MATCH (n)-[r]->(rn) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
+  }
   if (targetType!==null) {
     query = "MATCH (n:"+srcType+")-[r]->(rn:"+targetType+") WHERE id(n)="+srcId+" return n, r, rn";
+    if (status) {
+      query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
+      OPTIONAL MATCH (n)-[r]->(rn:${targetType}) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
+    }
   }
   let relations = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -411,18 +419,21 @@ const classpieceResources = async (srcId=null, srcType=null, targetType=null) =>
       let sourceItem = helpers.outputRecord(record.n);
       let relation = record.r;
       helpers.prepareOutput(relation);
-      let targetItem = helpers.outputRecord(record.rn);
-      if (record.rn.labels[0]==="Resource") {
-        if (typeof targetItem.metadata==="string") {
-          targetItem.metadata = JSON.parse(targetItem.metadata);
+      let targetItem = null;
+      if (record.rn!==null) {
+        targetItem = helpers.outputRecord(record.rn);
+        if (record.rn.labels[0]==="Resource") {
+          if (typeof targetItem.metadata==="string") {
+            targetItem.metadata = JSON.parse(targetItem.metadata);
+          }
+          if (typeof targetItem.metadata==="string") {
+            targetItem.metadata = JSON.parse(targetItem.metadata);
+          }
+          targetItem.person = await relatedPerson(targetItem._id);
         }
-        if (typeof targetItem.metadata==="string") {
-          targetItem.metadata = JSON.parse(targetItem.metadata);
-        }
-        targetItem.person = await relatedPerson(targetItem._id);
-      }
-      let newRelation = await helpers.prepareRelation(sourceItem, relation, targetItem);
-      relations.push(newRelation);
+        let newRelation = await helpers.prepareRelation(sourceItem, relation, targetItem);
+        relations.push(newRelation);
+      }      
     }
     return relations;
   });

@@ -156,8 +156,8 @@ const getEventsQuery = async (query, queryParams, limit) => {
   let nodesOutput = helpers.normalizeRecordsOutput(nodesPromise);
   for (let i=0;i<nodesOutput.length; i++) {
     let node = nodesOutput[i];
-    let temporal = await helpers.loadRelations(node._id, "Event", "Temporal");
-    let spatial = await helpers.loadRelations(node._id, "Event", "Spatial");
+    let temporal = await helpers.loadRelations(node._id, "Event", "Temporal", true);
+    let spatial = await helpers.loadRelations(node._id, "Event", "Spatial", true);
     node.temporal = temporal;
     node.spatial = spatial;
     nodes.push(node);
@@ -222,10 +222,10 @@ const getEvent = async(req, resp) => {
   }).catch((error) => {
     console.log(error)
   });
-  let events = await helpers.loadRelations(_id, "Event", "Event");
-  let organisations = await helpers.loadRelations(_id, "Event", "Organisation");
-  let people = await helpers.loadRelations(_id, "Event", "Person");
-  let resources = await helpers.loadRelations(_id, "Event", "Resource");
+  let events = await helpers.loadRelations(_id, "Event", "Event", true);
+  let organisations = await helpers.loadRelations(_id, "Event", "Organisation", true);
+  let people = await helpers.loadRelations(_id, "Event", "Person", true);
+  let resources = await helpers.loadRelations(_id, "Event", "Resource", true);
   event.events = events;
   event.organisations = organisations;
   event.people = people;
