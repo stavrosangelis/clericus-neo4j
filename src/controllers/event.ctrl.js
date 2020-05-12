@@ -232,8 +232,8 @@ const getEvents = async (req, resp) => {
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
-    if (queryPage<1) {
-      queryPage = 1;
+    if (queryPage<0) {
+      queryPage = 0;
     }
   }
   if (typeof parameters.limit!=="undefined") {
