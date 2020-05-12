@@ -2,7 +2,7 @@ const driver = require("../../config/db-driver");
 const helpers = require("../../helpers");
 const fs = require('fs');
 const archivePath = process.env.ARCHIVEPATH;
-const TaxonomyTerm = require("../TaxonomyTerm.ctrl").TaxonomyTerm;
+const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 const getHeatmap = async (req, resp) => {
   let data = [];
