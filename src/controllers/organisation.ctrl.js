@@ -268,6 +268,9 @@ const getOrganisations = async (req, resp) => {
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
+    if (queryPage<1) {
+      queryPage = 1;
+    }
   }
   if (typeof parameters.limit!=="undefined") {
     limit = parseInt(parameters.limit,10);

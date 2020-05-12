@@ -319,6 +319,9 @@ const getResources = async (req, resp) => {
   if (typeof parameters.page!=="undefined") {
     page = parseInt(parameters.page,10);
     queryPage = parseInt(parameters.page,10)-1;
+    if (queryPage<1) {
+      queryPage = 1;
+    }
   }
   if (typeof parameters.limit!=="undefined") {
     limit = parseInt(parameters.limit,10);
@@ -583,7 +586,7 @@ const updateStatus = async(req, resp) => {
     return false;
   }
   let userId = req.decoded.id;
-  let responseData = [];  
+  let responseData = [];
   let session = driver.session();
   for (let i=0; i<postData._ids.length; i++) {
     let _id = postData._ids[i];
