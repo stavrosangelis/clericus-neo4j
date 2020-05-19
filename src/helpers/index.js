@@ -240,24 +240,28 @@ const lowerCaseOnlyFirst = (str) => {
   return  firstLetter+restOfString;
 }
 
-const loadRelations = async (srcId=null, srcType=null, targetType=null, status=false) => {
+const loadRelations = async (srcId=null, srcType=null, targetType=null, status=false, relType=null) => {
   if (srcId===null || srcType===null) {
     return false;
   }
   let session = driver.session()
-  let query = `MATCH (n:${srcType})-[r]->(rn) WHERE id(n)=${srcId} return n, r, rn ORDER BY id(r)`
+  let r = "r";
+  if (relType!==null) {
+    r = `r:${relType}`;
+  }
+  let query = `MATCH (n:${srcType})-[${r}]->(rn) WHERE id(n)=${srcId} return n, r, rn ORDER BY id(r)`;
+
   if (status) {
     query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
-    OPTIONAL MATCH (n)-[r]->(rn) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
+    OPTIONAL MATCH (n)-[${r}]->(rn) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
   }
   if (targetType!==null) {
-    query = `MATCH (n:${srcType})-[r]->(rn:${targetType}) WHERE id(n)=${srcId} return n, r, rn ORDER BY id(r)`;
+    query = `MATCH (n:${srcType})-[${r}]->(rn:${targetType}) WHERE id(n)=${srcId} return n, r, rn ORDER BY id(r)`;
     if (status) {
       query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
-      OPTIONAL MATCH (n)-[r]->(rn:${targetType}) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
+      OPTIONAL MATCH (n)-[${r}]->(rn:${targetType}) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
     }
   }
-
   let relations = await session.writeTransaction(tx=>
     tx.run(query,{})
   )

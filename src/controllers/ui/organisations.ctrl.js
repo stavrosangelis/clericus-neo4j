@@ -204,6 +204,7 @@ const getOrganisation = async(req, resp) => {
     return false;
   }
   let _id = parameters._id;
+  let session = driver.session();
   let query = "MATCH (n:Organisation) WHERE id(n)="+_id+" AND n.status='public' return n";
   let organisation = await session.writeTransaction(tx=>
     tx.run(query,{})

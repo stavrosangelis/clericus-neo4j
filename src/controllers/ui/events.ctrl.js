@@ -39,6 +39,9 @@ const getEvents = async (req, resp) => {
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
+      if (queryParams!=="") {
+        queryParams +=" AND ";
+      }
       queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
@@ -51,6 +54,9 @@ const getEvents = async (req, resp) => {
   if (typeof parameters.eventType!=="undefined") {
     eventType = parameters.eventType;
     if (eventType!=="") {
+      if (queryParams!=="") {
+        queryParams +=" AND ";
+      }
       queryParams += `LOWER(n.eventType)= "${eventType}" `;
     }
   }

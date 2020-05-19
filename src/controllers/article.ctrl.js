@@ -10,7 +10,7 @@ const UploadedFile = require('./uploadedFile.ctrl').UploadedFile;
 const ArticleCategory = require('./articleCategory.ctrl').ArticleCategory;
 
 class Article {
-  constructor({_id=null,label=null,permalink=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,permalink=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,highlight=false,highlightOrder=0,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
@@ -23,6 +23,8 @@ class Article {
     this.status = status;
     this.featuredImage = featuredImage;
     this.featuredImageDetails = featuredImageDetails;
+    this.highlight = highlight;
+    this.highlightOrder = highlightOrder;
     this.createdBy = createdBy;
     this.createdAt = createdAt;
     this.updatedBy = updatedBy;
@@ -748,6 +750,210 @@ const imagesBrowser = async(req, resp) => {
   });
 }
 
+/**
+* @api {get} /highlights Get highlights
+* @apiName get highlights
+* @apiGroup Articles
+*
+* @apiParam {number} [page] The page of the requested highlights.
+* @apiParam {number} [limit] The number of the requested highlights.
+
+*/
+const getHighlights = async(req, resp) => {
+  let parameters = req.query;
+  let page = 0;
+  let limit = 25;
+  let queryPage = 0;
+  if (typeof parameters.page!=="undefined") {
+    page = parseInt(parameters.page,10);
+    queryPage = parseInt(parameters.page,10)-1;
+    if (queryPage===-1) queryPage = 0;
+  }
+  if (typeof parameters.limit!=="undefined") {
+    limit = parseInt(parameters.limit,10);
+  }
+  let currentPage = page;
+  if (page===0) {
+    currentPage = 1;
+  }
+  let skip = limit*queryPage;
+  let query = `MATCH (n:Article) WHERE n.highlight=true RETURN n ORDER BY n.highlightOrder SKIP ${skip} LIMIT ${limit}`
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  for (let i=0;i<nodes.length; i++) {
+    let node = nodes[i];
+    if (typeof node.featuredImage!=="undefined" && node.featuredImage!=="") {
+      let featuredImageDetails = new UploadedFile({_id:node.featuredImage});
+      await featuredImageDetails.load();
+      node.featuredImageDetails = featuredImageDetails;
+    }
+    else node.featuredImageDetails = null;
+  }
+  resp.json({
+    status: true,
+    data: nodes,
+    error: [],
+    msg: "Query results",
+  });
+}
+
+const updateHighlights = async(req,resp) => {
+  let parameters = req.body;
+  if (typeof parameters.item==="undefined" || typeof parameters.otherItem==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please provide two valid items to continue",
+    });
+    return false;
+  }
+  let item = parameters.item;
+  let otherItem = parameters.otherItem;
+
+  let userId = req.decoded.id;
+  let now = new Date().toISOString();
+  let results = {
+    status: false,
+    data: [],
+    error: true,
+    msg: ""
+  };
+  let queryItem = `MATCH (n:Article) WHERE id(n)=${item._id} SET n.highlight=true, n.highlightOrder=${item.order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+  let session = driver.session();
+  let resultItemPromise = await session.run(queryItem,{}).then(result => {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0];
+      let key = record.keys[0];
+      let resultRecord = record.toObject()[key];
+      resultRecord = helpers.outputRecord(resultRecord);
+      results.status = true;
+      results.error = false;
+      results.data.push(resultRecord);
+    }
+    return records;
+  });
+  let queryOtherItem = `MATCH (n:Article) WHERE id(n)=${otherItem._id} SET n.highlight=true, n.highlightOrder=${otherItem.order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+  let resultOtherItemPromise = await session.run(queryOtherItem,{}).then(result => {
+    session.close();
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0];
+      let key = record.keys[0];
+      let resultRecord = record.toObject()[key];
+      resultRecord = helpers.outputRecord(resultRecord);
+      results.data.push(resultRecord);
+    }
+    return records;
+  });
+  await normalizeHighlightsOrder(userId);
+  resp.json(results);
+}
+
+const addHighlight = async(req,resp) => {
+  let parameters = req.body;
+  if (typeof parameters._id==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please provide a valid article id to continue",
+    });
+    return false;
+  }
+  let _id = parameters._id;
+  let order = Number(parameters.order);
+
+  let userId = req.decoded.id;
+  let now = new Date().toISOString();
+  let query = `MATCH (n:Article) WHERE id(n)=${_id} SET n.highlight=true, n.highlightOrder=${order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+  let session = driver.session();
+  let resultPromise = await session.run(query,{}).then(result => {
+    session.close();
+    let records = result.records;
+    let output = {error: true, msg:["The record cannot be updated"], status: false, data: []};
+    if (records.length>0) {
+      let record = records[0];
+      let key = record.keys[0];
+      let resultRecord = record.toObject()[key];
+      resultRecord = helpers.outputRecord(resultRecord);
+      output = {error: [], status: true, data: resultRecord, msg: ""};
+    }
+    return output;
+  });
+  await normalizeHighlightsOrder(userId);
+  resp.json(resultPromise);
+}
+
+const removeHighlight = async(req, resp) => {
+  let parameters = req.body;
+  if (typeof parameters._id==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please provide a valid article id to continue",
+    });
+    return false;
+  }
+  let _id = parameters._id;
+
+  let userId = req.decoded.id;
+  let now = new Date().toISOString();
+  let query = `MATCH (n:Article) WHERE id(n)=${_id} SET n.highlight=false, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+  let session = driver.session();
+  let resultPromise = await session.run(query,{}).then(result => {
+    session.close();
+    let records = result.records;
+    let output = {error: true, msg:["The record cannot be updated"], status: false, data: []};
+    if (records.length>0) {
+      let record = records[0];
+      let key = record.keys[0];
+      let resultRecord = record.toObject()[key];
+      resultRecord = helpers.outputRecord(resultRecord);
+      output = {error: [], status: true, data: resultRecord, msg: ""};
+    }
+    return output;
+  });
+  await normalizeHighlightsOrder(userId);
+  resp.json(resultPromise);
+}
+
+const normalizeHighlightsOrder = async(userId)=>{
+  let query = `MATCH (n:Article) WHERE n.highlight=true RETURN n ORDER BY n.highlightOrder`;
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  for (let i=0;i<nodes.length;i++) {
+    let n = nodes[i];
+    let order = i+1;
+    let now = new Date().toISOString();
+    let query = `MATCH (n:Article) WHERE id(n)=${n._id} SET n.highlightOrder=${order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+    let resultPromise = await session.run(query,{}).then(result => {
+      let records = result.records;
+      return records;
+    });
+  }
+  session.close();
+}
+
 module.exports = {
   Article: Article,
   getArticles: getArticles,
@@ -757,4 +963,8 @@ module.exports = {
   deleteArticle: deleteArticle,
   uploadArticleImage: uploadImage,
   imagesBrowser: imagesBrowser,
+  getHighlights: getHighlights,
+  updateHighlights: updateHighlights,
+  addHighlight: addHighlight,
+  removeHighlight: removeHighlight,
 };

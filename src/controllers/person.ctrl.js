@@ -432,6 +432,7 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
       let relations = {};
       relations.nodeId = node._id;
       relations.resources = await helpers.loadRelations(node._id, "Person", "Resource");
+      relations.affiliations = await helpers.loadRelations(node._id, "Person", "Organisation", false, "hasAffiliation");
       resolve(relations);
     })
     return newPromise;
@@ -447,6 +448,7 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
 
   let nodesPopulated = nodes.map(node=> {
     let resources = [];
+    let affiliations = [];
     let nodeResources = nodesResourcesRelations.find(relation=>relation.nodeId===node._id);
     if (typeof nodeResources!=="undefined") {
       resources = nodeResources.resources.map(item=>{
@@ -468,15 +470,16 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
         item.ref.paths = paths;
         return item;
       });
+      affiliations = nodeResources.affiliations;
     }
     node.resources = nodeResources.resources;
+    node.affiliations = affiliations;
     return node;
   });
 
   let queryCount = `MATCH (n:Person) ${queryParams} RETURN count(*)`;
   if (classpieceId>0) {
     queryCount = `MATCH (n:Person)-->(r:Resource) ${queryParams} RETURN count(*)`;
-    console.log(queryCount)
   }
 
   let count = await session.writeTransaction(tx=>

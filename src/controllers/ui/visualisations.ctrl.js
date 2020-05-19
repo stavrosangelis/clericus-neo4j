@@ -383,7 +383,9 @@ const normalizeRelatedPathsOutput = async(records) => {
     }
     helpers.prepareOutput(target);
     target = helpers.outputRecord(target);
-    let segments = path.segments.map(s=>normalizeSegment(s,classpieceTerm));
+    let segments = path.segments
+      //.filter(s=>s.start.properties.status==="public" && s.end.properties.status==="public")
+      .map(s=>normalizeSegment(s,classpieceTerm));
     paths.push({source: source, target: target, segments: segments})
   }
   return paths;

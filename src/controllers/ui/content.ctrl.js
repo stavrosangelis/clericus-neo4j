@@ -421,9 +421,68 @@ const getArticleCategory = async(req, resp)  => {
   }
 }
 
+const getHighlights = async(req, resp) => {
+  let parameters = req.query;
+  let page = 0;
+  let limit = 25;
+  let queryPage = 0;
+  if (typeof parameters.page!=="undefined") {
+    page = parseInt(parameters.page,10);
+    queryPage = parseInt(parameters.page,10)-1;
+    if (queryPage===-1) queryPage = 0;
+  }
+  if (typeof parameters.limit!=="undefined") {
+    limit = parseInt(parameters.limit,10);
+  }
+  let currentPage = page;
+  if (page===0) {
+    currentPage = 1;
+  }
+  let skip = limit*queryPage;
+  let query = `MATCH (n:Article) WHERE n.status='public' AND n.highlight=true RETURN n ORDER BY n.highlightOrder SKIP ${skip} LIMIT ${limit}`
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  for (let i=0;i<nodes.length; i++) {
+    let node = nodes[i];
+    if (typeof node.featuredImage!=="undefined" && node.featuredImage!=="") {
+      let featuredImageDetails = new UploadedFile({_id:node.featuredImage});
+      await featuredImageDetails.load();
+      node.featuredImageDetails = featuredImageDetails;
+    }
+    else node.featuredImageDetails = null;
+
+    let author = new User({_id: node.updatedBy});
+    await author.load();
+    let authorLabel = "";
+    if (author.firstName!=="") {
+      authorLabel = author.firstName;
+    }
+    if (author.firstName!=="" && author.lastName!=="") {
+      authorLabel += ` ${author.lastName}`;
+    }
+    node.author = authorLabel;
+  }
+  resp.json({
+    status: true,
+    data: nodes,
+    error: [],
+    msg: "Query results",
+  });
+}
+
 module.exports = {
   Article: Article,
   getArticles: getArticles,
   getArticle: getArticle,
   getArticleCategory: getArticleCategory,
+  getHighlights: getHighlights,
 };

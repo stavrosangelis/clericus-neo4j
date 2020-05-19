@@ -60,6 +60,7 @@ server.get('/classpiece', classpiecesController.getClasspiece);
 server.get('/content-articles', contentController.getArticles);
 server.get('/content-article', contentController.getArticle);
 server.get('/content-category', contentController.getArticleCategory);
+server.get('/ui-highlights', contentController.getHighlights);
 
 // ******* ui events ******** //
 server.get('/ui-events', eventsUiController.getEvents);
@@ -106,6 +107,10 @@ server.get('/article', auth.checkAdminToken, articleController.getArticle);
 server.get('/articles', auth.checkAdminToken, articleController.getArticles);
 server.get('/articles-list', auth.checkAdminToken, articleController.getArticlesList);
 server.delete('/article', auth.checkAdminToken, articleController.deleteArticle);
+server.get('/highlights', auth.checkAdminToken, articleController.getHighlights);
+server.put('/highlights', auth.checkAdminToken, articleController.updateHighlights);
+server.put('/highlight', auth.checkAdminToken, articleController.addHighlight);
+server.delete('/highlight', auth.checkAdminToken, articleController.removeHighlight);
 
 // article categories
 server.put('/article-category', auth.checkAdminToken, articleCategoryController.putArticleCategory);
@@ -230,6 +235,8 @@ server.get('/prepare-dioceses-data', auth.checkAdminToken, toolsDiocesesLocation
 server.get('/dioceses-allocate-locations', auth.checkAdminToken, toolsDiocesesLocationsController.allocateLocations);
 server.get('/ocr-document', auth.checkAdminToken, cvisionController.analyseDocument);
 server.get('/read-document', auth.checkAdminToken, cvisionController.readDocumentResults);
+server.get('/get-document-columns', cvisionController.getColumns);
+server.post('/update-document-columns', cvisionController.updateColumns);
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);
