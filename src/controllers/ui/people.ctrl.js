@@ -177,7 +177,7 @@ const getPeople = async (req, resp) => {
     if (events.length===1) {
       queryParams += `AND id(e)=${events[0]} `;
     }
-    else {
+    else if (events.length>1) {
       queryParams += `AND id(e) IN [${events}] `;
     }
   }
@@ -199,11 +199,13 @@ const getPeople = async (req, resp) => {
         }
       }
     }
-    match = "(n:Resource)-[revent]->(e:Event)";
+    if (events.length>0) {
+      match = "(n:Resource)-[revent]->(e:Event)";
+    }
     if (events.length===1) {
       queryParams += `AND id(e)=${events[0]} `;
     }
-    else {
+    else if (events.length>1) {
       queryParams += `AND id(e) IN [${events}] `;
     }
   }
