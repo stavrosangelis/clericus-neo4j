@@ -242,7 +242,7 @@ const getOrganisationsActiveFilters = async(req, resp) => {
   if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
     _ids = parameters._ids;
   }
-  let query = `MATCH (o:Organisation)-->(n) WHERE o.status='public' AND id(o) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
+  let query = `MATCH (o:Organisation)-->(n) WHERE o.status='public' AND id(o) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource OR n:Temporal OR n:Spatial) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -262,6 +262,8 @@ const getOrganisationsActiveFilters = async(req, resp) => {
   let organisations = [];
   let people = [];
   let resources = [];
+  let temporal = [];
+  let spatial = [];
   let eventsFind = nodes.filter(n=>n.type==="Event");
   if (eventsFind!=="undefined") {
     events = eventsFind;
@@ -278,12 +280,22 @@ const getOrganisationsActiveFilters = async(req, resp) => {
   if (resourcesFind!=="undefined") {
     resources = resourcesFind;
   }
+  let temporalFind = nodes.filter(n=>n.type==="Temporal");
+  if (temporalFind!=="undefined") {
+    temporal = temporalFind;
+  }
+  let spatialFind = nodes.filter(n=>n.type==="Spatial");
+  if (spatialFind!=="undefined") {
+    spatial = spatialFind;
+  }
 
   let output = {
     events: events,
     organisations: organisations,
     people: people,
     resources: resources,
+    temporal: temporal,
+    spatial: spatial,
   }
   resp.json({
     status: true,

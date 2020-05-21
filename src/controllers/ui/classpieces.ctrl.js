@@ -14,6 +14,8 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 * @apiParam {array} [organisations] An array of organisations ids
 * @apiParam {array} [people] An array of people ids
 * @apiParam {array} [resources] An array of resources ids
+* @apiParam {array} [temporal] An array of temporal ids
+* @apiParam {array} [spatial] An array of spatial ids
 
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
@@ -76,6 +78,8 @@ const getClasspieces = async (req, resp) => {
   let organisations = [];
   let people = [];
   let resources = [];
+  let temporal = [];
+  let spatial = [];
   let page = 0;
   let orderField = "label";
   let queryPage = 0;
@@ -86,6 +90,44 @@ const getClasspieces = async (req, resp) => {
 
   let query = "";
   let queryParams = " n.status='public'";
+
+  // temporal
+  let temporalEventIds = [];
+  if (typeof parameters.temporal!=="undefined") {
+    let session = driver.session();
+    let queryTemporal = `MATCH (n:Temporal)-[r]-(e:Event) WHERE id(n) IN [${parameters.temporal}] RETURN DISTINCT id(e)`;
+    let temporalResults = await session.writeTransaction(tx=>
+      tx.run(queryTemporal,{})
+    )
+    .then(result=> {
+      session.close();
+      return result.records;
+    });
+    for (let t=0;t<temporalResults.length; t++) {
+      let tr=temporalResults[t];
+      helpers.prepareOutput(tr);
+      temporalEventIds.push(tr._fields[0])
+    }
+  }
+
+  // spatial
+  let spatialEventIds = [];
+  if (typeof parameters.spatial!=="undefined") {
+    let session = driver.session();
+    let querySpatial = `MATCH (n:Spatial)-[r]-(e:Event) WHERE id(n) IN [${parameters.spatial}] RETURN DISTINCT id(e)`;
+    let spatialResults = await session.writeTransaction(tx=>
+      tx.run(querySpatial,{})
+    )
+    .then(result=> {
+      session.close();
+      return result.records;
+    });
+    for (let s=0;s<spatialResults.length; s++) {
+      let sr=spatialResults[s];
+      helpers.prepareOutput(sr);
+      spatialEventIds.push(sr._fields[0])
+    }
+  }
 
   // get classpiece resource type id
   let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
@@ -134,6 +176,48 @@ const getClasspieces = async (req, resp) => {
 
   if (typeof parameters.events!=="undefined") {
     events = parameters.events;
+    if (temporalEventIds.length>0) {
+      for (let i=0;i<temporalEventIds.length; i++) {
+        let tei = temporalEventIds[i];
+        if (events.indexOf(tei)===-1) {
+          events.push(tei);
+        }
+      }
+    }
+    if (spatialEventIds.length>0) {
+      for (let i=0;i<spatialEventIds.length; i++) {
+        let sei = spatialEventIds[i];
+        if (events.indexOf(sei)===-1) {
+          events.push(sei);
+        }
+      }
+    }
+    match = "(n:Resource)-[revent]->(e:Event)";
+    if (events.length===1) {
+      queryParams += `AND id(e)=${events[0]} `;
+    }
+    else {
+      queryParams += `AND id(e) IN [${events}] `;
+    }
+  }
+  else {
+    events = [];
+    if (temporalEventIds.length>0) {
+      for (let i=0;i<temporalEventIds.length; i++) {
+        let tei = temporalEventIds[i];
+        if (events.indexOf(tei)===-1) {
+          events.push(tei);
+        }
+      }
+    }
+    if (spatialEventIds.length>0) {
+      for (let i=0;i<spatialEventIds.length; i++) {
+        let sei = spatialEventIds[i];
+        if (events.indexOf(sei)===-1) {
+          events.push(sei);
+        }
+      }
+    }
     match = "(n:Resource)-[revent]->(e:Event)";
     if (events.length===1) {
       queryParams += `AND id(e)=${events[0]} `;
@@ -433,7 +517,7 @@ const classpieceResources = async (srcId=null, srcType=null, targetType=null, st
         }
         let newRelation = await helpers.prepareRelation(sourceItem, relation, targetItem);
         relations.push(newRelation);
-      }      
+      }
     }
     return relations;
   });
@@ -446,7 +530,7 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
     _ids = parameters._ids;
   }
-  let query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND id(c) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.systemType as systemType`;
+  let query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND id(c) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource OR n:Temporal OR n:Spatial) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.systemType as systemType`;
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -466,6 +550,8 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   let organisations = [];
   let people = [];
   let resources = [];
+  let temporal = [];
+  let spatial = [];
   let eventsFind = nodes.filter(n=>n.type==="Event");
   if (eventsFind!=="undefined") {
     events = eventsFind;
@@ -482,12 +568,22 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   if (resourcesFind!=="undefined") {
     resources = resourcesFind;
   }
+  let temporalFind = nodes.filter(n=>n.type==="Temporal");
+  if (temporalFind!=="undefined") {
+    temporal = temporalFind;
+  }
+  let spatialFind = nodes.filter(n=>n.type==="Spatial");
+  if (spatialFind!=="undefined") {
+    spatial = spatialFind;
+  }
 
   let output = {
     events: events,
     organisations: organisations,
     people: people,
     resources: resources,
+    temporal: temporal,
+    spatial: spatial,
   }
   resp.json({
     status: true,

@@ -39,6 +39,8 @@ const getPeople = async (req, resp) => {
   let fnameSoundex = "";
   let lnameSoundex = "";
   let description = "";
+  let temporal = [];
+  let spatial = [];
   let page = 0;
   let orderField = "label";
   let queryPage = 0;
@@ -114,10 +116,90 @@ const getPeople = async (req, resp) => {
     limit = parseInt(parameters.limit,10);
   }
 
+  // temporal
+  let temporalEventIds = [];
+  if (typeof parameters.temporal!=="undefined") {
+    let session = driver.session();
+    let queryTemporal = `MATCH (n:Temporal)-[r]-(e:Event) WHERE id(n) IN [${parameters.temporal}] RETURN DISTINCT id(e)`;
+    let temporalResults = await session.writeTransaction(tx=>
+      tx.run(queryTemporal,{})
+    )
+    .then(result=> {
+      session.close();
+      return result.records;
+    });
+    for (let t=0;t<temporalResults.length; t++) {
+      let tr=temporalResults[t];
+      helpers.prepareOutput(tr);
+      temporalEventIds.push(tr._fields[0])
+    }
+  }
+
+  // spatial
+  let spatialEventIds = [];
+  if (typeof parameters.spatial!=="undefined") {
+    let session = driver.session();
+    let querySpatial = `MATCH (n:Spatial)-[r]-(e:Event) WHERE id(n) IN [${parameters.spatial}] RETURN DISTINCT id(e)`;
+    let spatialResults = await session.writeTransaction(tx=>
+      tx.run(querySpatial,{})
+    )
+    .then(result=> {
+      session.close();
+      return result.records;
+    });
+    for (let s=0;s<spatialResults.length; s++) {
+      let sr=spatialResults[s];
+      helpers.prepareOutput(sr);
+      spatialEventIds.push(sr._fields[0])
+    }
+  }
+
   let events=[], organisations=[], people=[], resources=[];
   if (typeof parameters.events!=="undefined") {
     events = parameters.events;
+    if (temporalEventIds.length>0) {
+      for (let i=0;i<temporalEventIds.length; i++) {
+        let tei = temporalEventIds[i];
+        if (events.indexOf(tei)===-1) {
+          events.push(tei);
+        }
+      }
+    }
+    if (spatialEventIds.length>0) {
+      for (let i=0;i<spatialEventIds.length; i++) {
+        let sei = spatialEventIds[i];
+        if (events.indexOf(sei)===-1) {
+          events.push(sei);
+        }
+      }
+    }
     match = "(n:Person)-[revent]->(e:Event)";
+    if (events.length===1) {
+      queryParams += `AND id(e)=${events[0]} `;
+    }
+    else {
+      queryParams += `AND id(e) IN [${events}] `;
+    }
+  }
+  else {
+    events = [];
+    if (temporalEventIds.length>0) {
+      for (let i=0;i<temporalEventIds.length; i++) {
+        let tei = temporalEventIds[i];
+        if (events.indexOf(tei)===-1) {
+          events.push(tei);
+        }
+      }
+    }
+    if (spatialEventIds.length>0) {
+      for (let i=0;i<spatialEventIds.length; i++) {
+        let sei = spatialEventIds[i];
+        if (events.indexOf(sei)===-1) {
+          events.push(sei);
+        }
+      }
+    }
+    match = "(n:Resource)-[revent]->(e:Event)";
     if (events.length===1) {
       queryParams += `AND id(e)=${events[0]} `;
     }
@@ -351,7 +433,7 @@ const getPersonActiveFilters = async(req, resp) => {
   if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
     _ids = parameters._ids;
   }
-  let query = `MATCH (p:Person)-->(n) WHERE p.status='public' AND id(p) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
+  let query = `MATCH (p:Person)-->(n) WHERE p.status='public' AND id(p) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource OR n:Temporal OR n:Spatial) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
@@ -371,6 +453,8 @@ const getPersonActiveFilters = async(req, resp) => {
   let organisations = [];
   let people = [];
   let resources = [];
+  let temporal = [];
+  let spatial = [];
   let eventsFind = nodes.filter(n=>n.type==="Event");
   if (eventsFind!=="undefined") {
     events = eventsFind;
@@ -387,12 +471,22 @@ const getPersonActiveFilters = async(req, resp) => {
   if (resourcesFind!=="undefined") {
     resources = resourcesFind;
   }
+  let temporalFind = nodes.filter(n=>n.type==="Temporal");
+  if (temporalFind!=="undefined") {
+    temporal = temporalFind;
+  }
+  let spatialFind = nodes.filter(n=>n.type==="Spatial");
+  if (spatialFind!=="undefined") {
+    spatial = spatialFind;
+  }
 
   let output = {
     events: events,
     organisations: organisations,
     people: people,
     resources: resources,
+    temporal: temporal,
+    spatial: spatial,
   }
   resp.json({
     status: true,
