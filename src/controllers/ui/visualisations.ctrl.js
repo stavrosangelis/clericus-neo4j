@@ -3,6 +3,95 @@ const helpers = require("../../helpers");
 const fs = require('fs');
 const archivePath = process.env.ARCHIVEPATH;
 const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
+const schedule = require('node-schedule');
+
+const getGraphNetwork = async (req, resp) => {
+  let params = req.query;
+  let networkFileDir = `${archivePath}network-graph.json`;
+  let file = await helpers.readJSONFile(networkFileDir);
+  //produceGraphNetwork();
+  resp.json({
+    status: true,
+    data: JSON.stringify(file.data),
+    error: [],
+    msg: "Query results",
+  })
+}
+
+const produceGraphNetwork = async () => {
+  let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
+  await classpieceTerm.load();
+  let query = `OPTIONAL MATCH (n1:Event) WHERE n1.status='public'
+  WITH collect(distinct n1) as c1
+  OPTIONAL MATCH (n2:Organisation) WHERE n2.status='public'
+  WITH collect(distinct n2) + c1 as c2
+  OPTIONAL MATCH (n3:Person) WHERE n3.status='public'
+  WITH collect(distinct n3) + c2 as c3
+  OPTIONAL MATCH (n4:Resource) WHERE n4.status='public'
+  WITH collect(distinct n4) + c3 as c4
+  UNWIND c4 as n
+  OPTIONAL MATCH (n)-[r]-(t) WHERE t.status='public' RETURN n, r, t`;
+  let resultsPromise = await loadNodes(query);
+  let results = prepareItemsOutput(resultsPromise.records);
+  let nodes = results.nodes;
+  let relations = results.relations;
+  let nodesOutput = [];
+  for (let i=0;i<nodes.length; i++) {
+    let n = nodes[i];
+    let count = n.count || 1;
+    let size = 20+(10*count);
+    let nType = n.type.toLowerCase();
+    let colors = nodeColors(n.type);
+    if (typeof n.systemType!=="undefined" && parseInt(n.systemType,10)===parseInt(classpieceTerm._id,10)) {
+      nType = "Classpiece";
+    }
+    let newNode = {
+      id: n._id,
+      label: n.label,
+      itemId: n._id,
+      type: nType,
+      color: colors.color,
+      strokeColor: colors.strokeColor,
+      size: size
+    }
+    nodesOutput.push(newNode);
+  }
+  nodesOutput.sort((a, b) =>{
+    let akey = a.size;
+    let bkey = b.size;
+    if (akey<bkey) {
+      return -1;
+    }
+    if (bkey<bkey) {
+      return 1;
+    }
+    return 0;
+  });
+  let links = [];
+  for (let i=0;i<relations.length;i++) {
+    let rel = relations[i];
+    let link = {
+      source: rel.start,
+      target: rel.end,
+      refId: rel._id,
+      label: rel.type,
+    };
+    links.push(link)
+  }
+  let data = {
+    nodes: nodesOutput,
+    links: links
+  }
+  let targetDir = `${archivePath}network-graph.json`;
+  await fs.writeFile(targetDir, JSON.stringify(data), 'utf8', (error) => {
+    if (error) throw err;
+    console.log('Network graph saved successfully!');
+  });
+}
+
+let cronJob = schedule.scheduleJob('0 4 * * *', async()=> {
+  produceGraphNetwork();
+});
 
 const getHeatmap = async (req, resp) => {
   let data = [];
@@ -80,13 +169,19 @@ const getItemNetwork = async (req, resp) => {
   }
   // nodes
   let query = `MATCH (n) WHERE id(n)=${_id} AND n.status='public'
-  OPTIONAL MATCH (n)-[r]->(t) WHERE t.status='public' RETURN n, r, t`;
+  OPTIONAL MATCH (n)-[r*..${step}]->(t) WHERE t.status='public' RETURN n, r, t`;
   let nodesPromise = await loadNodes(query);
   let results = prepareItemOutput(nodesPromise.records);
   let nodes = [];
   let links = [];
   let item = results.node;
   let colors = nodeColors(item.type);
+  let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
+  await classpieceTerm.load();
+  let itemType = item.type;
+  if (item.systemType===classpieceTerm._id) {
+    itemType = "classpiece";
+  }
   let nodeOutput = {
     id: item._id,
     label: item.label,
@@ -126,11 +221,15 @@ const getItemNetwork = async (req, resp) => {
           label: ref.type,
         };
         let colors = nodeColors(target.type);
+        let targetType = target.type;
+        if (target.systemType===classpieceTerm._id) {
+          targetType = "classpiece";
+        }
         let newTarget = {
           id: target._id,
           label: target.label,
           itemId: target._id,
-          type: target.type,
+          type: targetType,
           color: colors.color,
           strokeColor: colors.strokeColor,
           size: 30
@@ -158,11 +257,15 @@ const getItemNetwork = async (req, resp) => {
           label: "",
         };
         let colors = nodeColors(type);
+        let newTargetType = target.type;
+        if (newTarget.systemType===classpieceTerm._id) {
+          newTarget = "classpiece";
+        }
         let newTarget = {
           id: relatedNode._id,
           label: relatedNode.label,
           itemId: relatedNode._id,
-          type: type,
+          type: newTargetType,
           color: colors.color,
           strokeColor: colors.strokeColor,
           size: 30
@@ -195,6 +298,72 @@ const loadNodes = async (query) => {
     return result;
   });
   return nodes;
+}
+
+const prepareItemsOutput = (records) => {
+  let nodesIds = [];
+  let relationsPairs = [];
+  let results = [];
+  let nodes = [];
+  let relations = [];
+  let allowedTypes = ["Event", "Organisation", "Person", "Resource"];
+  for (let i=0; i<records.length; i++) {
+    let record = records[i];
+    helpers.prepareOutput(record);
+    let recordObject = record.toObject();
+    let node = helpers.outputRecord(recordObject['n']);
+    if (typeof recordObject['n'].labels!=="undefined") {
+      node.type = recordObject['n'].labels[0];
+    }
+    let target = null;
+    if (recordObject['t']!==null && recordObject['t']!==0) {
+      target = helpers.outputRecord(recordObject['t']);
+      if (typeof recordObject['t'].labels!=="undefined") {
+        target.type = recordObject['t'].labels[0];
+      }
+    }
+    let relation = null;
+    if (recordObject['r']!==null) {
+      relation = helpers.outputRelation(recordObject['r']);
+    }
+    if (nodesIds.indexOf(node._id)===-1) {
+      nodesIds.push(node._id);
+      nodes.push(node);
+    }
+    if (target!==null && target._id!==0) {
+      if (nodesIds.indexOf(target._id)===-1 && allowedTypes.indexOf(target.type)>-1) {
+        nodesIds.push(target._id);
+        nodes.push(target);
+      }
+      let pair = `${relation.start},${relation.end}`;
+      let reversePair = `${relation.end},${relation.start}`;
+      if (relationsPairs.indexOf(pair)===-1 && relationsPairs.indexOf(reversePair)===-1) {
+        relationsPairs.push(pair);
+        relations.push(relation);
+      }
+    }
+  }
+
+  let relationsOutput = relations.filter(rel=> {
+    if (nodesIds.indexOf(rel.start)>-1 && nodesIds.indexOf(rel.end)>-1) {
+      return true;
+    }
+    return false;
+  });
+  for (let i=0; i<nodes.length; i++) {
+    let n = nodes[i];
+    let count = 1;
+    let countQuery = relationsOutput.find(r=>{
+      if (r.start===n._id || r.end===n.id) {
+        return true;
+      }
+      return false;
+    });
+    if (typeof countQuery!=="undefined") {
+      count = countQuery.length;
+    }
+  }
+  return {nodes: nodes, relations: relationsOutput};
 }
 
 const prepareItemOutput = (records) => {
@@ -274,12 +443,13 @@ const getRelatedNodes = async(req, resp) => {
     return false;
   }
   let _id = params._id;
+  let step = 1;
   if (typeof params.step!=="undefined" || params.step==="") {
     step = parseInt(params.step,10);
     if (step<1) step=1;
     if (step>6) step=6;
   }
-  let relatedNodes = await loadRelatedNodes(_id, 1);
+  let relatedNodes = await loadRelatedNodes(_id, step);
   resp.json({
     status: true,
     data: relatedNodes,
@@ -426,5 +596,6 @@ module.exports = {
   getItemNetwork: getItemNetwork,
   getRelatedNodes: getRelatedNodes,
   getRelatedPaths: getRelatedPaths,
-  getHeatmap: getHeatmap
+  getHeatmap: getHeatmap,
+  getGraphNetwork: getGraphNetwork,
 }

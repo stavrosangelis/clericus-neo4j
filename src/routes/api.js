@@ -85,6 +85,7 @@ server.post('/search', searchController.search);
 
 // ******* ui visualisations ******** //
 server.get('/heatmap', visualisationsController.getHeatmap);
+server.get('/graph-network', visualisationsController.getGraphNetwork);
 server.get('/item-network', visualisationsController.getItemNetwork);
 server.get('/item-network-related-nodes', visualisationsController.getRelatedNodes);
 server.get('/item-network-related-paths', visualisationsController.getRelatedPaths);
