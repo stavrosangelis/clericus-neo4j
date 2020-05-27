@@ -364,10 +364,10 @@ const temporalEvents = async(params) => {
   if (dateType==="after") {
     operator=">";
   }
-  if (startDate==="" || startDate=null || startDate="null") {
+  if (startDate==="" || startDate===null || startDate==="null") {
     return [];
   }
-  if (dateType==="range" && ((startDate==="" || startDate=null || startDate="null" || endDate==="" || endDate=null || endDate="null")) {
+  if (dateType==="range" && ((startDate==="" || startDate===null || startDate==="null" || endDate==="" || endDate===null || endDate==="null")) {
     return [];
   }
 
