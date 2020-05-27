@@ -4,6 +4,9 @@ const fs = require('fs');
 const archivePath = process.env.ARCHIVEPATH;
 const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 const schedule = require('node-schedule');
+const d3 = require("d3");
+const d32 = require("d3-force-reuse");
+const { performance } = require('perf_hooks');
 
 const getGraphNetwork = async (req, resp) => {
   let params = req.query;
@@ -19,6 +22,7 @@ const getGraphNetwork = async (req, resp) => {
 }
 
 const produceGraphNetwork = async () => {
+  let t0 = performance.now()
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
   let query = `OPTIONAL MATCH (n1:Event) WHERE n1.status='public'
@@ -78,15 +82,76 @@ const produceGraphNetwork = async () => {
     };
     links.push(link)
   }
+  let t1 = performance.now();
+  let diff = t1-t0;
   let data = {
     nodes: nodesOutput,
-    links: links
+    links: links,
+    statistics: {
+      fileCreateTime: diff+"ms"
+    }
   }
   let targetDir = `${archivePath}network-graph.json`;
-  await fs.writeFile(targetDir, JSON.stringify(data), 'utf8', (error) => {
-    if (error) throw err;
-    console.log('Network graph saved successfully!');
+  let writeFile = await new Promise((resolve,reject)=>{
+    fs.writeFile(targetDir, JSON.stringify(data), 'utf8', (error) => {
+      if (error) throw err;
+      console.log('Network graph saved successfully!');
+      resolve(true);
+    });
+  })
+  .then(async()=>{
+    await graphSimulation(data);
   });
+  return writeFile;
+}
+
+const graphSimulation = async(data) => {
+  let t0 = performance.now();
+  let nodes = data.nodes;
+  let links = data.links;
+  let statistics = data.statistics;
+  nodes[0].x = 0;
+  nodes[0].y = 0;
+  let strength = -500;
+  const simulation = d3.forceSimulation(nodes)
+    .force("link",
+    d3.forceLink(links)
+        .id(d => d.id)
+        .strength(d=>1)
+        .distance(d=>200)
+      )
+    .force("charge", d32.forceManyBodyReuse().strength(strength))
+    .force("center", d3.forceCenter(0, 0))
+    .force('collide', d3.forceCollide(60))
+    //.alphaDecay(0.06)
+    .stop();
+
+  let max = Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay()));
+  for (let i = 0; i < max; i++) {
+    simulation.tick();
+  }
+  delete nodes['update']
+  simulation.stop();
+
+  let t1 = performance.now();
+  let diff = t1-t0;
+  let newData = {
+    nodes: nodes,
+    links: links,
+    statistics: {
+      fileCreateTime: statistics.fileCreateTime,
+      simulationTime: diff+"ms"
+    }
+  }
+  let targetDir = `${archivePath}network-graph.json`;
+  let writeFile = await new Promise((resolve,reject)=>{
+    fs.writeFile(targetDir, JSON.stringify(newData), 'utf8', (error) => {
+      if (error) throw err;
+      console.log('Network graph simulation completed successfully!');
+      resolve(true);
+    });
+  });
+  return writeFile;
 }
 
 let cronJob = schedule.scheduleJob('0 4 * * *', async()=> {
@@ -179,7 +244,7 @@ const getItemNetwork = async (req, resp) => {
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
   let itemType = item.type;
-  if (item.systemType===classpieceTerm._id) {
+  if (typeof item.systemType!=="undefined" && item.systemType===classpieceTerm._id) {
     itemType = "classpiece";
   }
   let nodeOutput = {
@@ -208,23 +273,23 @@ const getItemNetwork = async (req, resp) => {
   }
 
   let allowedTypes = ["Event", "Organisation", "Person", "Resource"];
-  for (let i=0;i<relations.length; i++) {
+  /*for (let i=0;i<relations.length; i++) {
     let relation = relations[i];
-    let ref = relation.relation;
+    let ref = relation.relation[0];
     let target = relation.target;
+    let targetType = target.type;
     if (target!==null) {
-      if (allowedTypes.indexOf(target.type)>-1) {
+      if (allowedTypes.indexOf(targetType)>-1) {
         let newRelation = {
           source: ref.start,
           target: ref.end,
           refId: ref._id,
           label: ref.type,
         };
-        let colors = nodeColors(target.type);
-        let targetType = target.type;
-        if (target.systemType===classpieceTerm._id) {
-          targetType = "classpiece";
+        if (typeof target.systemType!=="undefined" && target.systemType===classpieceTerm._id) {
+          targetType = "Classpiece";
         }
+        let colors = nodeColors(targetType);
         let newTarget = {
           id: target._id,
           label: target.label,
@@ -241,9 +306,9 @@ const getItemNetwork = async (req, resp) => {
       }
     }
 
-  }
-
-  if (step>1) {
+  }*/
+  if (step>0) {
+    let nodeIds = [];
     let relatedNodes = await loadRelatedNodes(_id, step);
     for (let j=0;j<relatedNodes.length; j++) {
       let relatedNode = relatedNodes[j];
@@ -256,16 +321,15 @@ const getItemNetwork = async (req, resp) => {
           refId: `ref_${item._id}_${relatedNode._id}`,
           label: "",
         };
-        let colors = nodeColors(type);
-        let newTargetType = target.type;
-        if (newTarget.systemType===classpieceTerm._id) {
-          newTarget = "classpiece";
+        if (typeof relatedNode.systemType!=="undefined" && relatedNode.systemType===classpieceTerm._id) {
+          type = "Classpiece";
         }
+        let colors = nodeColors(type);
         let newTarget = {
           id: relatedNode._id,
           label: relatedNode.label,
           itemId: relatedNode._id,
-          type: newTargetType,
+          type: type,
           color: colors.color,
           strokeColor: colors.strokeColor,
           size: 30
@@ -427,6 +491,11 @@ const nodeColors = (type) =>{
       color: '#00cbff',
       strokeColor: '#0982a0'
     }
+    ,
+    "Classpiece":{
+      color: '#1ed8bf',
+      strokeColor: '#1e9dd8'
+    }
   }
   return colors[type];
 }
@@ -450,6 +519,14 @@ const getRelatedNodes = async(req, resp) => {
     if (step>6) step=6;
   }
   let relatedNodes = await loadRelatedNodes(_id, step);
+  let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
+  await classpieceTerm.load();
+  for (let i=0;i<relatedNodes.length;i++) {
+    let relatedNode = relatedNodes[i];
+    if (relatedNode.type==="Resource" && relatedNode.systemType===classpieceTerm._id) {
+      relatedNode.type = "Classpiece";
+    }
+  }
   resp.json({
     status: true,
     data: relatedNodes,
