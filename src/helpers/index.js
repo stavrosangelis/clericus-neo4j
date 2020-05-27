@@ -367,7 +367,7 @@ const temporalEvents = async(params) => {
   if (startDate==="" || startDate===null || startDate==="null") {
     return [];
   }
-  if (dateType==="range" && ((startDate==="" || startDate===null || startDate==="null" || endDate==="" || endDate===null || endDate==="null")) {
+  if (dateType==="range" && (startDate==="" || startDate===null || startDate==="null" || endDate==="" || endDate===null || endDate==="null")) {
     return [];
   }
 
