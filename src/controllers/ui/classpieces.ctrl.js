@@ -228,7 +228,6 @@ const getClasspieces = async (req, resp) => {
       queryParams += `AND id(e) IN [${events}] `;
     }
   }
-  console.log(events.length)
   if (typeof parameters.organisations!=="undefined") {
     organisations = parameters.organisations;
     if (events.length>0) {
@@ -290,7 +289,6 @@ const getClasspieces = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  console.log(queryParams)
   query = `MATCH ${match} ${queryParams} RETURN n ORDER BY n.label SKIP ${skip} LIMIT ${limit}`;
   let data = await getResourcesQuery(query, match, queryParams, limit);
   if (data.error) {
@@ -319,7 +317,6 @@ const getClasspieces = async (req, resp) => {
 
 const getResourcesQuery = async (query, match, queryParams, limit) => {
   let session = driver.session();
-  console.log(query)
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )

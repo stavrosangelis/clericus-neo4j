@@ -39,8 +39,6 @@ const getPeople = async (req, resp) => {
   let fnameSoundex = "";
   let lnameSoundex = "";
   let description = "";
-  let temporal = [];
-  let spatial = [];
   let page = 0;
   let orderField = "label";
   let queryPage = 0;
@@ -118,23 +116,9 @@ const getPeople = async (req, resp) => {
 
   // temporal
   let temporalEventIds = [];
-  if (typeof parameters.temporal!=="undefined") {
-    let session = driver.session();
-    let queryTemporal = `MATCH (n:Temporal)-[r]-(e:Event) WHERE id(n) IN [${parameters.temporal}] RETURN DISTINCT id(e)`;
-    let temporalResults = await session.writeTransaction(tx=>
-      tx.run(queryTemporal,{})
-    )
-    .then(result=> {
-      session.close();
-      return result.records;
-    });
-    for (let t=0;t<temporalResults.length; t++) {
-      let tr=temporalResults[t];
-      helpers.prepareOutput(tr);
-      temporalEventIds.push(tr._fields[0])
-    }
+  if (parameters.temporals!=="undefined") {
+   temporalEventIds = await helpers.temporalEvents(parameters.temporals);
   }
-
   // spatial
   let spatialEventIds = [];
   if (typeof parameters.spatial!=="undefined") {

@@ -44,7 +44,7 @@ const produceGraphNetwork = async () => {
     let n = nodes[i];
     let count = n.count || 1;
     let size = 20+(10*count);
-    let nType = n.type.toLowerCase();
+    let nType = n.type;
     let colors = nodeColors(n.type);
     if (typeof n.systemType!=="undefined" && parseInt(n.systemType,10)===parseInt(classpieceTerm._id,10)) {
       nType = "Classpiece";
@@ -135,13 +135,15 @@ const graphSimulation = async(data) => {
 
   let t1 = performance.now();
   let diff = t1-t0;
+  let now = Date.now();
   let newData = {
     nodes: nodes,
     links: links,
     statistics: {
       fileCreateTime: statistics.fileCreateTime,
-      simulationTime: diff+"ms"
-    }
+      simulationTime: diff+"ms",
+    },
+    updatedAt: now
   }
   let targetDir = `${archivePath}network-graph.json`;
   let writeFile = await new Promise((resolve,reject)=>{

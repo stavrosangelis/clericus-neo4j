@@ -352,6 +352,57 @@ const addslashes = (str) => {
   return str.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
+const temporalEvents = async(params) => {
+  props = JSON.parse(params);
+  let dateType = props.dateType;
+  let startDate = props.startDate;
+  let endDate = props.endDate;
+  let operator = "=";
+  if (dateType==="before") {
+    operator="<";
+  }
+  if (dateType==="after") {
+    operator=">";
+  }
+  if (startDate==="") {
+    return [];
+  }
+  if (dateType==="range" && endDate==="") {
+    return [];
+  }
+
+  let query = `MATCH (n:Temporal)
+    WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
+    OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public'
+    RETURN distinct id(e) as id`;
+  if (dateType==="range") {
+    query = `MATCH (n:Temporal)
+      WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))>=date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")})) AND date(datetime({epochmillis: apoc.date.parse(n.endDate,"ms","dd-MM-yyyy")}))<=date(datetime({epochmillis: apoc.date.parse('${endDate}',"ms","dd/MM/yyyy")}))
+      OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public'
+      RETURN distinct id(e) as id`;
+  }
+  let session = driver.session();
+  let eventIds = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let output = [];
+  for (let i=0;i<eventIds.length;i++) {
+    let eventId = eventIds[i];
+    prepareOutput(eventId);
+    let _id = eventId.toObject()['id'];
+    if (_id!==null) {
+      output.push(_id);
+    }
+  }
+  return output;
+}
+
 module.exports = {
   soundex: soundex,
   hashFileName: hashFileName,
@@ -375,4 +426,5 @@ module.exports = {
   escapeRegExp: escapeRegExp,
   prepareRelation: prepareRelation,
   addslashes: addslashes,
+  temporalEvents: temporalEvents,
 }
