@@ -135,7 +135,8 @@ const graphSimulation = async(data) => {
 
   let t1 = performance.now();
   let diff = t1-t0;
-  let now = Date.now();
+  let now = new Date();
+  let dateString = now.getUTCFullYear() +"/"+ (now.getUTCMonth()+1) +"/"+ now.getUTCDate() + " " + now.getUTCHours() + ":" + now.getUTCMinutes() + ":" + now.getUTCSeconds();
   let newData = {
     nodes: nodes,
     links: links,
@@ -143,7 +144,7 @@ const graphSimulation = async(data) => {
       fileCreateTime: statistics.fileCreateTime,
       simulationTime: diff+"ms",
     },
-    updatedAt: now
+    updatedAt: dateString
   }
   let targetDir = `${archivePath}network-graph.json`;
   let writeFile = await new Promise((resolve,reject)=>{
