@@ -32,6 +32,243 @@ const helpers = require("../../helpers");
 }
 */
 const getPeople = async (req, resp) => {
+  let params = await getPeoplePrepareQueryParams(req);
+  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ORDER BY n.label SKIP ${params.skip} LIMIT ${params.limit}`;
+  let data = await getPeopleQuery(query, params.match, params.queryParams, params.limit);
+  if (data.error) {
+    resp.json({
+      status: false,
+      data: [],
+      error: data.error,
+      msg: data.error.message,
+    })
+  }
+  else {
+    let responseData = {
+      currentPage: params.currentPage,
+      data: data.nodes,
+      totalItems: data.count,
+      totalPages: data.totalPages,
+    }
+    resp.json({
+      status: true,
+      data: responseData,
+      error: [],
+      msg: "Query results",
+    });
+  }
+}
+
+const getPeopleQuery = async (query, match, queryParams, limit) => {
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise, "n");
+
+  // get related resources/thumbnails
+  let nodeResourcesPromises = nodes.map(node => {
+    let newPromise = new Promise(async (resolve,reject)=> {
+      let relations = {};
+      relations.nodeId = node._id;
+      relations.resources = await helpers.loadRelations(node._id, "Person", "Resource", true);
+      resolve(relations);
+    })
+    return newPromise;
+  });
+
+  let nodesResourcesRelations = await Promise.all(nodeResourcesPromises)
+  .then(data=>{
+    return data;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  let nodesPopulated = nodes.map(node=> {
+    let resources = [];
+    let nodeResources = nodesResourcesRelations.find(relation=>relation.nodeId===node._id);
+    if (typeof nodeResources!=="undefined") {
+      resources = nodeResources.resources.map(item=>{
+        let ref = item.ref;
+        let paths = item.ref.paths.map(path=> {
+          let pathOut = null;
+          if (typeof path==="string") {
+            pathOut = JSON.parse(path);
+            if (typeof pathOut==="string") {
+              pathOut = JSON.parse(pathOut);
+            }
+          }
+          else {
+            pathOut = path;
+          }
+          return pathOut;
+        });
+
+        item.ref.paths = paths;
+        return item;
+      });
+    }
+    node.resources = nodeResources.resources;
+    return node;
+  });
+  let count = await session.writeTransaction(tx=>
+    tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
+  )
+  .then(result=> {
+    session.close();
+    let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['c'];
+    return output;
+  });
+  let totalPages = Math.ceil(count/limit)
+  let result = {
+    nodes: nodesPopulated,
+    count: count,
+    totalPages: totalPages
+  }
+  return result;
+}
+
+/**
+* @api {get} /person Get person
+* @apiName get person
+* @apiGroup People
+*
+* @apiParam {string} _id The _id of the requested person.
+* @apiSuccessExample {json} Success-Response:
+{"status":true,"data":{"_id":"2069","honorificPrefix":["My"],"firstName":"fname","middleName":"mname","lastName":"lname","label":"fname mname lname","fnameSoundex":"F550","lnameSoundex":"L550","description":"description","status":"private","alternateAppelations":[{"appelation":"","firstName":"altfname","middleName":"altmname","lastName":"altlname","note":"note","language":{"value":"en","label":"English"}}],"createdBy":"260","createdAt":"2020-01-14T15:39:10.638Z","updatedBy":"260","updatedAt":"2020-01-14T15:42:42.939Z","events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
+*/
+const getPerson = async(req, resp) => {
+  let parameters = req.query;
+  if (typeof parameters._id==="undefined" || parameters._id==="") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select a valid id to continue.",
+    });
+    return false;
+  }
+  let _id = parameters._id;
+  let session = driver.session();
+  let query = "MATCH (n:Person) WHERE id(n)="+_id+" AND n.status='public' return n";
+  let person = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+  }).catch((error) => {
+    console.log(error)
+  });
+  let events = await helpers.loadRelations(_id, "Person", "Event", true);
+  let organisations = await helpers.loadRelations(_id, "Person", "Organisation", true);
+  let people = await helpers.loadRelations(_id, "Person", "Person", true);
+  let resources = await helpers.loadRelations(_id, "Person", "Resource", true);
+  person.events = events;
+  person.organisations = organisations;
+  person.people = people;
+  person.resources = resources;
+  resp.json({
+    status: true,
+    data: person,
+    error: [],
+    msg: "Query results",
+  });
+}
+
+const getPersonActiveFilters = async(req, resp) => {
+  let params = await getPeoplePrepareQueryParams(req);
+  let session = driver.session();
+  let peopleIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
+  let peopleIdsResults = await session.writeTransaction(tx=>tx.run(peopleIdsQuery,{}))
+  .then(result=> {
+    return result.records;
+  });
+  let peopleIds = [];
+  for (let i in peopleIdsResults) {
+    let record = peopleIdsResults[i];
+    helpers.prepareOutput(record);
+    peopleIds.push(record.toObject()['_id']);
+  }
+  let query = `MATCH (p:Person)-->(n) WHERE p.status='public' AND n.status='public' AND id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.eventType as eventType`;
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    return result.records;
+  });
+  session.close();
+
+  let nodes = nodesPromise.map(record=> {
+    helpers.prepareOutput(record);
+    let outputItem = record.toObject();
+    outputItem.type = outputItem.labels[0];
+    delete outputItem.labels;
+    return outputItem;
+  });
+  let events = [];
+  let organisations = [];
+  let people = [];
+  let resources = [];
+  let temporal = [];
+  let spatial = [];
+  let eventsFind = nodes.filter(n=>n.type==="Event");
+  if (eventsFind!=="undefined") {
+    events = [];
+    for (let i=0;i<eventsFind.length; i++) {
+      let e = eventsFind[i];
+      if (events.indexOf(e.eventType)===-1)  {
+        events.push(e.eventType);
+      }
+    }
+  }
+  let organisationsFind = nodes.filter(n=>n.type==="Organisation");
+  if (organisationsFind!=="undefined") {
+    organisations = organisationsFind;
+  }
+  let peopleFind = nodes.filter(n=>n.type==="Person");
+  if (peopleFind!=="undefined") {
+    people = peopleFind;
+  }
+  let resourcesFind = nodes.filter(n=>n.type==="Resource");
+  if (resourcesFind!=="undefined") {
+    resources = resourcesFind;
+  }
+  let spatialFind = nodes.filter(n=>n.type==="Spatial");
+  if (spatialFind!=="undefined") {
+    spatial = spatialFind;
+  }
+  let output = {
+    events: events,
+    organisations: organisations,
+    people: people,
+    resources: resources,
+    spatial: spatial,
+  }
+  resp.json({
+    status: true,
+    data: output,
+    error: [],
+    msg: "Query results",
+  })
+}
+
+const getPeoplePrepareQueryParams = async(req)=>{
   let parameters = req.query;
   let label = "";
   let firstName = "";
@@ -117,9 +354,16 @@ const getPeople = async (req, resp) => {
   // temporal
   let temporalEventIds = [];
   if (parameters.temporals!=="undefined") {
-    let temporals = JSON.parse(parameters.temporals);
+    let eventTypes = [];
+    if (typeof parameters.events!=="undefined") {
+      eventTypes = parameters.events;
+    }
+    let temporals = parameters.temporals;
+    if (typeof temporals==="string") {
+      temporals = JSON.parse(temporals);
+    }
     if (temporals.startDate!=="" && temporals.startDate!==null) {
-      temporalEventIds = await helpers.temporalEvents(temporals);
+      temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
       if (temporalEventIds.length===0) {
          resp.json({
            status: true,
@@ -135,8 +379,10 @@ const getPeople = async (req, resp) => {
          return false;
        }
     }
+    else if (typeof eventTypes!=="undefined") {
+      temporalEventIds = await helpers.eventsFromTypes(eventTypes);
+    }
   }
-
   // spatial
   let spatialEventIds = [];
   if (typeof parameters.spatial!=="undefined") {
@@ -158,7 +404,6 @@ const getPeople = async (req, resp) => {
 
   let events=[], organisations=[], people=[], resources=[];
   if (typeof parameters.events!=="undefined") {
-    events = parameters.events;
     if (temporalEventIds.length>0) {
       for (let i=0;i<temporalEventIds.length; i++) {
         let tei = temporalEventIds[i];
@@ -271,233 +516,14 @@ const getPeople = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = `MATCH ${match} ${queryParams} RETURN distinct n ORDER BY n.label SKIP ${skip} LIMIT ${limit}`;
-  let data = await getPeopleQuery(query, match, queryParams, limit);
-  if (data.error) {
-    resp.json({
-      status: false,
-      data: [],
-      error: data.error,
-      msg: data.error.message,
-    })
-  }
-  else {
-    let responseData = {
-      currentPage: currentPage,
-      data: data.nodes,
-      totalItems: data.count,
-      totalPages: data.totalPages,
-    }
-    resp.json({
-      status: true,
-      data: responseData,
-      error: [],
-      msg: "Query results",
-    });
-  }
-}
 
-const getPeopleQuery = async (query, match, queryParams, limit) => {
-  let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  }).catch((error) => {
-    console.log(error)
-  });
-
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise, "n");
-
-  // get related resources/thumbnails
-  let nodeResourcesPromises = nodes.map(node => {
-    let newPromise = new Promise(async (resolve,reject)=> {
-      let relations = {};
-      relations.nodeId = node._id;
-      relations.resources = await helpers.loadRelations(node._id, "Person", "Resource", true);
-      resolve(relations);
-    })
-    return newPromise;
-  });
-
-  let nodesResourcesRelations = await Promise.all(nodeResourcesPromises)
-  .then(data=>{
-    return data;
-  })
-  .catch((error) => {
-    console.log(error)
-  });
-
-
-
-  let nodesPopulated = nodes.map(node=> {
-    let resources = [];
-    let nodeResources = nodesResourcesRelations.find(relation=>relation.nodeId===node._id);
-    if (typeof nodeResources!=="undefined") {
-      resources = nodeResources.resources.map(item=>{
-        let ref = item.ref;
-        let paths = item.ref.paths.map(path=> {
-          let pathOut = null;
-          if (typeof path==="string") {
-            pathOut = JSON.parse(path);
-            if (typeof pathOut==="string") {
-              pathOut = JSON.parse(pathOut);
-            }
-          }
-          else {
-            pathOut = path;
-          }
-          return pathOut;
-        });
-
-        item.ref.paths = paths;
-        return item;
-      });
-    }
-    node.resources = nodeResources.resources;
-    return node;
-  });
-  let count = await session.writeTransaction(tx=>
-    tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
-  )
-  .then(result=> {
-    session.close();
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['c'];
-    return output;
-  });
-  let totalPages = Math.ceil(count/limit)
-  let result = {
-    nodes: nodesPopulated,
-    count: count,
-    totalPages: totalPages
-  }
-  return result;
-}
-
-/**
-* @api {get} /person Get person
-* @apiName get person
-* @apiGroup People
-*
-* @apiParam {string} _id The _id of the requested person.
-* @apiSuccessExample {json} Success-Response:
-{"status":true,"data":{"_id":"2069","honorificPrefix":["My"],"firstName":"fname","middleName":"mname","lastName":"lname","label":"fname mname lname","fnameSoundex":"F550","lnameSoundex":"L550","description":"description","status":"private","alternateAppelations":[{"appelation":"","firstName":"altfname","middleName":"altmname","lastName":"altlname","note":"note","language":{"value":"en","label":"English"}}],"createdBy":"260","createdAt":"2020-01-14T15:39:10.638Z","updatedBy":"260","updatedAt":"2020-01-14T15:42:42.939Z","events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
-*/
-const getPerson = async(req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
-    resp.json({
-      status: false,
-      data: [],
-      error: true,
-      msg: "Please select a valid id to continue.",
-    });
-    return false;
-  }
-  let _id = parameters._id;
-  let session = driver.session();
-  let query = "MATCH (n:Person) WHERE id(n)="+_id+" AND n.status='public' return n";
-  let person = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    session.close();
-    let records = result.records;
-    if (records.length>0) {
-      let record = records[0].toObject();
-      let outputRecord = helpers.outputRecord(record.n);
-      return outputRecord;
-    }
-  }).catch((error) => {
-    console.log(error)
-  });
-  let events = await helpers.loadRelations(_id, "Person", "Event", true);
-  let organisations = await helpers.loadRelations(_id, "Person", "Organisation", true);
-  let people = await helpers.loadRelations(_id, "Person", "Person", true);
-  let resources = await helpers.loadRelations(_id, "Person", "Resource", true);
-  person.events = events;
-  person.organisations = organisations;
-  person.people = people;
-  person.resources = resources;
-  resp.json({
-    status: true,
-    data: person,
-    error: [],
-    msg: "Query results",
-  });
-}
-
-const getPersonActiveFilters = async(req, resp) => {
-  let parameters = req.body;
-  let _ids = [];
-  if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
-    _ids = parameters._ids;
-  }
-  let query = `MATCH (p:Person)-->(n) WHERE p.status='public' AND id(p) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource OR n:Temporal OR n:Spatial) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
-  let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  });
-
-  let nodes = nodesPromise.map(record=> {
-    helpers.prepareOutput(record);
-    let outputItem = record.toObject();
-    outputItem.type = outputItem.labels[0];
-    delete outputItem.labels;
-    return outputItem;
-  });
-  let events = [];
-  let organisations = [];
-  let people = [];
-  let resources = [];
-  let temporal = [];
-  let spatial = [];
-  let eventsFind = nodes.filter(n=>n.type==="Event");
-  if (eventsFind!=="undefined") {
-    events = eventsFind;
-  }
-  let organisationsFind = nodes.filter(n=>n.type==="Organisation");
-  if (organisationsFind!=="undefined") {
-    organisations = organisationsFind;
-  }
-  let peopleFind = nodes.filter(n=>n.type==="Person");
-  if (peopleFind!=="undefined") {
-    people = peopleFind;
-  }
-  let resourcesFind = nodes.filter(n=>n.type==="Resource");
-  if (resourcesFind!=="undefined") {
-    resources = resourcesFind;
-  }
-  let temporalFind = nodes.filter(n=>n.type==="Temporal");
-  if (temporalFind!=="undefined") {
-    temporal = temporalFind;
-  }
-  let spatialFind = nodes.filter(n=>n.type==="Spatial");
-  if (spatialFind!=="undefined") {
-    spatial = spatialFind;
-  }
-
-  let output = {
-    events: events,
-    organisations: organisations,
-    people: people,
-    resources: resources,
-    temporal: temporal,
-    spatial: spatial,
-  }
-  resp.json({
-    status: true,
-    data: output,
-    error: [],
-    msg: "Query results",
-  })
+  return {
+    match: match,
+    queryParams: queryParams,
+    skip: skip,
+    limit: limit,
+    currentPage: currentPage,
+  };
 }
 
 module.exports = {

@@ -78,7 +78,7 @@ server.post('/ui-organisations-active-filters', organisationsUiController.getOrg
 // ******* ui people  ******** //
 server.get('/ui-people', peopleController.getPeople);
 server.get('/ui-person', peopleController.getPerson);
-server.post('/ui-person-active-filters', peopleController.getPersonActiveFilters);
+server.get('/ui-person-active-filters', peopleController.getPersonActiveFilters);
 
 // ******* ui search ******** //
 server.post('/search', searchController.search);

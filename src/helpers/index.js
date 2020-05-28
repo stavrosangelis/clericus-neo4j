@@ -352,7 +352,7 @@ const addslashes = (str) => {
   return str.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
-const temporalEvents = async(props) => {
+const temporalEvents = async(props, eventTypes) => {
   let dateType = props.dateType;
   let startDate = props.startDate;
   let endDate = props.endDate;
@@ -369,16 +369,28 @@ const temporalEvents = async(props) => {
   if (dateType==="range" && (startDate==="" || startDate===null || startDate==="null" || endDate==="" || endDate===null || endDate==="null")) {
     return [];
   }
-
+  let eventTypesIds = eventTypes.map(_id=>`"${_id}"`);
   let query = `MATCH (n:Temporal)
     WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
     OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public'
     RETURN distinct id(e) as id`;
+  if (eventTypes.length>0) {
+    query = `MATCH (n:Temporal)
+      WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
+      OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public' AND e.eventType IN [${eventTypesIds}]
+      RETURN distinct id(e) as id`;
+  }
   if (dateType==="range") {
     query = `MATCH (n:Temporal)
       WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))>=date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")})) AND date(datetime({epochmillis: apoc.date.parse(n.endDate,"ms","dd-MM-yyyy")}))<=date(datetime({epochmillis: apoc.date.parse('${endDate}',"ms","dd/MM/yyyy")}))
       OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public'
       RETURN distinct id(e) as id`;
+      if (eventTypes.length>0) {
+        query = `MATCH (n:Temporal)
+          WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))>=date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")})) AND date(datetime({epochmillis: apoc.date.parse(n.endDate,"ms","dd-MM-yyyy")}))<=date(datetime({epochmillis: apoc.date.parse('${endDate}',"ms","dd/MM/yyyy")}))
+          OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public' AND e.eventType IN [${eventTypesIds}]
+          RETURN distinct id(e) as id`;
+      }
   }
   let session = driver.session();
   let eventIds = await session.writeTransaction(tx=>
@@ -395,6 +407,31 @@ const temporalEvents = async(props) => {
     let eventId = eventIds[i];
     prepareOutput(eventId);
     let _id = eventId.toObject()['id'];
+    if (_id!==null) {
+      output.push(_id);
+    }
+  }
+  return output;
+}
+
+const eventsFromTypes = async(props)=> {
+  let ids = props.map(_id=>`"${_id}"`);
+  let query = `MATCH (n:Event) WHERE n.eventType IN [${ids}] AND n.status='public' RETURN distinct id(n) as _id;`;
+  let session = driver.session();
+  let eventIds = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let output = [];
+  for (let i=0;i<eventIds.length;i++) {
+    let eventId = eventIds[i];
+    prepareOutput(eventId);
+    let _id = eventId.toObject()['_id'];
     if (_id!==null) {
       output.push(_id);
     }
@@ -426,4 +463,5 @@ module.exports = {
   prepareRelation: prepareRelation,
   addslashes: addslashes,
   temporalEvents: temporalEvents,
+  eventsFromTypes: eventsFromTypes,
 }
