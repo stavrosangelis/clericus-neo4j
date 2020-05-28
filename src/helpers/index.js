@@ -352,8 +352,7 @@ const addslashes = (str) => {
   return str.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
-const temporalEvents = async(params) => {
-  props = JSON.parse(params);
+const temporalEvents = async(props) => {
   let dateType = props.dateType;
   let startDate = props.startDate;
   let endDate = props.endDate;

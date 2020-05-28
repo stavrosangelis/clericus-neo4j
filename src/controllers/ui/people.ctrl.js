@@ -117,8 +117,26 @@ const getPeople = async (req, resp) => {
   // temporal
   let temporalEventIds = [];
   if (parameters.temporals!=="undefined") {
-   temporalEventIds = await helpers.temporalEvents(parameters.temporals);
+    let temporals = JSON.parse(parameters.temporals);
+    if (temporals.startDate!=="" && temporals.startDate!==null) {
+      temporalEventIds = await helpers.temporalEvents(temporals);
+      if (temporalEventIds.length===0) {
+         resp.json({
+           status: true,
+           data: {
+             currentPage: 1,
+             data: [],
+             totalItems: 0,
+             totalPages: 1,
+           },
+           error: [],
+           msg: "Query results",
+         })
+         return false;
+       }
+    }
   }
+
   // spatial
   let spatialEventIds = [];
   if (typeof parameters.spatial!=="undefined") {
@@ -159,10 +177,10 @@ const getPeople = async (req, resp) => {
     }
     match = "(n:Person)-[revent]->(e:Event)";
     if (events.length===1) {
-      queryParams += `AND id(e)=${events[0]} `;
+      queryParams += ` AND id(e)=${events[0]} `;
     }
     else if (events.length>1) {
-      queryParams += `AND id(e) IN [${events}] `;
+      queryParams += ` AND id(e) IN [${events}] `;
     }
   }
   else {
@@ -184,13 +202,13 @@ const getPeople = async (req, resp) => {
       }
     }
     if (events.length>0) {
-      match = "(n:Resource)-[revent]->(e:Event)";
+      match = "(n:Person)-[revent]->(e:Event)";
     }
     if (events.length===1) {
-      queryParams += `AND id(e)=${events[0]} `;
+      queryParams += ` AND id(e)=${events[0]} `;
     }
     else if (events.length>1) {
-      queryParams += `AND id(e) IN [${events}] `;
+      queryParams += ` AND id(e) IN [${events}] `;
     }
   }
   if (typeof parameters.organisations!=="undefined") {
@@ -202,10 +220,10 @@ const getPeople = async (req, resp) => {
       match = "(n:Person)-[rorganisation]->(o:Organisation)";
     }
     if (organisations.length===1) {
-      queryParams += `AND id(o)=${organisations[0]} `;
+      queryParams += ` AND id(o)=${organisations[0]} `;
     }
     else {
-      queryParams += `AND id(o) IN [${organisations}] `;
+      queryParams += ` AND id(o) IN [${organisations}] `;
     }
   }
   if (typeof parameters.people!=="undefined") {
@@ -217,10 +235,10 @@ const getPeople = async (req, resp) => {
       match = "(n:Person)-[rperson]->(p:Person)";
     }
     if (people.length===1) {
-      queryParams += `AND id(p)=${people[0]} `;
+      queryParams += ` AND id(p)=${people[0]} `;
     }
     else {
-      queryParams += `AND id(p) IN [${people}] `;
+      queryParams += ` AND id(p) IN [${people}] `;
     }
   }
   if (typeof parameters.resources!=="undefined") {
@@ -232,10 +250,10 @@ const getPeople = async (req, resp) => {
       match = "(n:Person)-[rresource]->(re:Resource)";
     }
     if (resources.length===1) {
-      queryParams += `AND id(re)=${resources[0]} `;
+      queryParams += ` AND id(re)=${resources[0]} `;
     }
     else {
-      queryParams += `AND id(re) IN [${resources}] `;
+      queryParams += ` AND id(re) IN [${resources}] `;
     }
   }
   if (typeof parameters.page!=="undefined") {
@@ -253,7 +271,7 @@ const getPeople = async (req, resp) => {
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  query = `MATCH ${match} ${queryParams} RETURN n ORDER BY n.label SKIP ${skip} LIMIT ${limit}`;
+  query = `MATCH ${match} ${queryParams} RETURN distinct n ORDER BY n.label SKIP ${skip} LIMIT ${limit}`;
   let data = await getPeopleQuery(query, match, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -275,7 +293,7 @@ const getPeople = async (req, resp) => {
       data: responseData,
       error: [],
       msg: "Query results",
-    })
+    });
   }
 }
 
@@ -341,14 +359,14 @@ const getPeopleQuery = async (query, match, queryParams, limit) => {
     return node;
   });
   let count = await session.writeTransaction(tx=>
-    tx.run(`MATCH ${match} ${queryParams} RETURN count(*)`)
+    tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
   )
   .then(result=> {
     session.close();
     let resultRecord = result.records[0];
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
-    let output = countObj['count(*)'];
+    let output = countObj['c'];
     return output;
   });
   let totalPages = Math.ceil(count/limit)
