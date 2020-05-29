@@ -672,10 +672,33 @@ const normalizeSegment = (segment, classpieceTerm) => {
   return triple;
 }
 
+const getTimeline = async(req,resp) => {
+
+  let session = driver.session();
+  let query = `MATCH (n:Event)-->(t:Temporal) WHERE n.status='public' RETURN distinct t, count(distinct t) as c`;
+  let results = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  });
+  let output = {
+    count: results.length,
+    items: results
+  }
+  resp.json({
+    status: true,
+    data: output,
+    error: [],
+    msg: "Query results",
+  });
+}
 module.exports = {
   getItemNetwork: getItemNetwork,
   getRelatedNodes: getRelatedNodes,
   getRelatedPaths: getRelatedPaths,
   getHeatmap: getHeatmap,
   getGraphNetwork: getGraphNetwork,
+  getTimeline: getTimeline,
 }

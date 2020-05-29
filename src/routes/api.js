@@ -53,7 +53,7 @@ server.get('/carousel', carouselController.getCarousel);
 
 // ******* ui classpieces ******** //
 server.get('/classpieces', classpiecesController.getClasspieces);
-server.post('/classpieces-active-filters', classpiecesController.getClasspiecesActiveFilters);
+server.get('/classpieces-active-filters', classpiecesController.getClasspiecesActiveFilters);
 server.get('/classpiece', classpiecesController.getClasspiece);
 
 // ******* ui content ******** //
@@ -84,6 +84,7 @@ server.get('/ui-person-active-filters', peopleController.getPersonActiveFilters)
 server.post('/search', searchController.search);
 
 // ******* ui visualisations ******** //
+server.get('/timeline', visualisationsController.getTimeline);
 server.get('/heatmap', visualisationsController.getHeatmap);
 server.get('/graph-network', visualisationsController.getGraphNetwork);
 server.get('/item-network', visualisationsController.getItemNetwork);
