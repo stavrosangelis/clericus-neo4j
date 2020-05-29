@@ -71,226 +71,9 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 */
 
 const getClasspieces = async (req, resp) => {
-  let parameters = req.query;
-  let label = "";
-  let description = "";
-  let events = [];
-  let organisations = [];
-  let people = [];
-  let resources = [];
-  let temporal = [];
-  let spatial = [];
-  let page = 0;
-  let orderField = "label";
-  let queryPage = 0;
-  let queryOrder = "";
-  let limit = 25;
-
-  let match = "(n:Resource)";
-
-  let query = "";
-  let queryParams = " n.status='public'";
-
-  // temporal
-  let temporalEventIds = [];
-  if (typeof parameters.temporal!=="undefined") {
-    let session = driver.session();
-    let queryTemporal = `MATCH (n:Temporal)-[r]-(e:Event) WHERE id(n) IN [${parameters.temporal}] RETURN DISTINCT id(e)`;
-    let temporalResults = await session.writeTransaction(tx=>
-      tx.run(queryTemporal,{})
-    )
-    .then(result=> {
-      session.close();
-      return result.records;
-    });
-    for (let t=0;t<temporalResults.length; t++) {
-      let tr=temporalResults[t];
-      helpers.prepareOutput(tr);
-      temporalEventIds.push(tr._fields[0])
-    }
-  }
-
-  // spatial
-  let spatialEventIds = [];
-  if (typeof parameters.spatial!=="undefined") {
-    let session = driver.session();
-    let querySpatial = `MATCH (n:Spatial)-[r]-(e:Event) WHERE id(n) IN [${parameters.spatial}] RETURN DISTINCT id(e)`;
-    let spatialResults = await session.writeTransaction(tx=>
-      tx.run(querySpatial,{})
-    )
-    .then(result=> {
-      session.close();
-      return result.records;
-    });
-    for (let s=0;s<spatialResults.length; s++) {
-      let sr=spatialResults[s];
-      helpers.prepareOutput(sr);
-      spatialEventIds.push(sr._fields[0])
-    }
-  }
-
-  // get classpiece resource type id
-  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
-  await classpieceSystemType.load();
-
-  let systemType = classpieceSystemType._id;
-  if (typeof parameters.label!=="undefined") {
-    label = parameters.label;
-    if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
-    }
-  }
-  if (systemType!=="") {
-    if (queryParams!=="") {
-      queryParams += " AND ";
-    }
-    queryParams += `LOWER(n.systemType) = '${systemType}' `;
-  }
-  if (typeof parameters.description!=="undefined") {
-    description = parameters.description;
-    if (description!=="") {
-      if (queryParams !=="") {
-        queryParams += " AND ";
-      }
-      queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
-    }
-  }
-
-  if (typeof parameters.orderField!=="undefined") {
-    orderField = parameters.orderField;
-  }
-  if (orderField!=="") {
-    queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
-      queryOrder += " DESC";
-    }
-  }
-
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
-  }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
-  }
-
-  if (typeof parameters.events!=="undefined") {
-    events = parameters.events;
-    if (temporalEventIds.length>0) {
-      for (let i=0;i<temporalEventIds.length; i++) {
-        let tei = temporalEventIds[i];
-        if (events.indexOf(tei)===-1) {
-          events.push(tei);
-        }
-      }
-    }
-    if (spatialEventIds.length>0) {
-      for (let i=0;i<spatialEventIds.length; i++) {
-        let sei = spatialEventIds[i];
-        if (events.indexOf(sei)===-1) {
-          events.push(sei);
-        }
-      }
-    }
-    match = "(n:Resource)-[revent]->(e:Event)";
-    if (events.length===1) {
-      queryParams += `AND id(e)=${events[0]} `;
-    }
-    else if (events.length>1){
-      queryParams += `AND id(e) IN [${events}] `;
-    }
-  }
-  else {
-    events = [];
-    if (temporalEventIds.length>0) {
-      for (let i=0;i<temporalEventIds.length; i++) {
-        let tei = temporalEventIds[i];
-        if (events.indexOf(tei)===-1) {
-          events.push(tei);
-        }
-      }
-    }
-    if (spatialEventIds.length>0) {
-      for (let i=0;i<spatialEventIds.length; i++) {
-        let sei = spatialEventIds[i];
-        if (events.indexOf(sei)===-1) {
-          events.push(sei);
-        }
-      }
-    }
-    if (events.length>0) {
-      match = "(n:Resource)-[revent]->(e:Event)";
-    }
-    if (events.length===1) {
-      queryParams += `AND id(e)=${events[0]} `;
-    }
-    else if (events.length>1) {
-      queryParams += `AND id(e) IN [${events}] `;
-    }
-  }
-  if (typeof parameters.organisations!=="undefined") {
-    organisations = parameters.organisations;
-    if (events.length>0) {
-      match += ", (n:Resource)-[rorganisation]->(o:Organisation)";
-    }
-    else {
-      match = "(n:Resource)-[rorganisation]->(o:Organisation)";
-    }
-    if (organisations.length===1) {
-      queryParams += `AND id(o)=${organisations[0]} `;
-    }
-    else {
-      queryParams += `AND id(o) IN [${organisations}] `;
-    }
-  }
-  if (typeof parameters.people!=="undefined") {
-    people = parameters.people;
-    if (events.length>0 || organisations.length>0) {
-      match += ", (n:Resource)-[rperson]->(p:Person)";
-    }
-    else {
-      match = "(n:Resource)-[rperson]->(p:Person)";
-    }
-    if (people.length===1) {
-      queryParams += `AND id(p)=${people[0]} `;
-    }
-    else {
-      queryParams += `AND id(p) IN [${people}] `;
-    }
-  }
-  if (typeof parameters.resources!=="undefined") {
-    resources = parameters.resources;
-    if (events.length>0 || organisations.length>0 || people.length>0) {
-      match += ", (n:Resource)-[rresource]->(re:Resource)";
-    }
-    else {
-      match = "(n:Resource)-[rresource]->(re:Resource)";
-    }
-    if (resources.length===1) {
-      queryParams += `AND id(re)=${resources[0]} `;
-    }
-    else {
-      queryParams += `AND id(re) IN [${resources}] `;
-    }
-  }
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
-  }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
-  }
-  let currentPage = page;
-  if (page===0) {
-    currentPage = 1;
-  }
-
-  let skip = limit*queryPage;
-  if (queryParams!=="") {
-    queryParams = "WHERE "+queryParams;
-  }
-  query = `MATCH ${match} ${queryParams} RETURN n ORDER BY n.label SKIP ${skip} LIMIT ${limit}`;
-  let data = await getResourcesQuery(query, match, queryParams, limit);
+  let params = await getClasspiecesPrepareQueryParams(req);
+  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ORDER BY n.label SKIP ${params.skip} LIMIT ${params.limit}`;
+  let data = await getResourcesQuery(query, params.match, params.queryParams, params.limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -301,7 +84,7 @@ const getClasspieces = async (req, resp) => {
   }
   else {
     let responseData = {
-      currentPage: currentPage,
+      currentPage: params.currentPage,
       data: data.nodes,
       totalItems: data.count,
       totalPages: data.totalPages,
@@ -341,14 +124,14 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
     return nodeOutput;
   });
   let count = await session.writeTransaction(tx=>
-    tx.run(`MATCH ${match} ${queryParams} RETURN count(*)`)
+    tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
   )
   .then(result=> {
     session.close()
     let resultRecord = result.records[0];
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
-    let output = countObj['count(*)'];
+    let output = countObj['c'];
     output = parseInt(output,10);
     return output;
   });
@@ -527,20 +310,25 @@ const classpieceResources = async (srcId=null, srcType=null, targetType=null, st
 }
 
 const getClasspiecesActiveFilters = async(req, resp) => {
-  let parameters = req.body;
-  let _ids = [];
-  if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
-    _ids = parameters._ids;
-  }
-  let query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND id(c) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource OR n:Temporal OR n:Spatial) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.systemType as systemType`;
+  let params = await getClasspiecesPrepareQueryParams(req);
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
+  let itemsIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
+  let itemsIdsResults = await session.writeTransaction(tx=>tx.run(itemsIdsQuery,{}))
   .then(result=> {
     return result.records;
   });
-
+  let itemsIds = [];
+  for (let i in itemsIdsResults) {
+    let record = itemsIdsResults[i];
+    helpers.prepareOutput(record);
+    itemsIds.push(record.toObject()['_id']);
+  }
+  let query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND n.status='public' AND id(c) IN [${itemsIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.systemType as systemType, n.eventType as eventType`;
+  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    return result.records;
+  });
+  session.close();
   let nodes = nodesPromise.map(record=> {
     helpers.prepareOutput(record);
     let outputItem = record.toObject();
@@ -556,7 +344,13 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   let spatial = [];
   let eventsFind = nodes.filter(n=>n.type==="Event");
   if (eventsFind!=="undefined") {
-    events = eventsFind;
+    events = [];
+    for (let i=0;i<eventsFind.length; i++) {
+      let e = eventsFind[i];
+      if (events.indexOf(e.eventType)===-1)  {
+        events.push(e.eventType);
+      }
+    }
   }
   let organisationsFind = nodes.filter(n=>n.type==="Organisation");
   if (organisationsFind!=="undefined") {
@@ -614,6 +408,247 @@ const relatedPerson = async (resourceId=null) => {
     }
   });
   return person;
+}
+
+const getClasspiecesPrepareQueryParams = async(req)=>{
+  let parameters = req.query;
+  let label = "";
+  let description = "";
+  let events = [];
+  let organisations = [];
+  let people = [];
+  let resources = [];
+  let temporal = [];
+  let spatial = [];
+  let page = 0;
+  let orderField = "label";
+  let queryPage = 0;
+  let queryOrder = "";
+  let limit = 25;
+
+  let match = "(n:Resource)";
+
+  let query = "";
+  let queryParams = " n.status='public'";
+
+  // temporal
+  let temporalEventIds = [];
+  if (typeof parameters.temporals!=="undefined") {
+    let eventTypes = [];
+    if (typeof parameters.events!=="undefined") {
+      eventTypes = parameters.events;
+    }
+    let temporals = parameters.temporals;
+    if (typeof temporals==="string") {
+      temporals = JSON.parse(temporals);
+    }
+    if (temporals.startDate!=="" && temporals.startDate!==null) {
+      temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
+      if (temporalEventIds.length===0) {
+         resp.json({
+           status: true,
+           data: {
+             currentPage: 1,
+             data: [],
+             totalItems: 0,
+             totalPages: 1,
+           },
+           error: [],
+           msg: "Query results",
+         })
+         return false;
+       }
+    }
+    else if (typeof eventTypes!=="undefined") {
+      temporalEventIds = await helpers.eventsFromTypes(eventTypes);
+    }
+  }
+  // spatial
+  let spatialEventIds = [];
+  if (typeof parameters.spatial!=="undefined") {
+    let session = driver.session();
+    let querySpatial = `MATCH (n:Spatial)-[r]-(e:Event) WHERE id(n) IN [${parameters.spatial}] RETURN DISTINCT id(e)`;
+    let spatialResults = await session.writeTransaction(tx=>
+      tx.run(querySpatial,{})
+    )
+    .then(result=> {
+      session.close();
+      return result.records;
+    });
+    for (let s=0;s<spatialResults.length; s++) {
+      let sr=spatialResults[s];
+      helpers.prepareOutput(sr);
+      spatialEventIds.push(sr._fields[0])
+    }
+  }
+
+  // get classpiece resource type id
+  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  await classpieceSystemType.load();
+
+  let systemType = classpieceSystemType._id;
+  if (typeof parameters.label!=="undefined") {
+    label = parameters.label;
+    if (label!=="") {
+      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+    }
+  }
+  if (systemType!=="") {
+    if (queryParams!=="") {
+      queryParams += " AND ";
+    }
+    queryParams += `LOWER(n.systemType) = '${systemType}' `;
+  }
+  if (typeof parameters.description!=="undefined") {
+    description = parameters.description;
+    if (description!=="") {
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+    }
+  }
+
+  if (typeof parameters.orderField!=="undefined") {
+    orderField = parameters.orderField;
+  }
+  if (orderField!=="") {
+    queryOrder = "ORDER BY n."+orderField;
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+      queryOrder += " DESC";
+    }
+  }
+
+  if (typeof parameters.page!=="undefined") {
+    page = parseInt(parameters.page,10);
+    queryPage = parseInt(parameters.page,10)-1;
+  }
+  if (typeof parameters.limit!=="undefined") {
+    limit = parseInt(parameters.limit,10);
+  }
+
+  if (typeof parameters.events!=="undefined") {
+    if (temporalEventIds.length>0) {
+      for (let i=0;i<temporalEventIds.length; i++) {
+        let tei = temporalEventIds[i];
+        if (events.indexOf(tei)===-1) {
+          events.push(tei);
+        }
+      }
+    }
+    if (spatialEventIds.length>0) {
+      for (let i=0;i<spatialEventIds.length; i++) {
+        let sei = spatialEventIds[i];
+        if (events.indexOf(sei)===-1) {
+          events.push(sei);
+        }
+      }
+    }
+    match = "(n:Resource)-[revent]->(e:Event)";
+    if (events.length===1) {
+      queryParams += `AND id(e)=${events[0]} `;
+    }
+    else if (events.length>1){
+      queryParams += `AND id(e) IN [${events}] `;
+    }
+  }
+  else {
+    events = [];
+    if (temporalEventIds.length>0) {
+      for (let i=0;i<temporalEventIds.length; i++) {
+        let tei = temporalEventIds[i];
+        if (events.indexOf(tei)===-1) {
+          events.push(tei);
+        }
+      }
+    }
+    if (spatialEventIds.length>0) {
+      for (let i=0;i<spatialEventIds.length; i++) {
+        let sei = spatialEventIds[i];
+        if (events.indexOf(sei)===-1) {
+          events.push(sei);
+        }
+      }
+    }
+    if (events.length>0) {
+      match = "(n:Resource)-[revent]->(e:Event)";
+    }
+    if (events.length===1) {
+      queryParams += `AND id(e)=${events[0]} `;
+    }
+    else if (events.length>1) {
+      queryParams += `AND id(e) IN [${events}] `;
+    }
+  }
+  if (typeof parameters.organisations!=="undefined") {
+    organisations = parameters.organisations;
+    if (events.length>0) {
+      match += ", (n:Resource)-[rorganisation]->(o:Organisation)";
+    }
+    else {
+      match = "(n:Resource)-[rorganisation]->(o:Organisation)";
+    }
+    if (organisations.length===1) {
+      queryParams += `AND id(o)=${organisations[0]} `;
+    }
+    else {
+      queryParams += `AND id(o) IN [${organisations}] `;
+    }
+  }
+  if (typeof parameters.people!=="undefined") {
+    people = parameters.people;
+    if (events.length>0 || organisations.length>0) {
+      match += ", (n:Resource)-[rperson]->(p:Person)";
+    }
+    else {
+      match = "(n:Resource)-[rperson]->(p:Person)";
+    }
+    if (people.length===1) {
+      queryParams += `AND id(p)=${people[0]} `;
+    }
+    else {
+      queryParams += `AND id(p) IN [${people}] `;
+    }
+  }
+  if (typeof parameters.resources!=="undefined") {
+    resources = parameters.resources;
+    if (events.length>0 || organisations.length>0 || people.length>0) {
+      match += ", (n:Resource)-[rresource]->(re:Resource)";
+    }
+    else {
+      match = "(n:Resource)-[rresource]->(re:Resource)";
+    }
+    if (resources.length===1) {
+      queryParams += `AND id(re)=${resources[0]} `;
+    }
+    else {
+      queryParams += `AND id(re) IN [${resources}] `;
+    }
+  }
+  if (typeof parameters.page!=="undefined") {
+    page = parseInt(parameters.page,10);
+    queryPage = parseInt(parameters.page,10)-1;
+  }
+  if (typeof parameters.limit!=="undefined") {
+    limit = parseInt(parameters.limit,10);
+  }
+  let currentPage = page;
+  if (page===0) {
+    currentPage = 1;
+  }
+
+  let skip = limit*queryPage;
+  if (queryParams!=="") {
+    queryParams = "WHERE "+queryParams;
+  }
+
+  return {
+    match: match,
+    queryParams: queryParams,
+    skip: skip,
+    limit: limit,
+    currentPage: currentPage,
+  };
 }
 
 module.exports = {

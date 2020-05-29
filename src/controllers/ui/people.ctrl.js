@@ -353,7 +353,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
 
   // temporal
   let temporalEventIds = [];
-  if (parameters.temporals!=="undefined") {
+  if (typeof parameters.temporals!=="undefined") {
     let eventTypes = [];
     if (typeof parameters.events!=="undefined") {
       eventTypes = parameters.events;
