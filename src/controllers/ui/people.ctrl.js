@@ -285,11 +285,14 @@ const getPeoplePrepareQueryParams = async(req)=>{
   let match = "(n:Person)";
 
   let query = "";
-  let queryParams = " n.status='public'";
+  let queryParams = " n.status='public' ";
 
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
       queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
