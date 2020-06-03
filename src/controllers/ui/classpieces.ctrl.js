@@ -72,7 +72,7 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 const getClasspieces = async (req, resp) => {
   let params = await getClasspiecesPrepareQueryParams(req);
-  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ORDER BY n.label SKIP ${params.skip} LIMIT ${params.limit}`;
+  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
   let data = await getResourcesQuery(query, params.match, params.queryParams, params.limit);
   if (data.error) {
     resp.json({
@@ -647,7 +647,8 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
     queryParams: queryParams,
     skip: skip,
     limit: limit,
-    currentPage: currentPage,
+    currentPage: currentPage,    
+    queryOrder: queryOrder
   };
 }
 

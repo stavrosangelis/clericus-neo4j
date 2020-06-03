@@ -716,6 +716,7 @@ const getTimeline = async(req,resp) => {
     msg: "Query results",
   });
 }
+
 module.exports = {
   getItemNetwork: getItemNetwork,
   getRelatedNodes: getRelatedNodes,

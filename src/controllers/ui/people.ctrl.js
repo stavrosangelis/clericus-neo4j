@@ -33,7 +33,7 @@ const helpers = require("../../helpers");
 */
 const getPeople = async (req, resp) => {
   let params = await getPeoplePrepareQueryParams(req);
-  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ORDER BY n.label SKIP ${params.skip} LIMIT ${params.limit}`;
+  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
   let data = await getPeopleQuery(query, params.match, params.queryParams, params.limit);
   if (data.error) {
     resp.json({
@@ -526,6 +526,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
     skip: skip,
     limit: limit,
     currentPage: currentPage,
+    queryOrder: queryOrder
   };
 }
 
