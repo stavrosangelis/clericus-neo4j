@@ -8,6 +8,9 @@ const ExifImage = require('exif').ExifImage;
 const iptc = require('node-iptc');
 const path = require('path');
 const helpers = require("../../helpers");
+const csvParser = require('csv-parser');
+const stringSimilarity = require('string-similarity');
+const levenshtein = require('js-levenshtein');
 
 const resourcesPath = process.env.RESOURCESPATH;
 const archivePath = process.env.ARCHIVEPATH;
@@ -674,8 +677,8 @@ const readDocumentResults = async(req,resp) => {
     let writeFile = await new Promise ((resolve,reject)=> {
       fs.writeFile(csvPath, csv, 'utf8', function(err) {
         if (err) {
-          output.push(error);
-          reject(error);
+          output.push(err);
+          reject(err);
         } else {
           output.push(`CSV from file "${file}" created successfully at the path "${csvPath}"`)
           resolve(true);
@@ -727,6 +730,561 @@ const updateColumns = async (req, resp) => {
   })
 }
 
+const prepareForIngestion = async (req,resp) => {
+  const directory = `${archivePath}documents/hamell-csv/`;
+  const outputDirectory = `${archivePath}documents/hamell-csv-output/`;
+  const files = await fs.readdirSync(directory);
+  let headers = ['Name','Diocese','Matriculated','Class','Ordained'];
+
+  for (f in files) {
+    let fileNum = files[f];
+    console.log(fileNum);
+    let file = await new Promise((resolve,reject)=>{
+      let results = [];
+      fs.createReadStream(directory+fileNum)
+      .pipe(csvParser(headers))
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+    });
+    const isUpperCase = (str) => /^[A-Z]*$/.test(str);
+    const firstCapital = helpers.capitalCaseOnlyFirst;
+    const isVowel = (char) => ["a", "e", "i", "o", "u","y"].includes(char);
+    const removeExtern = (str)=>{
+      str = str.replace('(extern)','')
+      .replace('(extern','')
+      .replace('extern)','')
+      .replace('extern','');
+      return str;
+    }
+    const removePriest = (str)=>{
+      str = str.replace('(priest)','').replace('(Priest)','');
+      return str;
+    }
+    const removeSame = (str)=>{
+      str = str.replace('same','').replace('same.','');
+      return str;
+    }
+    const removeSpecialCharacters = (str)=>{
+      str = str.replace(/\*/g,'');
+      str = str.replace(/,/g,'');
+      str = str.replace(/\?/g,'');
+      return str;
+    }
+    const parseVid = (str) => {
+      if (str.toLowerCase().includes("vid")) {
+        return {
+          status: true,
+          str: str.replace("vid.","").replace("vid","").trim()
+        };
+      }
+      return {
+        status: false,
+        str: str
+      };
+    }
+    const lastNamePrefix = (prefix, lastName) => {
+      if (prefix===null) {
+        return ;
+      }
+      prefix = prefix.replace(/[()]+/g,"").trim();
+      if (prefix.length>=lastName.length && !prefix.includes("'")) {
+        return prefix;
+      }
+      else if (prefix.includes("'")){
+        let prefixLength = prefix.length-1;
+        let lastChar = prefix[prefixLength].toLowerCase();
+        if (isVowel(lastChar)) {
+          let firstIndex = null;
+          let lastIndex = null;
+          for (let i=0;i<lastName.length;i++) {
+            let char = lastName[i];
+            if (isVowel(char.toLowerCase())) {
+              firstIndex = i;
+              break;
+            }
+          }
+          if (firstIndex!==null) {
+            for (let i=0;i<lastName.length;i++) {
+              let char = lastName[i];
+              if (i>firstIndex && !isVowel(char.toLowerCase())) {
+                lastIndex = i;
+                break;
+              }
+            }
+          }
+          let lastCharIndex = lastName.length-1;
+          lastName = lastName.substring(lastIndex, lastCharIndex);
+          return prefix+lastName;
+        }
+        else {
+          return "O'"+lastName;
+        }
+      }
+      else {
+        lastName = lastName.replace(/[()]+/g,"");
+        return lastName;
+      }
+    }
+    const extractPrefix = (str) => {
+      let re = /\s\(([^)]+)\)/;
+      let prefix = str.match(re);
+      let prefixStr = null;
+      if (prefix!==null) {
+        prefixStr = prefix[0];
+      }
+      str = str.replace(prefixStr,'');
+      return {
+        prefix: prefixStr,
+        str: str
+      }
+    }
+    const parseLastName = (lastName) => {
+      let alLastName = "";
+      // prefix
+      if (lastName.includes("-)")) {
+        let re = /\(([^)]+)\)/;
+        let prefix = lastName.match(re);
+        prefix = prefix[0].replace(/[()-]+/g,"");
+        let cleanLastName = lastName.replace(/\(([^)]+)\)/,'');
+        cleanLastName = cleanLastName.substring(prefix.length);
+        alLastName = prefix+cleanLastName;
+      }
+      // suffix
+      if (lastName.includes("(-")) {
+        let re = /\(([^)]+)\)/;
+        let suffix = lastName.match(re);
+        suffix = suffix[0].replace(/[()-]+/g,"");
+        let cleanLastName = lastName.replace(/\(([^)]+)\)/,'');
+        let length = cleanLastName.length-suffix.length;
+        cleanLastName = cleanLastName.substring(0,length);
+        alLastName = cleanLastName+suffix;
+      }
+      // no indication
+      if (lastName.includes("(") && !lastName.includes("-")) {
+        alLastName = lastName.replace(/\(([^)]+)\)/g,'');
+      }
+      lastName = lastName.replace(/[()-]+/g,'');
+      lastName = firstCapital(lastName);
+      if (alLastName!=="") {
+        alLastName = firstCapital(alLastName);
+      }
+      return {
+        lastName: lastName,
+        alLastName: alLastName,
+      }
+    }
+
+    const extractReligiousOrder = (str) => {
+      let orders = [" OMI", " Soc. Miss.", " O. Carm.", " O. Carm", " OFM", " O.F.M.", " SJ", " S.J.", " OP", " O.P.", " CM", " C.M.", " OSA", " Missionary", " OMI", " OFM Cap.", " OFM Cap", " ODC", " CP"];
+      let relOrder = null;
+      for (let i in orders) {
+        let order = orders[i];
+        if (str.includes(order)) {
+          relOrder = order;
+          str = str.replace(order,"");
+        }
+      }
+      return {
+        order: relOrder,
+        str: str
+      }
+    }
+    const splitName = (str) => {
+      let religiousOrder = extractReligiousOrder(str);
+      let religiousOrderText = religiousOrder.order;
+      str = religiousOrder.str;
+      let parsePrefix = extractPrefix(str);
+      let prefix = parsePrefix.prefix;
+      str = parsePrefix.str;
+      let parts = str.split(" ");
+      let lastName='', firstName='', middleName='';
+      let alLastName='', alFirstName='', alMiddleName='';
+      let lastNameIndex = -1;
+      for (let i in parts) {
+        let part = parts[i];
+        let cleanPart = removeSpecialCharacters(part);
+        cleanPart = cleanPart.replace(/[()-]+/g,"").trim();
+        if (isUpperCase(cleanPart)) {
+          lastName = part;
+          lastNameIndex = Number(i);
+          break;
+        }
+      }
+      let fnIndex = lastNameIndex+1;
+      let mnIndex = fnIndex+1;
+      if (typeof parts[fnIndex]!=="undefined") {
+        firstName = parts[fnIndex];
+        if (firstName.includes("(")) {
+          alFirstName = firstName.replace(/\(([^)]+)\)/g,'');
+          alFirstName = firstCapital(alFirstName);
+          firstName = firstName.replace(/[()-]+/g,'');
+        }
+        firstName = firstCapital(firstName);
+      }
+      if (typeof parts[mnIndex]!=="undefined") {
+        middleName = parts[mnIndex];
+        middleName = firstCapital(middleName);
+      }
+      if (prefix!==null) {
+        // check if firstname or lastName
+        let prefixClean = removeSpecialCharacters(prefix);
+        prefixClean = prefixClean.replace(/[()']+/g,"").trim();
+        // comparisons
+        let isLastName = false;
+        if (isUpperCase(prefixClean)) {
+          isLastName = true;
+        }
+        else {
+          let l1 = stringSimilarity.compareTwoStrings(prefixClean, lastName);
+          let l2 = levenshtein(prefixClean, lastName);
+          let f1 = stringSimilarity.compareTwoStrings(prefixClean, firstName);
+          let f2 = levenshtein(prefixClean, firstName);
+          if (l1>=f1 && l2<=f2) {
+            isLastName = true;
+          }
+        }
+
+        if (isLastName) {
+          let lastNameWithPrefix = lastNamePrefix(prefix,lastName);
+          let newAlLastName = firstCapital(lastNameWithPrefix);
+          for (let i in newAlLastName) {
+            let char = newAlLastName[i];
+            let prevIndex = Number(i)-1
+            if (newAlLastName[prevIndex]==="'") {
+              char = char.toUpperCase();
+            }
+            alLastName += char;
+          }
+        }
+        else {
+          alFirstName = firstCapital(prefixClean);
+        }
+      }
+      let prepareLastName = parseLastName(lastName);
+      lastName = prepareLastName.lastName;
+      if (prepareLastName.alLastName!=="") {
+        alLastName = prepareLastName.alLastName
+      }
+      let output = {
+        lastName:lastName,
+        firstName:firstName,
+      }
+      if (middleName!=='') {
+        output.middleName = middleName;
+      }
+      if (alLastName!=='') {
+        output.alternateLastName = alLastName;
+      }
+      if (alFirstName!=='') {
+        output.alternateFirstName = alFirstName;
+      }
+      if (religiousOrderText!=="") {
+        output.religiousOrder = religiousOrderText;
+      }
+      return output;
+    }
+    const hasQuestionMark = (str) => {
+      if (str.includes("?")) {
+        return true;
+      }
+      return false;
+    }
+    const hasSame = (str) => {
+      if (str.includes("same")) {
+        return true;
+      }
+      return false;
+    }
+
+    const parseName = (str) => {
+      str = removeExtern(str);
+      str = removePriest(str);
+      str = removeSame(str);
+      str = removeSpecialCharacters(str);
+      str = str.trim();
+      str = splitName(str);
+      return str;
+    }
+    const parseMatriculationDate = (str) => {
+      str = removeSpecialCharacters(str);
+      str = str.replace("(PL)","").replace("P-PL","").replace("(I)","").replace("(II)","");
+      str = removeExtern(str);
+      str = removePriest(str);
+      str = removeSame(str);
+      let parts = str.split(".");
+      if (parts.length!==3) {
+        if (isNaN(Number(str))) {
+          str = "";
+        }
+        else if (str!==""){
+          str = `1-1-${str}`
+        };
+      }
+      else if (parts.length===1 && str!==""){
+        str = `1-1-${str}`
+      }
+      else {
+        str = parts.join("-");
+      }
+      return str;
+    }
+
+    const parseDeath = (str) => {}
+    const parseDash = (str) => {
+      str = str.replace(".","");
+      str = str.replace(/[a-z]/gi,"");
+      let parts = str.split("-");
+      let startYear = parts[0];
+      let endYear = parts[1];
+      let lastIndex = 4 - endYear.length;
+      let yearPrefix = startYear.substring(0,lastIndex);
+      startYear = `1-1-${startYear}`;
+      endYear = `31-12-${yearPrefix}${endYear}`;
+      return {start: startYear, end: endYear};
+    }
+    const parseDot = (str) => {
+      let parts = str.split(".");
+      if (parts.length!==3) {
+        if (isNaN(Number(str))) {
+          str = "";
+        }
+        else if (parts.length===1 && str!==""){
+          str = `1-1-${str}`
+        };
+      }
+      else {
+        str = parts.join("-");
+      }
+      return {start:str};
+    }
+    const parseRole = (str) => {
+      let role = "";
+      if (str.includes("l")||str.includes("L")) {
+        role = "Lector";
+      }
+      if (str.includes("a")||str.includes("A")) {
+        role = "Acolyte";
+      }
+      if (str.includes("t")||str.includes("T")) {
+        role = "Tonsure";
+      }
+      if (str.includes("s")||str.includes("S")) {
+        role = "Subdeacon";
+      }
+      if (str.includes("d")||str.includes("D")) {
+        role = "Deacon";
+      }
+      return role;
+    }
+
+    const parseOrdinationDateItem = (str) => {
+      let item = {};
+      if (str.toLowerCase().includes("Ad vota saec")) {
+        item.eventType = "left the seminary/did not complete studies";
+      }
+      else if (str.includes("d.")) {
+        item.eventType = "death";
+        str = str.replace("d.","");
+      }
+      else {
+        item.eventType = "ordination";
+      }
+      if (str!=="yes") {
+        let date = str.replace(/[LATSDlatsd]+/g,'');
+        if (date.includes("-")) {
+          date = parseDash(date);
+        }
+        else if (date.includes(".")) {
+          date = parseDot(date);
+        }
+        else if (date.length===4) {
+          date = {start:`1-1-${date}`};
+        }
+        let role = parseRole(str);
+        item.date = date;
+        if (role!=="") {
+          item.role = role;
+        }
+      }
+      return item;
+    }
+
+    const parseOrdinationDate = (str) => {
+      let output = [];
+      str = removeSpecialCharacters(str);
+      str = str.replace("(PL)","").replace("P-PL","").replace("P","").replace("(I)","").replace("(II)","").replace(/ /g,"");
+      str = removeExtern(str);
+      str = removePriest(str);
+      str = removeSame(str);
+      if (str.includes(";")) {
+        let parts = str.split(";");
+        for (let i in parts) {
+          let part = parts[i];
+          let item = parseOrdinationDateItem(part);
+          output.push(item)
+        }
+      }
+      else {
+        let item = parseOrdinationDateItem(str);
+        output.push(item)
+      }
+      return output;
+    }
+
+    let csv = "";
+    for (let line in file) {
+      let row = file[line];
+      if (Number(line)===0) {
+        row[5] = "Parsed name";
+        row[6] = "Affiliation";
+        row[7] = "Matriculation event";
+        row[8] = "Ordination event(s)";
+        row[9] = "?";
+        row[10] = "Same";
+        csv += `${row[0]},${row[1]},${row[2]},${row[3]},${row[4]},${row[5]},${row[6]},${row[7]},${row[8]},${row[9]},${row[10]}\n`;
+      }
+      if (Number(line)>0) {
+        let colName = row['0'];
+        let colDiocese = row['1'];
+        let colMatriculated = row['2'];
+        let colClass = row['3'];
+        let colOrdained = row['4'];
+        let vidText = "";
+
+        let dioceseText = "";
+        let checkDioceseVid = parseVid(colDiocese);
+        if (checkDioceseVid.status) {
+          vidText = checkDioceseVid.str;
+          colDiocese = "";
+        }
+        if (colDiocese!=="") {
+          dioceseText = colDiocese;
+        }
+        let matriculationOutput = {};
+        let checkMatriculationVid = parseVid(colMatriculated);
+        if (checkMatriculationVid.status) {
+          vidText = checkMatriculationVid.str;
+          colMatriculated = "";
+        }
+        let checkClassVid = parseVid(colClass);
+        if (checkClassVid.status) {
+          vidText = checkClassVid.str;
+          colClass = "";
+        }
+        if (colMatriculated!=="") {
+          matriculationOutput.date = parseMatriculationDate(colMatriculated);
+          if (colClass!=="") {
+            matriculationOutput.role = colClass;
+          }
+        }
+        let checkOrdinationVid = parseVid(colOrdained);
+        if (checkOrdinationVid.status) {
+          vidText = checkOrdinationVid.str;
+          colOrdained = "";
+        }
+        let ordinationOutput = [];
+        if (colOrdained!=="") {
+          ordinationOutput = parseOrdinationDate(colOrdained);
+        }
+        let nameCol = parseName(colName);
+        row[5] = nameCol;
+        row[6] = dioceseText;
+        row[7] = matriculationOutput;
+        row[8] = ordinationOutput;
+        let hasQuestionMarkText = "", hasSameText = "";
+        if (hasQuestionMark(colName) || hasQuestionMark(colDiocese) || hasQuestionMark(colMatriculated) || hasQuestionMark(colClass) || hasQuestionMark(colOrdained)) {
+          row[9] = "true";
+          hasQuestionMarkText = "true";
+        }
+        if (hasSame(colName) || hasSame(colDiocese) || hasSame(colMatriculated) || hasSame(colClass) || hasSame(colOrdained)) {
+          row[10] = "true";
+          hasSameText = "true";
+        }
+
+        let nameText = "";
+        if (typeof nameCol.lastName!=="undefined") {
+          nameText += `lastName: ${nameCol.lastName}`;
+        }
+        if (typeof nameCol.firstName!=="undefined") {
+          nameText += ` firstName: ${nameCol.firstName}`;
+        }
+        if (typeof nameCol.middleName!=="undefined") {
+          nameText += ` middleName: ${nameCol.middleName}`;
+        }
+        if (typeof nameCol.alternateLastName!=="undefined") {
+          nameText += ` alternateLastName: ${nameCol.alternateLastName}`;
+        }
+        if (typeof nameCol.alternateFirstName!=="undefined") {
+          nameText += ` alternateFirstName: ${nameCol.alternateFirstName}`;
+        }
+        if (vidText!=="") {
+          nameText += ` alternateLastName: ${vidText}`;
+        }
+        if (typeof nameCol.religiousOrder!=="undefined" && nameCol.religiousOrder!==null && nameCol.religiousOrder!=="") {
+          if (dioceseText!=="") {
+            dioceseText += " | ";
+          }
+          dioceseText += `religiousOrder: ${nameCol.religiousOrder}`;
+        }
+        let matriculationText = "";
+        if(typeof matriculationOutput.date!=="undefined" && matriculationOutput.date!=="") {
+          matriculationText += `matriculation at ${matriculationOutput.date}`;
+        }
+        if(typeof matriculationOutput.role!=="undefined" && matriculationOutput.role!=="") {
+          matriculationText += ` in ${matriculationOutput.role}`;
+        }
+        let ordinationText = "";
+        for (let o=0;o<ordinationOutput.length;o++) {
+          let oItem = ordinationOutput[o];
+          if (o>0) {
+            ordinationText += `; `;
+          }
+          if (typeof oItem.eventType!=="undefined") {
+            ordinationText += oItem.eventType;
+          }
+          if (typeof oItem.date!=="undefined") {
+            ordinationText += ` at`
+            if (typeof oItem.date.start!=="undefined") {
+              ordinationText += ` ${oItem.date.start}`;
+            }
+            if (typeof oItem.date.end!=="undefined") {
+              ordinationText += ` - ${oItem.date.end}`;
+            }
+          }
+          if (typeof oItem.role!=="undefined") {
+            ordinationText += ` as ${oItem.role}`;
+          }
+        }
+        csv += `"${row[0]}","${row[1]}","${row[2]}","${row[3]}","${row[4]}","${nameText}","${dioceseText}","${matriculationText}","${ordinationText}","${hasQuestionMarkText}","${hasSameText}"\n`;
+      }
+
+    }
+
+    let writeFile = await new Promise ((resolve,reject)=> {
+      fs.writeFile(outputDirectory+fileNum, csv, 'utf8', function(err) {
+        if (err) {
+          reject(err);
+        } else {
+        //  console.log(`CSV created successfully at the path "${outputDirectory+fileNum}"`)
+          resolve(true);
+        }
+      });
+    });
+  }
+
+
+
+
+  let output = [];
+  resp.json({
+    status: true,
+    data: [],
+    error: false,
+    msg: '',
+  })
+}
 
 module.exports = {
   parseClassPiece: parseClassPiece,
@@ -736,4 +1294,5 @@ module.exports = {
   readDocumentResults: readDocumentResults,
   getColumns: getColumns,
   updateColumns: updateColumns,
+  prepareForIngestion: prepareForIngestion,
 }

@@ -1,5 +1,6 @@
 const driver = require("../../config/db-driver");
 const helpers = require("../../helpers");
+const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 /**
 * @api {get} /events Get events
@@ -232,10 +233,25 @@ const getEvent = async(req, resp) => {
   let organisations = await helpers.loadRelations(_id, "Event", "Organisation", true);
   let people = await helpers.loadRelations(_id, "Event", "Person", true);
   let resources = await helpers.loadRelations(_id, "Event", "Resource", true);
+
+  // get classpiece resource type id
+  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  await classpieceSystemType.load();
+  let classpieces = [];
+  let systemType = classpieceSystemType._id;
+  for (let i in resources) {
+    let resource = resources[i];
+    if (resource.ref.systemType===systemType) {
+      classpieces.push(resource);
+      resources.splice(i, 1);
+    }
+  }
+
   event.events = events;
   event.organisations = organisations;
   event.people = people;
   event.resources = resources;
+  event.classpieces = classpieces;
   resp.json({
     status: true,
     data: event,

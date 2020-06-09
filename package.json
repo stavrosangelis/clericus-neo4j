@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.45.116",
+  "version": "0.47.122",
   "description": "This is the Clericus API using neo4j as a database",
   "main": "src/app.js",
   "scripts": {
@@ -33,6 +33,7 @@
     "form-data": "^3.0.0",
     "formidable": "^1.2.1",
     "image-size": "^0.8.3",
+    "js-levenshtein": "^1.1.6",
     "jsonwebtoken": "^8.5.1",
     "neo4j-driver": "^4.0.2",
     "node-iptc": "^1.0.5",
@@ -42,7 +43,8 @@
     "passport-local": "^1.0.0",
     "pm2": "^4.1.2",
     "sanitize-html": "^1.21.1",
-    "soundex": "^0.2.1"
+    "soundex": "^0.2.1",
+    "string-similarity": "^4.0.1"
   },
   "devDependencies": {
     "ava": "^2.4.0",

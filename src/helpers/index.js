@@ -239,6 +239,26 @@ const lowerCaseOnlyFirst = (str) => {
   let restOfString = str.slice(1);
   return  firstLetter+restOfString;
 }
+const capitalCaseOnlyFirst = (str) => {
+  if (typeof str!=='string') {
+    return str;
+  }
+  str = str.toLowerCase();
+  let firstLetter = str.charAt(0).toUpperCase();
+  let restOfString = str.slice(1);
+  let newStr = "";
+  for (let i=0;i<restOfString.length; i++) {
+    let char = restOfString[i];
+    let prevIndex = i-1;
+    if (prevIndex>-1 && restOfString[prevIndex]===".") {
+      char = char.toUpperCase();
+    }
+    newStr += char;
+  }
+  return  firstLetter+newStr;
+}
+
+const isUpperCase = (str) => /^[A-Z]*$/.test(str);
 
 const loadRelations = async (srcId=null, srcType=null, targetType=null, status=false, relType=null) => {
   if (srcId===null || srcType===null) {
@@ -457,6 +477,8 @@ module.exports = {
   outputPaths: outputPaths,
   normalizeLabelId: normalizeLabelId,
   lowerCaseOnlyFirst: lowerCaseOnlyFirst,
+  capitalCaseOnlyFirst: capitalCaseOnlyFirst,
+  isUpperCase: isUpperCase,
   loadRelations: loadRelations,
   parseRequestData: parseRequestData,
   escapeRegExp: escapeRegExp,

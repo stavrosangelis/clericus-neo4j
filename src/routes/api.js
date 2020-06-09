@@ -85,6 +85,7 @@ server.post('/search', searchController.search);
 
 // ******* ui visualisations ******** //
 server.get('/timeline', visualisationsController.getTimeline);
+server.get('/item-timeline', visualisationsController.getItemTimeline);
 server.get('/heatmap', visualisationsController.getHeatmap);
 server.get('/graph-network', visualisationsController.getGraphNetwork);
 server.get('/item-network', visualisationsController.getItemNetwork);
@@ -239,6 +240,7 @@ server.get('/ocr-document', auth.checkAdminToken, cvisionController.analyseDocum
 server.get('/read-document', auth.checkAdminToken, cvisionController.readDocumentResults);
 server.get('/get-document-columns', cvisionController.getColumns);
 server.post('/update-document-columns', cvisionController.updateColumns);
+server.get('/prepare-hamell-ingestion', cvisionController.prepareForIngestion);
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);

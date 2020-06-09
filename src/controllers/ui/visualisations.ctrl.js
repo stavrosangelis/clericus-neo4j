@@ -673,9 +673,64 @@ const normalizeSegment = (segment, classpieceTerm) => {
 }
 
 const getTimeline = async(req,resp) => {
-
   let session = driver.session();
   let query = `MATCH (e:Event)-->(t:Temporal) WHERE e.status='public' RETURN distinct t,e ORDER BY date(datetime({epochmillis: apoc.date.parse(t.startDate,"ms","dd-MM-yyyy")}))`;
+  let results = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close();
+    return result.records;
+  });
+  let temporals = [];
+  let events = [];
+  let temporalIds = [];
+  for (let i=0;i<results.length;i++) {
+    let result = results[i];
+    helpers.prepareOutput(result);
+    let obj = result.toObject();
+    let temporal = helpers.outputRecord(obj['t']);
+    let event = helpers.outputRecord(obj['e']);
+    let tId = temporal._id;
+    event.temporalId = tId;
+    if (temporalIds.indexOf(tId)===-1) {
+      temporalIds.push(tId);
+      temporals.push(temporal);
+    }
+    events.push(event);
+  }
+
+  for (let i=0;i<temporals.length; i++) {
+    let temporal = temporals[i];
+    let temporalEvents = events.filter(e=>e.temporalId===temporal._id);
+    if (typeof temporalEvents==="undefined") {
+      temporalEvents = [];
+    }
+    temporal.events = temporalEvents;
+  }
+  resp.json({
+    status: true,
+    data: temporals,
+    error: [],
+    msg: "Query results",
+  });
+}
+
+const getItemTimeline = async(req,resp) => {
+  let params = req.query;
+  if (typeof params._id==="undefined") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: ["Please provide a valid _id and type to continue"],
+    });
+    return false;
+  }
+  let _id = params._id;
+  let session = driver.session();
+  let query = `MATCH (p)-->(e:Event) WHERE id(p)=${_id} AND p.status='public' AND e.status='public'
+  OPTIONAL MATCH (e)-->(t:Temporal) RETURN distinct t,e ORDER BY date(datetime({epochmillis: apoc.date.parse(t.startDate,"ms","dd-MM-yyyy")}))`;
   let results = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -724,4 +779,5 @@ module.exports = {
   getHeatmap: getHeatmap,
   getGraphNetwork: getGraphNetwork,
   getTimeline: getTimeline,
+  getItemTimeline: getItemTimeline,
 }
