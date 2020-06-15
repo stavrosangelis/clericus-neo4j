@@ -1174,7 +1174,7 @@ const prepareForIngestion = async (req,resp) => {
       }
       let newStr = outputString+outputNum;
       newStr = removeSpecialCharacters(newStr);
-      newStr = newStr.replace(/./g,'');
+      newStr = newStr.replace(/\./g,'');
       return newStr;
     }
 
