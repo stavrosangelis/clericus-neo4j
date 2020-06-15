@@ -177,7 +177,6 @@ const updateReference = async (reference) => {
       targetRole = " SET r2={role:'" + srcItem.role + "'}";
     }
   }
-
   let query = "MATCH (n1:" + srcItem.type + ") WHERE id(n1)=" + srcItem._id +
     " MATCH (n2:" + targetItem.type + ") WHERE id(n2)=" + targetItem._id +
     " MERGE (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" + srcRole +

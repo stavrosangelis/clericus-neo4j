@@ -14,7 +14,7 @@ const stringSimilarity = require('string-similarity');
 const levenshtein = require('js-levenshtein');
 const Taxonomy = require('../taxonomy.ctrl').Taxonomy;
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
-const references = require('../references.ctrl').updateReference;
+const references = require('../references.ctrl');
 const Person = require('../person.ctrl').Person;
 
 const resourcesPath = process.env.RESOURCESPATH;
@@ -745,16 +745,25 @@ const prepareForIngestion = async (req,resp) => {
   let output = [];
   let count = 0;
   let csv = "Name,Diocese,Matriculated,Class,Ordained,DB name,Classpiece, URL\n";
+  let hasTimeTerm = new Taxonomy({systemType:"hasTime"});
+  await hasTimeTerm.load();
   let matriculationClass = new Taxonomy({systemType:"matriculationClass"});
   await matriculationClass.load();
   let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "hasAffiliation"});
   await organisationTaxonomyTerm.load();
   let eventTypeMatriculation = new TaxonomyTerm({labelId: "matriculation"});
   await eventTypeMatriculation.load();
-  let ordinationTypeMatriculation = new TaxonomyTerm({labelId: "ordination"});
-  await ordinationTypeMatriculation.load();
+  let eventTypeOrdination = new TaxonomyTerm({labelId: "ordination"});
+  await eventTypeOrdination.load();
   let moTaxonomyTerm = new TaxonomyTerm({labelId: "hasParticipant"});
   await moTaxonomyTerm.load();
+  let referenceTerm = new TaxonomyTerm({labelId: "isReferencedIn"});
+  await referenceTerm.load();
+
+  let ordinationRanks = new Taxonomy({systemType:"ordinationRanks"});
+  await ordinationRanks.load();
+
+  let hamell1 = await loadHamellRef();
 
   for (f in files) {
     let fileNum = files[f];
@@ -768,7 +777,7 @@ const prepareForIngestion = async (req,resp) => {
         resolve(results);
       });
     });
-    const isUpperCase = (str) => /^[A-Z]*$/.test(str);
+    const isUpperCase = (str) => /^[A-Z']*$/.test(str);
     const firstCapital = helpers.capitalCaseOnlyFirst;
     const isVowel = (char) => ["a", "e", "i", "o", "u","y"].includes(char);
     const removeExtern = (str)=>{
@@ -1102,7 +1111,7 @@ const prepareForIngestion = async (req,resp) => {
     const parseOrdinationDateItem = (str) => {
       let item = {};
       if (str.toLowerCase().includes("Ad vota saec")) {
-        item.eventType = "left the seminary/did not complete studies";
+        item.eventType = "did not complete studies";
       }
       else if (str.includes("d.")) {
         item.eventType = "death";
@@ -1152,7 +1161,22 @@ const prepareForIngestion = async (req,resp) => {
       }
       return output;
     }
-
+    const parseColClass = (str) => {
+      let outputString = "";
+      let outputNum = "";
+      for (let i in str) {
+        let letter = str[i];
+        let num = Number(letter);
+        if (isNaN(num)) {
+          outputString += letter;
+        }
+        else outputNum += letter;
+      }
+      let newStr = outputString+outputNum;
+      newStr = removeSpecialCharacters(newStr);
+      newStr = newStr.replace(/./g,'');
+      return newStr;
+    }
 
     for (let line in file) {
       let row = file[line];
@@ -1187,7 +1211,7 @@ const prepareForIngestion = async (req,resp) => {
         if (colMatriculated!=="") {
           matriculationOutput.date = parseMatriculationDate(colMatriculated);
           if (colClass!=="") {
-            matriculationOutput.role = colClass;
+            matriculationOutput.role = parseColClass(colClass);
           }
         }
         let checkOrdinationVid = parseVid(colOrdained);
@@ -1219,9 +1243,11 @@ const prepareForIngestion = async (req,resp) => {
         else {
           person = await addPerson(nameCol,userId);
         }
-
+        if (typeof person._id==="undefined") {
+          continue;
+        }
         // 2.1 insert organisation/diocese
-        let diocese = await addDiocese(diocese, userId);
+        let diocese = await addDiocese(dioceseText, userId);
 
         // 2.2 link diocese with person
         let dioceseReference = {
@@ -1232,81 +1258,156 @@ const prepareForIngestion = async (req,resp) => {
           taxonomyTermId: organisationTaxonomyTerm._id,
         }
         let dioceseRef = await references.updateReference(dioceseReference);
-
         // 3.1. insert organisation/religious order
-         let religiousOrder = await addReligiousOrder(nameCol.religiousOrder, userId);
-        // 3.2 link religious order with person
-        let roReference = {
-          items: [
-            {_id: person._id, type: "Person"},
-            {_id: religiousOrder._id, type: "Organisation"},
-          ],
-          taxonomyTermId: organisationTaxonomyTerm._id,
+        if (nameCol.religiousOrder!==null) {
+          let religiousOrder = await addReligiousOrder(nameCol.religiousOrder, userId);
+          // 3.2 link religious order with person
+          let roReference = {
+            items: [
+             {_id: person._id, type: "Person"},
+             {_id: religiousOrder._id, type: "Organisation"},
+            ],
+            taxonomyTermId: organisationTaxonomyTerm._id,
+          }
+          let roRef = await references.updateReference(roReference);
         }
-         let roRef = await references.updateReference(roReference);
 
         // 4.1 insert matriculation date
-        let matriculationDate = await addDate(matriculationOutput.date,null,userId);
+        let matriculationDate = null;
+        if (typeof matriculationOutput.date!=="undefined") {
+          matriculationDate = await addDate(matriculationOutput.date,null,userId);
+        }
+
         // 4.2 insert matriculation role
         let matriculationRole = null;
         if (typeof matriculationOutput.role!=="undefined" && matriculationOutput.role!=="") {
-          matriculationRole = await addMatriculationRole(matriculationOutput.role, matriculationClass._id, userId);
+          matriculationRole = await addTaxonomyRole(matriculationOutput.role, matriculationClass._id, userId);
         }
         // 4.3 add matriculation event
-        let matriculationLabel = `Matriculation`;
-        if (matriculationRole!==null) {
-          matriculationLabel += ` into ${matriculationOutput.role}`;
+        if (matriculationDate!==null) {
+          let matriculationLabel = `Matriculation`;
+          if (matriculationRole!==null) {
+            matriculationLabel += ` into ${matriculationOutput.role}`;
+          }
+          let matriculationEvent = await addNewEvent(matriculationLabel, eventTypeMatriculation._id, userId);
+          // 4.5 matriculation event/person reference
+          let matriculationReference = {
+            items: [
+              {_id: matriculationEvent._id, type: "Event"},
+              {_id: person._id, type: "Person"}
+            ],
+            taxonomyTermId: moTaxonomyTerm._id,
+          };
+          if (matriculationRole!==null) {
+            matriculationReference.items[1].role = null;
+            matriculationReference.items[0].role = matriculationRole._id;
+          }
+          await references.updateReference(matriculationReference);
+          // 4.6 matriculation event/date reference
+          let matriculationDateReference = {
+            items: [
+              {_id: matriculationEvent._id, type: "Event"},
+              {_id: matriculationDate._id, type: "Temporal"}
+            ],
+            taxonomyTermId: hasTimeTerm._id,
+          };
+          await references.updateReference(matriculationDateReference);
         }
-        let matriculationEvent = await addNewEvent(matriculationLabel, eventTypeMatriculation._id, userId);
-        // 4.5 matriculation event/person reference
-        let matriculationReference = {
-          items: [
-            {_id: match._id, type: "Person"},
-            {_id: matriculationEvent._id, type: "Event"}
-          ],
-          taxonomyTermId: matriculationTaxonomyTerm._id,
-        };
-        if (matriculationRole!==null) {
-          matriculationReference.items[0].role = null;
-          matriculationReference.items[1].role = matriculationRole._id;
-        }
-        await updateReference(matriculationReference);
+
+
         // 5. insert ordination event (array)
         for (let j=0;j<ordinationOutput.length; j++) {
-          let ordinationItem = ordinationOutput[i];
-          let eventType = "";
-          let startDate = "";
-          let endDate = "";
-          let role = "";
-          let label = "";
+          let ordinationItem = ordinationOutput[j];
+          let eventType = "", startDate="", endDate=null, role="";
+          if (typeof ordinationItem.eventType!=="undefined") {
+            eventType = ordinationItem.eventType
+          }
+          if (typeof ordinationItem.date!=="undefined") {
+            if (typeof ordinationItem.start!=="undefined") {
+              startDate = ordinationItem.start;
+            }
+            if (typeof ordinationItem.end!=="undefined") {
+              endDate = ordinationItem.end;
+            }
+          }
+          if (typeof ordinationItem.role!=="undefined") {
+            role = ordinationItem.role
+          }
+          let label = "Ordination";
+          if (role!=="") {
+            label += ` as ${role}`;
+          }
+          let ordinationDate = null;
+          let ordinationDateId = null;
+          if (startDate!=="") {
+            ordinationDate = await addDate(startDate,endDate,userId);
+            ordinationDateId = ordinationDate._id;
+          }
+          let ordinationEvent = await updateEvent(label, eventTypeOrdination._id, ordinationDateId, userId);
+          let ordinationReference = {
+            items: [
+              {_id: ordinationEvent._id, type: "Event"},
+              {_id: person._id, type: "Person"}
+            ],
+            taxonomyTermId: moTaxonomyTerm._id,
+          };
+          if (role!=="") {
+            let ordinationRole = await addTaxonomyRole(role, ordinationRanks._id, userId);
+            ordinationReference.items[1].role = null;
+            ordinationReference.items[0].role = ordinationRole._id;
+          }
+          await references.updateReference(ordinationReference);
+          if (ordinationDate!==null) {
+            let ordinationDateReference = {
+              items: [
+                {_id: ordinationEvent._id, type: "Event"},
+                {_id: ordinationDate._id, type: "Temporal"}
+              ],
+              taxonomyTermId: hasTimeTerm._id,
+            };
+            await references.updateReference(ordinationDateReference);
+          }
+
         }
+        // 6. link to hamell1
+        if (typeof person._id!=="undefined") {
+          let hamellReference = {
+            items: [
+              {_id: person._id, type: "Person"},
+              {_id: hamell1._id, type: "Resource"},
+            ],
+            taxonomyTermId: referenceTerm._id,
+          }
+          let hamellRef = await references.updateReference(hamellReference);
+        }
+
       }
     }
   }
-  let writeFile = await new Promise ((resolve,reject)=> {
-    fs.writeFile(`${outputDirectory}diocese-classpiece-match.csv`, csv, 'utf8', function(err) {
-      if (err) {
-        reject(err);
-      } else {
-      //  console.log(`CSV created successfully at the path "${outputDirectory+fileNum}"`)
-        resolve(true);
-      }
-    });
-  });
   resp.json({
     status: true,
-    data: output,
+    data: [],
     error: false,
     msg: '',
   })
 }
 
 const existingPerson = async(name, diocese, ordination) => {
+  if (diocese==="") {
+    return {
+      match: false,
+      person: null,
+    }
+  }
   let session = driver.session();
   let output = {};
   let match = false;
   let person = null;
-  let query = `MATCH (n:Person) WHERE LOWER(n.lastName)="${name.lastName.toLowerCase().trim()}" AND LOWER(n.firstName)="${name.firstName.toLowerCase().trim()}" RETURN n`;
+  let lastName = name.lastName.toLowerCase().trim();
+  lastName = helpers.addslashes(lastName);
+  let firstName = name.firstName.toLowerCase().trim();
+  firstName = helpers.addslashes(firstName);
+  let query = `MATCH (n:Person) WHERE LOWER(n.lastName)="${lastName}" AND LOWER(n.firstName)="${firstName}" RETURN n`;
   let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     session.close();
@@ -1331,7 +1432,6 @@ const existingPerson = async(name, diocese, ordination) => {
       // Check for existing First name and last name and diocese and ordination year with classpiece
       let organisations = await helpers.loadRelations(node._id, "Person", "Organisation", false, "hasAffiliation");
       let classpieces = await helpers.loadRelations(node._id, "Person", "Resource", false, "isDepictedOn");
-
       let findDiocese = organisations.find(o=>{
         if (o.ref.label.toLowerCase()===diocese.toLowerCase().trim()) {
           return true;
@@ -1369,21 +1469,30 @@ const existingPerson = async(name, diocese, ordination) => {
 
 const addPerson = async(nameCol, userId) => {
   let session = driver.session();
-  let firstName="",middleName="",lastName="",fnameSoundex="", lnameSoundex="",alternateAppelation={};
-  if (nameCol.middleName!=="") {
+  let firstName="",middleName="",lastName="",fnameSoundex="", lnameSoundex="",alternateAppelation={},alternateAppelationVal=[];
+  if (typeof nameCol.middleName!=="undefined" && nameCol.middleName!=="") {
     middleName = nameCol.middleName;
   }
-  if (nameCol.firstName!=="") {
+  if (typeof nameCol.firstName!=="undefined" && nameCol.firstName!=="") {
     fnameSoundex = helpers.soundex(nameCol.firstName);
+    firstName = nameCol.firstName;
   }
-  if (nameCol.lastName!=="") {
+  if (typeof nameCol.lastName!=="undefined" && nameCol.lastName!=="") {
     lnameSoundex = helpers.soundex(nameCol.lastName);
+    lastName = nameCol.lastName;
   }
-  if (nameCol.alLastName!=="") {
+  let hasAlt = false;
+  if (typeof nameCol.alLastName!=="undefined" && nameCol.alLastName!=="") {
     alternateAppelation.lastName = nameCol.alLastName;
+    hasAlt = true;
   }
-  if (nameCol.alFirstName!=="") {
+  if (typeof nameCol.alFirstName!=="undefined" && nameCol.alFirstName!=="") {
     alternateAppelation.firstName = nameCol.alFirstName;
+    hasAlt = true;
+  }
+  if (hasAlt) {
+    alternateAppelation.appelation = "";
+    alternateAppelationVal = [alternateAppelation];
   }
   let personData = {
     label:null,
@@ -1393,7 +1502,7 @@ const addPerson = async(nameCol, userId) => {
     lastName:lastName,
     fnameSoundex:fnameSoundex,
     lnameSoundex:lnameSoundex,
-    alternateAppelations:[alternateAppelation],
+    alternateAppelations:alternateAppelationVal,
   };
   let newPerson = new Person(personData);
   let person = await newPerson.save(userId);
@@ -1402,8 +1511,9 @@ const addPerson = async(nameCol, userId) => {
 
 const addDiocese = async(diocese, userId) => {
   diocese = diocese.trim();
+  let escapeDiocese = helpers.addslashes(diocese);
   let session = driver.session();
-  let query = `MATCH (n:Organisation) WHERE n.organisationType="Diocese" AND LOWER(n.label)="${diocese.toLowerCase()}" RETURN n`;
+  let query = `MATCH (n:Organisation) WHERE n.organisationType="Diocese" AND LOWER(n.label)="${escapeDiocese.toLowerCase()}" RETURN n`;
   let organisation = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -1421,6 +1531,7 @@ const addDiocese = async(diocese, userId) => {
   if (organisation===null) {
     let newOrganisation = {};
     let now = new Date().toISOString();
+    newOrganisation.label = diocese;
     newOrganisation.createdBy = userId;
     newOrganisation.createdAt = now;
     newOrganisation.updatedBy = userId;
@@ -1453,8 +1564,9 @@ const addDiocese = async(diocese, userId) => {
 
 const addReligiousOrder = async(religiousOrder, userId) => {
   religiousOrder = religiousOrder.replace(/\./g,"").trim();
+  let escapeReligiousOrder = helpers.addslashes(religiousOrder);
   let session = driver.session();
-  let query = `MATCH (n:Organisation) WHERE n.organisationType="ReligiousOrder" AND LOWER(n.label)="${religiousOrder.toLowerCase()}" RETURN n`;
+  let query = `MATCH (n:Organisation) WHERE n.organisationType="ReligiousOrder" AND LOWER(n.label)="${escapeReligiousOrder.toLowerCase()}" RETURN n`;
   let organisation = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -1472,6 +1584,7 @@ const addReligiousOrder = async(religiousOrder, userId) => {
   if (organisation===null) {
     let newOrganisation = {};
     let now = new Date().toISOString();
+    newOrganisation.label = religiousOrder;
     newOrganisation.createdBy = userId;
     newOrganisation.createdAt = now;
     newOrganisation.updatedBy = userId;
@@ -1504,6 +1617,10 @@ const addReligiousOrder = async(religiousOrder, userId) => {
 
 const addDate = async(startDate, endDate=null, userId) => {
   let session = driver.session();
+  startDate = startDate.replace(/\ /g,"");
+  if (endDate!==null) {
+    endDate = endDate.replace(/\ /g,"");
+  }
   let queryEndDate = "";
   if (endDate!==null && endDate!=="") {
     queryEndDate = `AND n.endDate="${endDate}" `;
@@ -1523,13 +1640,19 @@ const addDate = async(startDate, endDate=null, userId) => {
   });
   if (temporal===null) {
     let now = new Date().toISOString();
-    newItem.label = `${startDate} - ${endDate}`;
-    newItem.startDate = startDate;
-    newItem.endDate = endDate;
-    newItem.createdBy = userId;
-    newItem.createdAt = now;
-    newItem.updatedBy = userId;
-    newItem.updatedAt = now;
+    let label = startDate;
+    if (endDate!==null) {
+      label +=  ` - ${endDate}`;
+    }
+    let newItem = {
+      label: label,
+      startDate: startDate,
+      endDate: endDate,
+      createdBy: userId,
+      createdAt: now,
+      updatedBy: userId,
+      updatedAt: now,
+    }
     let nodeProperties = helpers.prepareNodeProperties(newItem);
     let params = helpers.prepareParams(newItem);
     let query = `CREATE (n:Temporal ${nodeProperties}) RETURN n`;
@@ -1553,14 +1676,20 @@ const addDate = async(startDate, endDate=null, userId) => {
   return temporal;
 }
 
-const addMatriculationRole = async(label, taxonomyId, userId) => {
+const addTaxonomyRole = async(label, taxonomyId, userId) => {
+  label = label.trim();
   let labelId = helpers.normalizeLabelId(label);
   let taxonomyTerm = new TaxonomyTerm({labelId: labelId});
   await taxonomyTerm.load();
   if (taxonomyTerm._id===null) {
     // save taxonomy term
-    taxonomyTerm = new TaxonomyTerm({label: label});
-    await taxonomyTerm.save(userId);
+    let newData = {
+      label: label,
+      inverseLabel:label
+    };
+    taxonomyTerm = new TaxonomyTerm(newData);
+    let saveTaxonomyTerm = await taxonomyTerm.save(userId);
+    taxonomyTerm = saveTaxonomyTerm.data;
     // link to matriculation class taxonomy
     let newReference = {
       items: [
@@ -1569,8 +1698,7 @@ const addMatriculationRole = async(label, taxonomyId, userId) => {
       ],
       taxonomyTermLabel: "hasChild",
     }
-    await updateReference(newReference);
-    await taxonomyTerm.load();
+    await references.updateReference(newReference);
   }
   return taxonomyTerm;
 }
@@ -1604,6 +1732,52 @@ const addNewEvent = async(label, type, userId) => {
     console.log(error)
   });
   return item;
+}
+
+const updateEvent = async(label, type, temporalId, userId) => {
+  let event = null;
+  if (temporalId!==null) {
+    let session = driver.session();
+    let escapeLabel = helpers.addslashes(label);
+    let query = `MATCH (n:Event)-->(t:Temporal) WHERE LOWER(n.label)="${escapeLabel.toLowerCase()}" AND n.eventType="${type}" AND id(t)=${temporalId} RETURN n`;
+    event = await session.writeTransaction(tx=>
+      tx.run(query,{})
+    )
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+  }
+  if (event===null) {
+    event = await addNewEvent(label, type, userId);
+  }
+  return event;
+}
+
+const loadHamellRef = async() => {
+  let session = driver.session();
+  let query = `MATCH (n:Resource) WHERE LOWER(n.label)="hamell 1" return n`;
+  let node = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    session.close();
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+  }).catch((error) => {
+    console.log(error)
+  });
+  return node;
 }
 
 module.exports = {

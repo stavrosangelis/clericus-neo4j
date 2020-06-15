@@ -78,15 +78,15 @@ class Person {
           status = false;
           errors.push({field: "appelation", msg: "Appelation must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
-        if (alternateAppelation.appelation==="" && alternateAppelation.firstName.length<1) {
+        if (alternateAppelation.appelation==="" && typeof alternateAppelation.firstName!=="undefined" && alternateAppelation.firstName!==null && alternateAppelation.firstName!=="" && alternateAppelation.firstName.length<1) {
           status = false;
           errors.push({field: "firstName", msg: "First name must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
-        if (alternateAppelation.appelation==="" && alternateAppelation.middleName!=="" && this.firstName.length<1) {
+        if (alternateAppelation.appelation==="" && typeof alternateAppelation.middleName!=="undefined" && alternateAppelation.middleName!==null && alternateAppelation.middleName!=="" && this.firstName.length<1) {
           status = false;
           errors.push({field: "middleName", msg: "If middle name is entered it must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
-        if (alternateAppelation.appelation==="" && alternateAppelation.lastName.length<1) {
+        if (alternateAppelation.appelation==="" && typeof alternateAppelation.lastName!=="undefined" && alternateAppelation.lastName!==null && alternateAppelation.lastName!=="" && alternateAppelation.lastName.length<1) {
           status = false;
           errors.push({field: "lastName", msg: "Last name must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
