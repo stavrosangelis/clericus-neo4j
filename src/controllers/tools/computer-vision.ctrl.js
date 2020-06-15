@@ -3,6 +3,7 @@ const Canvas = require('canvas');
 const fs = require('fs');
 const FormData = require('form-data');
 const axios = require('axios');
+const driver = require("../../config/db-driver");
 
 const ExifImage = require('exif').ExifImage;
 const iptc = require('node-iptc');
@@ -11,6 +12,10 @@ const helpers = require("../../helpers");
 const csvParser = require('csv-parser');
 const stringSimilarity = require('string-similarity');
 const levenshtein = require('js-levenshtein');
+const Taxonomy = require('../taxonomy.ctrl').Taxonomy;
+const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
+const references = require('../references.ctrl').updateReference;
+const Person = require('../person.ctrl').Person;
 
 const resourcesPath = process.env.RESOURCESPATH;
 const archivePath = process.env.ARCHIVEPATH;
@@ -730,11 +735,26 @@ const updateColumns = async (req, resp) => {
   })
 }
 
+
 const prepareForIngestion = async (req,resp) => {
   const directory = `${archivePath}documents/hamell-csv/`;
   const outputDirectory = `${archivePath}documents/hamell-csv-output/`;
   const files = await fs.readdirSync(directory);
   let headers = ['Name','Diocese','Matriculated','Class','Ordained'];
+  let userId = req.decoded.id;
+  let output = [];
+  let count = 0;
+  let csv = "Name,Diocese,Matriculated,Class,Ordained,DB name,Classpiece, URL\n";
+  let matriculationClass = new Taxonomy({systemType:"matriculationClass"});
+  await matriculationClass.load();
+  let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "hasAffiliation"});
+  await organisationTaxonomyTerm.load();
+  let eventTypeMatriculation = new TaxonomyTerm({labelId: "matriculation"});
+  await eventTypeMatriculation.load();
+  let ordinationTypeMatriculation = new TaxonomyTerm({labelId: "ordination"});
+  await ordinationTypeMatriculation.load();
+  let moTaxonomyTerm = new TaxonomyTerm({labelId: "hasParticipant"});
+  await moTaxonomyTerm.load();
 
   for (f in files) {
     let fileNum = files[f];
@@ -1133,18 +1153,9 @@ const prepareForIngestion = async (req,resp) => {
       return output;
     }
 
-    let csv = "";
+
     for (let line in file) {
       let row = file[line];
-      if (Number(line)===0) {
-        row[5] = "Parsed name";
-        row[6] = "Affiliation";
-        row[7] = "Matriculation event";
-        row[8] = "Ordination event(s)";
-        row[9] = "?";
-        row[10] = "Same";
-        csv += `${row[0]},${row[1]},${row[2]},${row[3]},${row[4]},${row[5]},${row[6]},${row[7]},${row[8]},${row[9]},${row[10]}\n`;
-      }
       if (Number(line)>0) {
         let colName = row['0'];
         let colDiocese = row['1'];
@@ -1189,101 +1200,410 @@ const prepareForIngestion = async (req,resp) => {
           ordinationOutput = parseOrdinationDate(colOrdained);
         }
         let nameCol = parseName(colName);
-        row[5] = nameCol;
-        row[6] = dioceseText;
-        row[7] = matriculationOutput;
-        row[8] = ordinationOutput;
-        let hasQuestionMarkText = "", hasSameText = "";
-        if (hasQuestionMark(colName) || hasQuestionMark(colDiocese) || hasQuestionMark(colMatriculated) || hasQuestionMark(colClass) || hasQuestionMark(colOrdained)) {
-          row[9] = "true";
-          hasQuestionMarkText = "true";
-        }
-        if (hasSame(colName) || hasSame(colDiocese) || hasSame(colMatriculated) || hasSame(colClass) || hasSame(colOrdained)) {
-          row[10] = "true";
-          hasSameText = "true";
+
+        if (fileNum==="1.csv") {
+          output.push({
+            name: nameCol,
+            diocese: dioceseText,
+            matriculation: matriculationOutput,
+            ordination: ordinationOutput,
+          });
         }
 
-        let nameText = "";
-        if (typeof nameCol.lastName!=="undefined") {
-          nameText += `lastName: ${nameCol.lastName}`;
+        // 1. insert person
+        let match = await existingPerson(nameCol, dioceseText, ordinationOutput);
+        let person = null;
+        if (match.match) {
+          person = match.person;
         }
-        if (typeof nameCol.firstName!=="undefined") {
-          nameText += ` firstName: ${nameCol.firstName}`;
+        else {
+          person = await addPerson(nameCol,userId);
         }
-        if (typeof nameCol.middleName!=="undefined") {
-          nameText += ` middleName: ${nameCol.middleName}`;
+
+        // 2.1 insert organisation/diocese
+        let diocese = await addDiocese(diocese, userId);
+
+        // 2.2 link diocese with person
+        let dioceseReference = {
+          items: [
+            {_id: person._id, type: "Person"},
+            {_id: diocese._id, type: "Organisation"},
+          ],
+          taxonomyTermId: organisationTaxonomyTerm._id,
         }
-        if (typeof nameCol.alternateLastName!=="undefined") {
-          nameText += ` alternateLastName: ${nameCol.alternateLastName}`;
+        let dioceseRef = await references.updateReference(dioceseReference);
+
+        // 3.1. insert organisation/religious order
+         let religiousOrder = await addReligiousOrder(nameCol.religiousOrder, userId);
+        // 3.2 link religious order with person
+        let roReference = {
+          items: [
+            {_id: person._id, type: "Person"},
+            {_id: religiousOrder._id, type: "Organisation"},
+          ],
+          taxonomyTermId: organisationTaxonomyTerm._id,
         }
-        if (typeof nameCol.alternateFirstName!=="undefined") {
-          nameText += ` alternateFirstName: ${nameCol.alternateFirstName}`;
+         let roRef = await references.updateReference(roReference);
+
+        // 4.1 insert matriculation date
+        let matriculationDate = await addDate(matriculationOutput.date,null,userId);
+        // 4.2 insert matriculation role
+        let matriculationRole = null;
+        if (typeof matriculationOutput.role!=="undefined" && matriculationOutput.role!=="") {
+          matriculationRole = await addMatriculationRole(matriculationOutput.role, matriculationClass._id, userId);
         }
-        if (vidText!=="") {
-          nameText += ` alternateLastName: ${vidText}`;
+        // 4.3 add matriculation event
+        let matriculationLabel = `Matriculation`;
+        if (matriculationRole!==null) {
+          matriculationLabel += ` into ${matriculationOutput.role}`;
         }
-        if (typeof nameCol.religiousOrder!=="undefined" && nameCol.religiousOrder!==null && nameCol.religiousOrder!=="") {
-          if (dioceseText!=="") {
-            dioceseText += " | ";
-          }
-          dioceseText += `religiousOrder: ${nameCol.religiousOrder}`;
+        let matriculationEvent = await addNewEvent(matriculationLabel, eventTypeMatriculation._id, userId);
+        // 4.5 matriculation event/person reference
+        let matriculationReference = {
+          items: [
+            {_id: match._id, type: "Person"},
+            {_id: matriculationEvent._id, type: "Event"}
+          ],
+          taxonomyTermId: matriculationTaxonomyTerm._id,
+        };
+        if (matriculationRole!==null) {
+          matriculationReference.items[0].role = null;
+          matriculationReference.items[1].role = matriculationRole._id;
         }
-        let matriculationText = "";
-        if(typeof matriculationOutput.date!=="undefined" && matriculationOutput.date!=="") {
-          matriculationText += `matriculation at ${matriculationOutput.date}`;
+        await updateReference(matriculationReference);
+        // 5. insert ordination event (array)
+        for (let j=0;j<ordinationOutput.length; j++) {
+          let ordinationItem = ordinationOutput[i];
+          let eventType = "";
+          let startDate = "";
+          let endDate = "";
+          let role = "";
+          let label = "";
         }
-        if(typeof matriculationOutput.role!=="undefined" && matriculationOutput.role!=="") {
-          matriculationText += ` in ${matriculationOutput.role}`;
-        }
-        let ordinationText = "";
-        for (let o=0;o<ordinationOutput.length;o++) {
-          let oItem = ordinationOutput[o];
-          if (o>0) {
-            ordinationText += `; `;
-          }
-          if (typeof oItem.eventType!=="undefined") {
-            ordinationText += oItem.eventType;
-          }
-          if (typeof oItem.date!=="undefined") {
-            ordinationText += ` at`
-            if (typeof oItem.date.start!=="undefined") {
-              ordinationText += ` ${oItem.date.start}`;
-            }
-            if (typeof oItem.date.end!=="undefined") {
-              ordinationText += ` - ${oItem.date.end}`;
-            }
-          }
-          if (typeof oItem.role!=="undefined") {
-            ordinationText += ` as ${oItem.role}`;
-          }
-        }
-        csv += `"${row[0]}","${row[1]}","${row[2]}","${row[3]}","${row[4]}","${nameText}","${dioceseText}","${matriculationText}","${ordinationText}","${hasQuestionMarkText}","${hasSameText}"\n`;
       }
-
     }
-
-    let writeFile = await new Promise ((resolve,reject)=> {
-      fs.writeFile(outputDirectory+fileNum, csv, 'utf8', function(err) {
-        if (err) {
-          reject(err);
-        } else {
-        //  console.log(`CSV created successfully at the path "${outputDirectory+fileNum}"`)
-          resolve(true);
-        }
-      });
-    });
   }
-
-
-
-
-  let output = [];
+  let writeFile = await new Promise ((resolve,reject)=> {
+    fs.writeFile(`${outputDirectory}diocese-classpiece-match.csv`, csv, 'utf8', function(err) {
+      if (err) {
+        reject(err);
+      } else {
+      //  console.log(`CSV created successfully at the path "${outputDirectory+fileNum}"`)
+        resolve(true);
+      }
+    });
+  });
   resp.json({
     status: true,
-    data: [],
+    data: output,
     error: false,
     msg: '',
   })
+}
+
+const existingPerson = async(name, diocese, ordination) => {
+  let session = driver.session();
+  let output = {};
+  let match = false;
+  let person = null;
+  let query = `MATCH (n:Person) WHERE LOWER(n.lastName)="${name.lastName.toLowerCase().trim()}" AND LOWER(n.firstName)="${name.firstName.toLowerCase().trim()}" RETURN n`;
+  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    session.close();
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  if(nodesPromise.length>0) {
+    let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+    let ordinationYears = ordination.map(o=>{
+      if (typeof o.date!=="undefined") {
+        let startDate = o.date.start;
+        if (typeof o.date.start!=="undefined") {
+          let date = startDate.split("-");
+          return Number(date[2]);
+        }
+      }
+      else return 0;
+    })
+    for (let i=0;i<nodes.length; i++) {
+      let node = nodes[i];
+      // Check for existing First name and last name and diocese and ordination year with classpiece
+      let organisations = await helpers.loadRelations(node._id, "Person", "Organisation", false, "hasAffiliation");
+      let classpieces = await helpers.loadRelations(node._id, "Person", "Resource", false, "isDepictedOn");
+
+      let findDiocese = organisations.find(o=>{
+        if (o.ref.label.toLowerCase()===diocese.toLowerCase().trim()) {
+          return true;
+        }
+        return false;
+      });
+      let findClasspiece = classpieces.find(c=>{
+        let label = c.ref.label;
+        label = label.substr(0,4);
+        let num = Number(label);
+        let prev2 = num-2;
+        let prev = num-1;
+        let next = num+1;
+        let next2 = num+2;
+        if (ordinationYears.indexOf(num)>-1 || ordinationYears.indexOf(prev)>-1 || ordinationYears.indexOf(prev2)>-1 || ordinationYears.indexOf(next)>-1 || ordinationYears.indexOf(next2)>-1) {
+          return true;
+        }
+        return false;
+      });
+
+      let nodeClasspiece = "";
+      if (classpieces.length>0 && classpieces[0].ref.label) {
+        nodeClasspiece = classpieces[0].ref.label;
+      };
+      if (typeof findDiocese!=="undefined" && typeof findClasspiece!=="undefined") {
+        match = true;
+        person = node;
+      }
+    }
+  }
+  output.match = match;
+  output.person = person;
+  return output;
+}
+
+const addPerson = async(nameCol, userId) => {
+  let session = driver.session();
+  let firstName="",middleName="",lastName="",fnameSoundex="", lnameSoundex="",alternateAppelation={};
+  if (nameCol.middleName!=="") {
+    middleName = nameCol.middleName;
+  }
+  if (nameCol.firstName!=="") {
+    fnameSoundex = helpers.soundex(nameCol.firstName);
+  }
+  if (nameCol.lastName!=="") {
+    lnameSoundex = helpers.soundex(nameCol.lastName);
+  }
+  if (nameCol.alLastName!=="") {
+    alternateAppelation.lastName = nameCol.alLastName;
+  }
+  if (nameCol.alFirstName!=="") {
+    alternateAppelation.firstName = nameCol.alFirstName;
+  }
+  let personData = {
+    label:null,
+    honorificPrefix:[],
+    firstName:firstName,
+    middleName:middleName,
+    lastName:lastName,
+    fnameSoundex:fnameSoundex,
+    lnameSoundex:lnameSoundex,
+    alternateAppelations:[alternateAppelation],
+  };
+  let newPerson = new Person(personData);
+  let person = await newPerson.save(userId);
+  return person.data;
+}
+
+const addDiocese = async(diocese, userId) => {
+  diocese = diocese.trim();
+  let session = driver.session();
+  let query = `MATCH (n:Organisation) WHERE n.organisationType="Diocese" AND LOWER(n.label)="${diocese.toLowerCase()}" RETURN n`;
+  let organisation = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    let records = result.records;
+    let outputRecord = null;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      outputRecord = helpers.outputRecord(record.n);
+    }
+    return outputRecord;
+  }).catch((error) => {
+    console.log(error)
+  });
+  if (organisation===null) {
+    let newOrganisation = {};
+    let now = new Date().toISOString();
+    newOrganisation.createdBy = userId;
+    newOrganisation.createdAt = now;
+    newOrganisation.updatedBy = userId;
+    newOrganisation.updatedAt = now;
+    newOrganisation.organisationType = "Diocese";
+    newOrganisation.status = "private";
+    newOrganisation.labelSoundex = helpers.soundex(diocese);
+    let nodeProperties = helpers.prepareNodeProperties(newOrganisation);
+    let params = helpers.prepareParams(newOrganisation);
+    let query = `CREATE (n:Organisation ${nodeProperties}) RETURN n`;
+    organisation = await session.writeTransaction(tx=>tx.run(query,params))
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+  }
+  else {
+    session.close();
+  }
+  return organisation;
+}
+
+const addReligiousOrder = async(religiousOrder, userId) => {
+  religiousOrder = religiousOrder.replace(/\./g,"").trim();
+  let session = driver.session();
+  let query = `MATCH (n:Organisation) WHERE n.organisationType="ReligiousOrder" AND LOWER(n.label)="${religiousOrder.toLowerCase()}" RETURN n`;
+  let organisation = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    let records = result.records;
+    let outputRecord = null;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      outputRecord = helpers.outputRecord(record.n);
+    }
+    return outputRecord;
+  }).catch((error) => {
+    console.log(error)
+  });
+  if (organisation===null) {
+    let newOrganisation = {};
+    let now = new Date().toISOString();
+    newOrganisation.createdBy = userId;
+    newOrganisation.createdAt = now;
+    newOrganisation.updatedBy = userId;
+    newOrganisation.updatedAt = now;
+    newOrganisation.organisationType = "ReligiousOrder";
+    newOrganisation.status = "private";
+    newOrganisation.labelSoundex = helpers.soundex(religiousOrder);
+    let nodeProperties = helpers.prepareNodeProperties(newOrganisation);
+    let params = helpers.prepareParams(newOrganisation);
+    let query = `CREATE (n:Organisation ${nodeProperties}) RETURN n`;
+    organisation = await session.writeTransaction(tx=>tx.run(query,params))
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+  }
+  else {
+    session.close();
+  }
+  return organisation;
+}
+
+const addDate = async(startDate, endDate=null, userId) => {
+  let session = driver.session();
+  let queryEndDate = "";
+  if (endDate!==null && endDate!=="") {
+    queryEndDate = `AND n.endDate="${endDate}" `;
+  }
+  let query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" ${queryEndDate} RETURN n`;
+  let temporal = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    let records = result.records;
+    let outputRecord = null;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      outputRecord = helpers.outputRecord(record.n);
+    }
+    return outputRecord;
+  }).catch((error) => {
+    console.log(error)
+  });
+  if (temporal===null) {
+    let now = new Date().toISOString();
+    newItem.label = `${startDate} - ${endDate}`;
+    newItem.startDate = startDate;
+    newItem.endDate = endDate;
+    newItem.createdBy = userId;
+    newItem.createdAt = now;
+    newItem.updatedBy = userId;
+    newItem.updatedAt = now;
+    let nodeProperties = helpers.prepareNodeProperties(newItem);
+    let params = helpers.prepareParams(newItem);
+    let query = `CREATE (n:Temporal ${nodeProperties}) RETURN n`;
+    temporal = await session.writeTransaction(tx=>tx.run(query,params))
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+  }
+  else {
+    session.close();
+  }
+  return temporal;
+}
+
+const addMatriculationRole = async(label, taxonomyId, userId) => {
+  let labelId = helpers.normalizeLabelId(label);
+  let taxonomyTerm = new TaxonomyTerm({labelId: labelId});
+  await taxonomyTerm.load();
+  if (taxonomyTerm._id===null) {
+    // save taxonomy term
+    taxonomyTerm = new TaxonomyTerm({label: label});
+    await taxonomyTerm.save(userId);
+    // link to matriculation class taxonomy
+    let newReference = {
+      items: [
+        {_id: taxonomyId, type: "Taxonomy"},
+        {_id: taxonomyTerm._id, type: "TaxonomyTerm"}
+      ],
+      taxonomyTermLabel: "hasChild",
+    }
+    await updateReference(newReference);
+    await taxonomyTerm.load();
+  }
+  return taxonomyTerm;
+}
+
+const addNewEvent = async(label, type, userId) => {
+  let session = driver.session();
+  let now = new Date().toISOString();
+  let eventData = {
+    label: label,
+    eventType: type,
+    status: 'private',
+    createdBy: userId,
+    createdAt: now,
+    updatedBy: userId,
+    updatedAt: now,
+  }
+  let nodeProperties = helpers.prepareNodeProperties(eventData);
+  let params = helpers.prepareParams(eventData);
+  let query = `CREATE (n:Event ${nodeProperties}) RETURN n`;
+  let item = await session.writeTransaction(tx=>tx.run(query,params))
+  .then(result=> {
+    session.close();
+    let records = result.records;
+    let outputRecord = null;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      outputRecord = helpers.outputRecord(record.n);
+    }
+    return outputRecord;
+  }).catch((error) => {
+    console.log(error)
+  });
+  return item;
 }
 
 module.exports = {

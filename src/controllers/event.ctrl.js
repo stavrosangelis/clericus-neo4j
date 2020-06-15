@@ -252,7 +252,6 @@ const getEvents = async (req, resp) => {
   }
 
   query = `MATCH (n:Event) ${queryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
-  console.log(query)
   if (temporal!=="" || spatial!=="") {
     let newQueryParams = queryParams;
     if (newQueryParams!=="") {

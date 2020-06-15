@@ -240,7 +240,7 @@ server.get('/ocr-document', auth.checkAdminToken, cvisionController.analyseDocum
 server.get('/read-document', auth.checkAdminToken, cvisionController.readDocumentResults);
 server.get('/get-document-columns', cvisionController.getColumns);
 server.post('/update-document-columns', cvisionController.updateColumns);
-server.get('/prepare-hamell-ingestion', cvisionController.prepareForIngestion);
+server.get('/prepare-hamell-ingestion', auth.checkAdminToken, cvisionController.prepareForIngestion);
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);

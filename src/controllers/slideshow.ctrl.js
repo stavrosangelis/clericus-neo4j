@@ -71,11 +71,12 @@ class Slideshow {
       this[key] = node[key];
     }
     // populate featured image
-    if (typeof this.image!=="undefined" && this.image!=="") {
+    if (this.image!==null && typeof this.image!=="undefined" && this.image!=="") {
       let imageDetails = new UploadedFile({_id:this.image});
       await imageDetails.load();
       this.imageDetails = imageDetails;
     }
+    else this.imageDetails = null;
   }
 
   async save(userId) {
