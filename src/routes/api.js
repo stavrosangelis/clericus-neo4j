@@ -241,6 +241,7 @@ server.get('/read-document', auth.checkAdminToken, cvisionController.readDocumen
 server.get('/get-document-columns', cvisionController.getColumns);
 server.post('/update-document-columns', cvisionController.updateColumns);
 server.get('/prepare-hamell-ingestion', auth.checkAdminToken, cvisionController.prepareForIngestion);
+server.get('/after-hamell-ingestion', auth.checkAdminToken, cvisionController.afterIngestion);
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);

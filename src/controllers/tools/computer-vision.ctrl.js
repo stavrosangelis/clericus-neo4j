@@ -1780,6 +1780,141 @@ const loadHamellRef = async() => {
   return node;
 }
 
+const afterIngestion = async (req,resp)=>{
+  let matriculationClasses = [
+    {
+      term: "Humanity",
+      alternateTerms: ["Humamty","Humanicy","Humanitv","Humanity()","Humantiy","Hurnanity","Rhumanity"]
+    },
+    {
+      term: "Philosophy1",
+      alternateTerms: ["IPhilosophy","Philosoohy1","Philosopny1","Philsoophy1"]
+    },
+    {
+      term: "Philosophy2",
+      alternateTerms: ["Phiosophy2"]
+    },
+    {
+      term: "Physics",
+      alternateTerms: ["Phvsics"]
+    },
+    {
+      term: "Rhetoric",
+      alternateTerms: ["Rheioric","RhetoriC","Rhetoricd","Rhetortc","Rhetotic"]
+    },
+    {
+      term: "Theology",
+      alternateTerms: ["TheoIogy","Theologv"]
+    },
+    {
+      term: "Theology1",
+      alternateTerms: ["ITheology","ltheology"]
+    },
+  ];
+
+  const loadTermId = async (label) => {
+    let session = driver.session();
+    let query = `MATCH (n:TaxonomyTerm) WHERE n.label="${label}" return n`;
+    let node = await session.writeTransaction(tx=>tx.run(query,{}))
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      let outputRecord = {_id:null};
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+    return node._id;
+  }
+
+  // 1. select relations where role equals to alternate term id and replace the relationship role with the main term id
+  // MATCH (s)-[r {role:"34870"}]-(e) SET r.role="matriculationClass.term._id"
+  const updateTerm = async(srcTerm, alternateTerm) => {
+    let session = driver.session();
+    // 1. load triples
+    let query = `MATCH (s:Person)-[r {role:"${alternateTerm._id}"}]->(t:Event) return s,r,t`;
+    let triple = await session.writeTransaction(tx=>tx.run(query,{}))
+    .then(result=> {
+      let records = result.records;
+      let source = null;
+      let relation = null;
+      let target = null;
+      let output = {source:source,relation:relation,target:target};
+      if (records.length>0) {
+        let record = records[0].toObject();
+        source = helpers.outputRecord(record.s);
+        relation = helpers.outputRelation(record.r);
+        target = helpers.outputRecord(record.t);
+        // 2. update relation roleId
+        relation.properties.role = srcTerm._id;
+        target.label = targetLabel;
+        output = {source:source,relation:relation,target:target};
+      }
+      return output;
+    }).catch((error) => {
+      console.log(error)
+    });
+
+
+    // 2. update the relation roleId
+    let query2 = `MATCH (s)-[r {role:"${alternateTerm._id}"}]->(t) SET r.role="${srcTerm._id}" return s,r,t`;
+    let updateRelationRoleId = await session.writeTransaction(tx=>tx.run(query2,{}))
+    .then(result=> {
+      let records = result.records;
+    }).catch((error) => {
+      console.log(error)
+    });
+
+    // 3. update event title
+    let newLabel = triple.target.label.replace(alternateTerm.label, srcTerm.label);
+    let query3 = `MATCH (e:Event) WHERE id(e)=${Number(triple.target._id)} SET e.label="${newLabel}" return e`;
+    let updateEventLabel = await session.writeTransaction(tx=>tx.run(query3,{}))
+    .then(result=> {
+      let records = result.records;
+    }).catch((error) => {
+      console.log(error)
+    });
+
+    // 4. delete the alternate taxonomy term
+    let query4 = `MATCH (t:TaxonomyTerm) WHERE id(t)=${Number(alternateTerm._id)} DELETE t`;
+    let deleteAlTerm = await session.writeTransaction(tx=>tx.run(query4,{}))
+    .then(result=> {
+      let records = result.records;
+    }).catch((error) => {
+      console.log(error)
+    });
+    session.close();
+    return triple;
+  }
+
+  let triples = [];
+  for (key in matriculationClasses) {
+    let matriculationClass = matriculationClasses[key];
+    // 1. find main term _id
+    let label = matriculationClass.term;
+    let mainId = await loadTermId(label);
+    matriculationClass.term = {label:label, _id:mainId};
+    // 2. find alternateTerms _ids
+    for (let tkey in matriculationClass.alternateTerms) {
+      let alTerm = matriculationClass.alternateTerms[tkey];
+      let alId = await loadTermId(alTerm);
+      matriculationClass.alternateTerms[tkey] = {label:alTerm, _id:alId};
+      let updatedTerm = await updateTerm(matriculationClass.term, matriculationClass.alternateTerms[tkey]);
+      triples.push(updatedTerm);
+    }
+  }
+  resp.json({
+    status: true,
+    data: {classes: matriculationClasses, triples: triples},
+    error: false,
+    msg: '',
+  })
+}
+
 module.exports = {
   parseClassPiece: parseClassPiece,
   imageExif: imageExif,
@@ -1789,4 +1924,5 @@ module.exports = {
   getColumns: getColumns,
   updateColumns: updateColumns,
   prepareForIngestion: prepareForIngestion,
+  afterIngestion: afterIngestion,
 }

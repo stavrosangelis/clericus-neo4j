@@ -288,7 +288,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
   let queryParams = " n.status='public' ";
 
   if (typeof parameters.label!=="undefined") {
-    label = parameters.label;
+    label = helpers.addslashes(parameters.label);
     if (label!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -297,7 +297,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
     }
   }
   if (typeof parameters.firstName!=="undefined") {
-    firstName = parameters.firstName;
+    firstName = helpers.addslashes(parameters.firstName);
     if (firstName!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -306,7 +306,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
     }
   }
   if (typeof parameters.lastName!=="undefined") {
-    lastName = parameters.lastName;
+    lastName = helpers.addslashes(parameters.lastName);
     if (lastName!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -329,7 +329,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
     queryParams += "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
   }
   if (typeof parameters.description!=="undefined") {
-    description = parameters.description.toLowerCase();
+    description = helpers.addslashes(parameters.description.toLowerCase());
     if (queryParams !=="") {
       queryParams += " AND ";
     }

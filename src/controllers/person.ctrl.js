@@ -293,13 +293,13 @@ const getPeople = async (req, resp) => {
   let query = "";
   let queryParams = "";
   if (typeof parameters.label!=="undefined") {
-    label = parameters.label;
+    label = helpers.addslashes(parameters.label);
     if (label!=="") {
       queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
   if (typeof parameters.firstName!=="undefined") {
-    firstName = parameters.firstName;
+    firstName = helpers.addslashes(parameters.firstName);
     if (firstName!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -308,7 +308,7 @@ const getPeople = async (req, resp) => {
     }
   }
   if (typeof parameters.lastName!=="undefined") {
-    lastName = parameters.lastName;
+    lastName = helpers.addslashes(parameters.lastName);
     if (lastName!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -331,7 +331,7 @@ const getPeople = async (req, resp) => {
     queryParams += "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
   }
   if (typeof parameters.description!=="undefined") {
-    description = parameters.description.toLowerCase();
+    description = helpers.addslashes(parameters.description.toLowerCase());
     if (queryParams !=="") {
       queryParams += " AND ";
     }
