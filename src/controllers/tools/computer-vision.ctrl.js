@@ -1323,11 +1323,11 @@ const prepareForIngestion = async (req,resp) => {
             eventType = ordinationItem.eventType
           }
           if (typeof ordinationItem.date!=="undefined") {
-            if (typeof ordinationItem.start!=="undefined") {
-              startDate = ordinationItem.start;
+            if (typeof ordinationItem.date.start!=="undefined") {
+              startDate = ordinationItem.date.start;
             }
-            if (typeof ordinationItem.end!=="undefined") {
-              endDate = ordinationItem.end;
+            if (typeof ordinationItem.date.end!=="undefined") {
+              endDate = ordinationItem.date.end;
             }
           }
           if (typeof ordinationItem.role!=="undefined") {
@@ -1357,6 +1357,7 @@ const prepareForIngestion = async (req,resp) => {
             ordinationReference.items[0].role = ordinationRole._id;
           }
           await references.updateReference(ordinationReference);
+
           if (ordinationDate!==null) {
             let ordinationDateReference = {
               items: [
@@ -1365,7 +1366,6 @@ const prepareForIngestion = async (req,resp) => {
               ],
               taxonomyTermId: hasTimeTerm._id,
             };
-            console.log(ordinationDateReference)
             await references.updateReference(ordinationDateReference);
           }
 
