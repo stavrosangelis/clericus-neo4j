@@ -1851,7 +1851,6 @@ const afterIngestion = async (req,resp)=>{
         target = helpers.outputRecord(record.t);
         // 2. update relation roleId
         relation.properties.role = srcTerm._id;
-        target.label = targetLabel;
         output = {source:source,relation:relation,target:target};
       }
       return output;
