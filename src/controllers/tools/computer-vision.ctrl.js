@@ -1311,7 +1311,6 @@ const prepareForIngestion = async (req,resp) => {
             ],
             taxonomyTermId: hasTimeTerm._id,
           };
-          console.log(matriculationDateReference)
           await references.updateReference(matriculationDateReference);
         }
 
