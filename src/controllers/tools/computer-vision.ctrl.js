@@ -745,7 +745,7 @@ const prepareForIngestion = async (req,resp) => {
   let output = [];
   let count = 0;
   let csv = "Name,Diocese,Matriculated,Class,Ordained,DB name,Classpiece, URL\n";
-  let hasTimeTerm = new Taxonomy({systemType:"hasTime"});
+  let hasTimeTerm = new TaxonomyTerm({labelId:"hasTime"});
   await hasTimeTerm.load();
   let matriculationClass = new Taxonomy({systemType:"matriculationClass"});
   await matriculationClass.load();
@@ -1311,6 +1311,7 @@ const prepareForIngestion = async (req,resp) => {
             ],
             taxonomyTermId: hasTimeTerm._id,
           };
+          console.log(matriculationDateReference)
           await references.updateReference(matriculationDateReference);
         }
 
@@ -1365,6 +1366,7 @@ const prepareForIngestion = async (req,resp) => {
               ],
               taxonomyTermId: hasTimeTerm._id,
             };
+            console.log(ordinationDateReference)
             await references.updateReference(ordinationDateReference);
           }
 
