@@ -1860,32 +1860,35 @@ const afterIngestion = async (req,resp)=>{
 
 
     // 2. update the relation roleId
-    let query2 = `MATCH (s)-[r {role:"${alternateTerm._id}"}]->(t) SET r.role="${srcTerm._id}" return s,r,t`;
-    let updateRelationRoleId = await session.writeTransaction(tx=>tx.run(query2,{}))
-    .then(result=> {
-      let records = result.records;
-    }).catch((error) => {
-      console.log(error)
-    });
+    if (triple.source!==null && triple.relation!==null && triple.relation!==target) {
+      let query2 = `MATCH (s)-[r {role:"${alternateTerm._id}"}]->(t) SET r.role="${srcTerm._id}" return s,r,t`;
+      let updateRelationRoleId = await session.writeTransaction(tx=>tx.run(query2,{}))
+      .then(result=> {
+        let records = result.records;
+      }).catch((error) => {
+        console.log(error)
+      });
 
-    // 3. update event title
-    let newLabel = triple.target.label.replace(alternateTerm.label, srcTerm.label);
-    let query3 = `MATCH (e:Event) WHERE id(e)=${Number(triple.target._id)} SET e.label="${newLabel}" return e`;
-    let updateEventLabel = await session.writeTransaction(tx=>tx.run(query3,{}))
-    .then(result=> {
-      let records = result.records;
-    }).catch((error) => {
-      console.log(error)
-    });
+      // 3. update event title
+      let newLabel = triple.target.label.replace(alternateTerm.label, srcTerm.label);
+      let query3 = `MATCH (e:Event) WHERE id(e)=${Number(triple.target._id)} SET e.label="${newLabel}" return e`;
+      let updateEventLabel = await session.writeTransaction(tx=>tx.run(query3,{}))
+      .then(result=> {
+        let records = result.records;
+      }).catch((error) => {
+        console.log(error)
+      });
 
-    // 4. delete the alternate taxonomy term
-    let query4 = `MATCH (t:TaxonomyTerm) WHERE id(t)=${Number(alternateTerm._id)} DELETE t`;
-    let deleteAlTerm = await session.writeTransaction(tx=>tx.run(query4,{}))
-    .then(result=> {
-      let records = result.records;
-    }).catch((error) => {
-      console.log(error)
-    });
+      // 4. delete the alternate taxonomy term
+      let query4 = `MATCH (t:TaxonomyTerm) WHERE id(t)=${Number(alternateTerm._id)} DELETE t`;
+      let deleteAlTerm = await session.writeTransaction(tx=>tx.run(query4,{}))
+      .then(result=> {
+        let records = result.records;
+      }).catch((error) => {
+        console.log(error)
+      });
+    }
+
     session.close();
     return triple;
   }
