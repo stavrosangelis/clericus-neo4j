@@ -1837,21 +1837,24 @@ const afterIngestion = async (req,resp)=>{
     let session = driver.session();
     // 1. load triples
     let query = `MATCH (s:Person)-[r {role:"${alternateTerm._id}"}]->(t:Event) return s,r,t`;
-    let triple = await session.writeTransaction(tx=>tx.run(query,{}))
+    let triples = await session.writeTransaction(tx=>tx.run(query,{}))
     .then(result=> {
       let records = result.records;
       let source = null;
       let relation = null;
       let target = null;
-      let output = {source:source,relation:relation,target:target};
+      let output = [];
       if (records.length>0) {
-        let record = records[0].toObject();
-        source = helpers.outputRecord(record.s);
-        relation = helpers.outputRelation(record.r);
-        target = helpers.outputRecord(record.t);
-        // 2. update relation roleId
-        relation.properties.role = srcTerm._id;
-        output = {source:source,relation:relation,target:target};
+        for (let i=0;i<records.length;i++) {
+          let record = records[i].toObject();
+          source = helpers.outputRecord(record.s);
+          relation = helpers.outputRelation(record.r);
+          target = helpers.outputRecord(record.t);
+          // 2. update relation roleId
+          relation.properties.role = srcTerm._id;
+          output.push({source:source,relation:relation,target:target});
+        }
+
       }
       return output;
     }).catch((error) => {
@@ -1860,16 +1863,17 @@ const afterIngestion = async (req,resp)=>{
 
 
     // 2. update the relation roleId
-    if (triple.source!==null && triple.relation!==null && triple.relation!==target) {
-      let query2 = `MATCH (s)-[r {role:"${alternateTerm._id}"}]->(t) SET r.role="${srcTerm._id}" return s,r,t`;
-      let updateRelationRoleId = await session.writeTransaction(tx=>tx.run(query2,{}))
-      .then(result=> {
-        let records = result.records;
-      }).catch((error) => {
-        console.log(error)
-      });
+    let query2 = `MATCH (s)-[r {role:"${alternateTerm._id}"}]->(t) SET r.role="${srcTerm._id}" return s,r,t`;
+    let updateRelationRoleId = await session.writeTransaction(tx=>tx.run(query2,{}))
+    .then(result=> {
+      let records = result.records;
+    }).catch((error) => {
+      console.log(error)
+    });
 
-      // 3. update event title
+    // 3. update event title
+    for (let i=0;i<triples.length;i++) {
+      let triple = triples[i];
       let newLabel = triple.target.label.replace(alternateTerm.label, srcTerm.label);
       let query3 = `MATCH (e:Event) WHERE id(e)=${Number(triple.target._id)} SET e.label="${newLabel}" return e`;
       let updateEventLabel = await session.writeTransaction(tx=>tx.run(query3,{}))
@@ -1878,19 +1882,21 @@ const afterIngestion = async (req,resp)=>{
       }).catch((error) => {
         console.log(error)
       });
-
-      // 4. delete the alternate taxonomy term
-      let query4 = `MATCH (t:TaxonomyTerm) WHERE id(t)=${Number(alternateTerm._id)} DELETE t`;
-      let deleteAlTerm = await session.writeTransaction(tx=>tx.run(query4,{}))
-      .then(result=> {
-        let records = result.records;
-      }).catch((error) => {
-        console.log(error)
-      });
     }
 
+    // 4. delete the alternate taxonomy term
+    let query4 = `MATCH (t:TaxonomyTerm) WHERE id(t)=${Number(alternateTerm._id)}
+    OPTIONAL MATCH (t)-[r]-(n)
+    DELETE r,t`;
+    let deleteAlTerm = await session.writeTransaction(tx=>tx.run(query4,{}))
+    .then(result=> {
+      let records = result.records;
+    }).catch((error) => {
+      console.log(error)
+    });
+
     session.close();
-    return triple;
+    return triples;
   }
 
   let triples = [];
