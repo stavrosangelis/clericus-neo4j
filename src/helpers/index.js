@@ -391,23 +391,23 @@ const temporalEvents = async(props, eventTypes) => {
   }
   let eventTypesIds = eventTypes.map(_id=>`"${_id}"`);
   let query = `MATCH (n:Temporal)
-    WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
+    WHERE NOT n.startDate="" AND date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
     OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public'
     RETURN distinct id(e) as id`;
   if (eventTypes.length>0) {
     query = `MATCH (n:Temporal)
-      WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
+      WHERE NOT n.startDate="" AND date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
       OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public' AND e.eventType IN [${eventTypesIds}]
       RETURN distinct id(e) as id`;
   }
   if (dateType==="range") {
     query = `MATCH (n:Temporal)
-      WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))>=date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")})) AND date(datetime({epochmillis: apoc.date.parse(n.endDate,"ms","dd-MM-yyyy")}))<=date(datetime({epochmillis: apoc.date.parse('${endDate}',"ms","dd/MM/yyyy")}))
+      WHERE NOT n.startDate="" AND date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))>=date(datetime({epochmillis: apoc.date.parse("${startDate}","ms","dd/MM/yyyy")})) AND date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))<=date(datetime({epochmillis: apoc.date.parse("${endDate}","ms","dd/MM/yyyy")}))
       OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public'
       RETURN distinct id(e) as id`;
       if (eventTypes.length>0) {
         query = `MATCH (n:Temporal)
-          WHERE date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))>=date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")})) AND date(datetime({epochmillis: apoc.date.parse(n.endDate,"ms","dd-MM-yyyy")}))<=date(datetime({epochmillis: apoc.date.parse('${endDate}',"ms","dd/MM/yyyy")}))
+          WHERE NOT n.startDate="" AND date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))>=date(datetime({epochmillis: apoc.date.parse("${startDate}","ms","dd/MM/yyyy")})) AND date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))<=date(datetime({epochmillis: apoc.date.parse("${endDate}","ms","dd/MM/yyyy")}))
           OPTIONAL MATCH (n)--(e:Event) WHERE e.status='public' AND e.eventType IN [${eventTypesIds}]
           RETURN distinct id(e) as id`;
       }

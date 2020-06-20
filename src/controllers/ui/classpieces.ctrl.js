@@ -445,18 +445,7 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
     if (temporals.startDate!=="" && temporals.startDate!==null) {
       temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
       if (temporalEventIds.length===0) {
-         resp.json({
-           status: true,
-           data: {
-             currentPage: 1,
-             data: [],
-             totalItems: 0,
-             totalPages: 1,
-           },
-           error: [],
-           msg: "Query results",
-         })
-         return false;
+         console.log(temporalEventIds);
        }
     }
     else if (typeof eventTypes!=="undefined") {
@@ -647,7 +636,7 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
     queryParams: queryParams,
     skip: skip,
     limit: limit,
-    currentPage: currentPage,    
+    currentPage: currentPage,
     queryOrder: queryOrder
   };
 }

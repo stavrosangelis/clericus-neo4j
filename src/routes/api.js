@@ -8,6 +8,7 @@ const articleController = require('../controllers/article.ctrl')
 const articleCategoryController = require('../controllers/articleCategory.ctrl')
 const authController = require('../controllers/authentication.ctrl')
 const cvisionController = require('../controllers/tools/computer-vision.ctrl');
+const contactFormsController = require('../controllers/contactForms.ctrl');
 const dashboardController = require('../controllers/dashboard.ctrl')
 const entityController = require('../controllers/entity.ctrl');
 const eventController = require('../controllers/event.ctrl');
@@ -44,6 +45,7 @@ const peopleController = require('../controllers/ui/people.ctrl');
 const searchController = require('../controllers/ui/search.ctrl');
 const uiMenuController = require('../controllers/ui/menu.ctrl');
 const visualisationsController = require('../controllers/ui/visualisations.ctrl');
+const contactController = require('../controllers/ui/contact.ctrl');
 
 // ******* ui endpoints ******** //
 server.get('/generic-stats', analyticsController.genericStats);
@@ -61,6 +63,9 @@ server.get('/content-articles', contentController.getArticles);
 server.get('/content-article', contentController.getArticle);
 server.get('/content-category', contentController.getArticleCategory);
 server.get('/ui-highlights', contentController.getHighlights);
+
+// ******* ui content ******** //
+server.post('/contact', contactController.postContact);
 
 // ******* ui events ******** //
 server.get('/ui-events', eventsUiController.getEvents);
@@ -120,6 +125,10 @@ server.put('/article-category', auth.checkAdminToken, articleCategoryController.
 server.get('/article-category', auth.checkAdminToken, articleCategoryController.getArticleCategory);
 server.get('/article-categories', auth.checkAdminToken, articleCategoryController.getArticleCategories);
 server.delete('/article-category', auth.checkAdminToken, articleCategoryController.deleteArticleCategory);
+
+// contact forms
+server.get('/contact-forms', auth.checkAdminToken, contactFormsController.getContactForms);
+server.get('/contact-form', auth.checkAdminToken, contactFormsController.getContactForm);
 
 // dashboard
 server.get('/dashboard', auth.checkAdminToken, dashboardController.dashboardStats);
@@ -267,5 +276,7 @@ server.post('/seed-db', seedController.seedData);
 
 // settings
 server.get('/settings', settingsController.getSettings);
+server.post('/app-settings', auth.checkAdminToken, settingsController.updateAppSettings);
+server.get('/app-settings', auth.checkAdminToken, settingsController.getAppSettings);
 
 module.exports = server;
