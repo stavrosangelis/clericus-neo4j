@@ -34,6 +34,7 @@ const helpers = require("../../helpers");
 const getPeople = async (req, resp) => {
   let params = await getPeoplePrepareQueryParams(req);
   let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
+  //console.log(query)
   let data = await getPeopleQuery(query, params.match, params.queryParams, params.limit);
   if (data.error) {
     resp.json({
@@ -269,7 +270,7 @@ const getPersonActiveFilters = async(req, resp) => {
 }
 
 const getPeoplePrepareQueryParams = async(req)=>{
-  let parameters = req.query;
+  let parameters = req.body;
   let label = "";
   let firstName = "";
   let lastName = "";
@@ -287,7 +288,11 @@ const getPeoplePrepareQueryParams = async(req)=>{
   let query = "";
   let queryParams = " n.status='public' ";
 
-  if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.advancedSearch!=="undefined") {
+    queryParams += advancedQueryBuilder(parameters.advancedSearch);
+  }
+
+  if (typeof parameters.label!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     label = helpers.addslashes(parameters.label);
     if (label!=="") {
       if (queryParams !=="") {
@@ -296,7 +301,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
-  if (typeof parameters.firstName!=="undefined") {
+  if (typeof parameters.firstName!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     firstName = helpers.addslashes(parameters.firstName);
     if (firstName!=="") {
       if (queryParams !=="") {
@@ -305,7 +310,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams += "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
     }
   }
-  if (typeof parameters.lastName!=="undefined") {
+  if (typeof parameters.lastName!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     lastName = helpers.addslashes(parameters.lastName);
     if (lastName!=="") {
       if (queryParams !=="") {
@@ -314,21 +319,21 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams += "LOWER(n.lastName) =~ LOWER('.*"+lastName+".*') ";
     }
   }
-  if (typeof parameters.fnameSoundex!=="undefined") {
+  if (typeof parameters.fnameSoundex!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     fnameSoundex = helpers.soundex(parameters.fnameSoundex);
     if (queryParams !=="") {
       queryParams += " AND ";
     }
     queryParams += "LOWER(n.fnameSoundex) =~ LOWER('.*"+fnameSoundex+".*') ";
   }
-  if (typeof parameters.lnameSoundex!=="undefined") {
+  if (typeof parameters.lnameSoundex!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     lnameSoundex = helpers.soundex(parameters.lnameSoundex);
     if (queryParams !=="") {
       queryParams += " AND ";
     }
     queryParams += "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
   }
-  if (typeof parameters.description!=="undefined") {
+  if (typeof parameters.description!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     description = helpers.addslashes(parameters.description.toLowerCase());
     if (queryParams !=="") {
       queryParams += " AND ";
@@ -406,7 +411,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
   }
 
   let events=[], organisations=[], people=[], resources=[];
-  if (typeof parameters.events!=="undefined") {
+  if (typeof parameters.events!=="undefined" && parameters.events.length>0) {
     if (temporalEventIds.length>0) {
       for (let i=0;i<temporalEventIds.length; i++) {
         let tei = temporalEventIds[i];
@@ -459,7 +464,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams += ` AND id(e) IN [${events}] `;
     }
   }
-  if (typeof parameters.organisations!=="undefined") {
+  if (typeof parameters.organisations!=="undefined" && parameters.organisations.length>0) {
     organisations = parameters.organisations;
     if (events.length>0) {
       match += ", (n:Person)-[rorganisation]->(o:Organisation)";
@@ -474,7 +479,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams += ` AND id(o) IN [${organisations}] `;
     }
   }
-  if (typeof parameters.people!=="undefined") {
+  if (typeof parameters.people!=="undefined" && parameters.people.length>0) {
     people = parameters.people;
     if (events.length>0 || organisations.length>0) {
       match += ", (n:Person)-[rperson]->(p:Person)";
@@ -489,7 +494,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams += ` AND id(p) IN [${people}] `;
     }
   }
-  if (typeof parameters.resources!=="undefined") {
+  if (typeof parameters.resources!=="undefined" && parameters.resources.length>0) {
     resources = parameters.resources;
     if (events.length>0 || organisations.length>0 || people.length>0) {
       match += ", (n:Person)-[rresource]->(re:Resource)";
@@ -528,6 +533,27 @@ const getPeoplePrepareQueryParams = async(req)=>{
     currentPage: currentPage,
     queryOrder: queryOrder
   };
+}
+
+const advancedQueryBuilder = (advancedSearch) => {
+  let query = "";
+  for (let i=0;i<advancedSearch.length;i++) {
+    let item = advancedSearch[i];
+    query += ` ${item.boolean.toUpperCase()}`;
+    if (item.qualifier==="not_equals") {
+      query += ` NOT n.${item.select} = "${item.input}" `;
+    }
+    if (item.qualifier==="not_contains") {
+      query += ` NOT LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
+    }
+    if (item.qualifier==="contains") {
+      query += ` LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
+    }
+    if (item.qualifier==="equals") {
+      query += ` n.${item.select} = "${item.input}" `;
+    }
+  }
+  return query;
 }
 
 module.exports = {
