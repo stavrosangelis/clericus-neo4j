@@ -8,6 +8,7 @@ const formidable = require('formidable');
 const path = require('path');
 const UploadedFile = require('./uploadedFile.ctrl').UploadedFile;
 const ArticleCategory = require('./articleCategory.ctrl').ArticleCategory;
+const getArticleCategoriesChildren = require('./articleCategory.ctrl').getArticleCategoriesChildren;
 
 class Article {
   constructor({_id=null,label=null,permalink=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,highlight=false,highlightOrder=0,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
@@ -239,7 +240,7 @@ const getArticles = async (req, resp) => {
   if (typeof parameters.categoryId!=="undefined") {
     categoryId = parameters.categoryId;
     if (categoryId!=="") {
-      queryParams +=`n.category=${categoryId} ` ;
+      queryParams +=`n.category="${categoryId}" ` ;
     }
   }
   if (typeof parameters.categoryName!=="undefined") {
@@ -248,7 +249,11 @@ const getArticles = async (req, resp) => {
       let category = new ArticleCategory({label:categoryName});
       await category.load();
       categoryId = category._id;
-      queryParams +=`n.category="${categoryId}" ` ;
+      console.log(typeof categoryId)
+      let categories = await getArticleCategoriesChildren(categoryId);
+      let childrenCategoriesIds = categories.map(c=>`"${c._id}"`);
+      let categoryIds = [`"${categoryId}"`,...childrenCategoriesIds];
+      queryParams +=`n.category IN [${categoryIds}] `;
     }
   }
   if (typeof parameters.status!=="undefined") {
@@ -286,6 +291,7 @@ const getArticles = async (req, resp) => {
   }
 
   query = "MATCH (n:Article) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+
   let data = await getArticlesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({

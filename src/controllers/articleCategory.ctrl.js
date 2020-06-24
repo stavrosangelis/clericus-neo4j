@@ -345,6 +345,7 @@ const deleteArticleCategory = async(req, resp) => {
 module.exports = {
   ArticleCategory: ArticleCategory,
   getArticleCategories: getArticleCategories,
+  getArticleCategoriesChildren: getArticleCategoriesChildren,
   getArticleCategory: getArticleCategory,
   putArticleCategory: putArticleCategory,
   deleteArticleCategory: deleteArticleCategory
