@@ -11,22 +11,20 @@ const helpers = require("../../helpers");
 const genericStats = async (req, resp) => {
   let countPeoplePromise = countNodes("Person");
   let countResourcesPromise = countNodes("Resource");
-  let countOrganisationsPromise = countNodes("Organisation");
+  let countUniqueLastNamesPromise = countUniqueLastNames();
+  let countDiocesesPromise = countNodes("Organisation", "Diocese");
+  /*let countOrganisationsPromise = countNodes("Organisation");
   let countEventsPromise = countNodes("Event");
   let countSpatialPromise = countNodes("Spatial");
-  let countTemporalPromise = countNodes("Temporal");
-  let countDiocesesPromise = countNodes("Organisation");
-  let stats = await Promise.all([countPeoplePromise, countResourcesPromise,countOrganisationsPromise,countEventsPromise,countSpatialPromise,countTemporalPromise,countDiocesesPromise]).then((data)=> {
+  let countTemporalPromise = countNodes("Temporal");*/
+  let stats = await Promise.all([countPeoplePromise,countResourcesPromise,countDiocesesPromise,countUniqueLastNamesPromise]).then((data)=> {
     return data;
   });
   let response = {
     people: stats[0],
     resources: stats[1],
-    organisations: stats[2],
-    events: stats[3],
-    spatial: stats[4],
-    temporal: stats[5],
-    dioceses: stats[6],
+    dioceses: stats[2],
+    lastNames: stats[3],
   }
   resp.json({
     status: true,
@@ -38,10 +36,11 @@ const genericStats = async (req, resp) => {
 
 const countNodes = async (type, systemType=null) => {
   let session = driver.session();
-  let query = "MATCH (n:"+type+") WHERE n.status='public' RETURN count(*)";
+  let query = `MATCH (n:${type}) WHERE n.status="public" RETURN count(*)`;
   if (systemType!==null && type==="Organisation") {
-    query = `MATCH (n:${type}) n.organisationType="${systemType} RETURN count(*)`;
+    query = `MATCH (n:${type}) WHERE n.organisationType="${systemType}" RETURN count(*)`;
   }
+
   let count = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -51,6 +50,23 @@ const countNodes = async (type, systemType=null) => {
     let countObj = resultRecord.toObject();
     helpers.prepareOutput(countObj);
     let output = countObj['count(*)'];
+    return output;
+  });
+  return parseInt(count,10);
+}
+
+const countUniqueLastNames = async () => {
+  let session = driver.session();
+  let query = `MATCH (n:Person) WHERE NOT n.lastName="" RETURN count(DISTINCT n.lastName) AS c`;
+  let count = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    session.close()
+    let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['c'];
     return output;
   });
   return parseInt(count,10);
