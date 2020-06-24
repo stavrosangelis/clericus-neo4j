@@ -240,7 +240,10 @@ const getArticles = async (req, resp) => {
   if (typeof parameters.categoryId!=="undefined") {
     categoryId = parameters.categoryId;
     if (categoryId!=="") {
-      queryParams +=`n.category="${categoryId}" ` ;
+      let categories = await getArticleCategoriesChildren(categoryId);
+      let childrenCategoriesIds = categories.map(c=>`"${c._id}"`);
+      let categoryIds = [`"${categoryId}"`,...childrenCategoriesIds];
+      queryParams +=`n.category IN [${categoryIds}] `;
     }
   }
   if (typeof parameters.categoryName!=="undefined") {
@@ -249,7 +252,6 @@ const getArticles = async (req, resp) => {
       let category = new ArticleCategory({label:categoryName});
       await category.load();
       categoryId = category._id;
-      console.log(typeof categoryId)
       let categories = await getArticleCategoriesChildren(categoryId);
       let childrenCategoriesIds = categories.map(c=>`"${c._id}"`);
       let categoryIds = [`"${categoryId}"`,...childrenCategoriesIds];
