@@ -6,6 +6,18 @@ class Person {
     if (typeof _id!=="undefined" && _id!==null) {
       this._id = _id;
     }
+    if (firstName!==null) {
+      firstName = firstName.trim();
+    }
+    if (middleName!==null) {
+      middleName = middleName.trim();
+    }
+    if (lastName!==null) {
+      lastName = lastName.trim();
+    }
+    if (description!==null) {
+      description = description.trim();
+    }
     this.honorificPrefix = honorificPrefix;
     this.firstName = firstName;
     this.middleName = middleName;
@@ -28,20 +40,21 @@ class Person {
       if (label!=="") {
         label += " ";
       }
-      label += props.firstName;
+      label += props.firstName.trim();
     }
     if (props.middleName!==null) {
       if (label!=="") {
         label += " ";
       }
-      label += props.middleName;
+      label += props.middleName.trim();
     }
     if (props.lastName!==null) {
       if (label!=="") {
         label += " ";
       }
-      label += props.lastName;
+      label += props.lastName.trim();
     }
+    label = label.replace(/  /g,' ');
     return label;
   }
 
@@ -74,7 +87,7 @@ class Person {
       for (let key in this.alternateAppelations) {
         let alternateAppelation = this.alternateAppelations[key];
         let label = "";
-        if (alternateAppelation.appelation!=="" && alternateAppelation.appelation.length<1) {
+        if (typeof alternateAppelation.appelation!=="undefined" && alternateAppelation.appelation!=="" && alternateAppelation.appelation.length<1) {
           status = false;
           errors.push({field: "appelation", msg: "Appelation must contain at least 1 characters for alternate appelation \""+alternateAppelation.appelation+"\""});
         }
@@ -755,6 +768,57 @@ const updateStatus = async(req, resp) => {
   });
 }
 
+const fixLabels = async(req, resp) => {
+  let output = [];
+  let query = `MATCH (n:Person) WHERE  n.label =~ '.*  .*'  RETURN n`;
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  let userId = req.decoded.id;
+  for (let i=0;i<nodes.length; i++) {
+    let node = nodes[i];
+    let label = node.label;
+    let firstName = node.firstName.trim();
+    let lastName = node.lastName.trim();
+    label = label.replace(/  /g,' ');
+    let now = new Date().toISOString();
+    let updatedBy = userId;
+    let updatedAt = now;
+
+    let query = `MATCH (n:Person) WHERE id(n)=${node._id} SET n.label="${label}", n.firstName="${firstName}", n.lastName="${lastName}", n.updatedBy="${updatedBy}", n.updatedAt="${updatedAt}" return n`;
+    const resultPromise = await session.run(query,{}).then(result => {
+      let records = result.records;
+      let ret = null;
+      if (records.length>0) {
+        let record = records[0];
+        let key = record.keys[0];
+        let resultRecord = record.toObject()[key];
+        resultRecord = helpers.outputRecord(resultRecord);
+        ret = resultRecord;
+      }
+      return ret;
+    })
+    .catch((error) => {
+      console.log(error)
+    });
+    output.push(resultPromise)
+  }
+  session.close();
+  resp.json({
+    status: true,
+    data: output,
+    error: [],
+    msg: "Query results",
+  })
+}
 module.exports = {
   Person: Person,
   getPeople: getPeople,
@@ -764,4 +828,5 @@ module.exports = {
   deletePeople: deletePeople,
   patchUnknown: patchUnknown,
   updateStatus: updateStatus,
+  fixLabels: fixLabels,
 };

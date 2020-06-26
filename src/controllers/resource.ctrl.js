@@ -349,7 +349,6 @@ const getResources = async (req, resp) => {
     queryParams = "WHERE "+queryParams;
   }
   query = "MATCH (n:Resource) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
-
   let data = await getResourcesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -994,7 +993,6 @@ const deleteClasspiece = async(req, resp) => {
     msg: "Query results",
   });}
 
-
 const updateAnnotationImage = async(req, resp) => {
   let postData = req.body;
   if (Object.keys(postData).length===0) {
@@ -1219,6 +1217,190 @@ const rotateCoordinates = (cx,cy,x,y,radians, width, height,rotateDegrees) => {
     return newCoordinates;
 }
 
+const classpieceCompiledEvent = async(req, resp) => {
+  let userId = req.decoded.id;
+  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  await classpieceSystemType.load();
+
+  let systemType = classpieceSystemType._id;
+  let query = `MATCH (n:Resource) WHERE n.systemType="${systemType}"  RETURN n ORDER BY n.label`;
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>
+    tx.run(query,{})
+  )
+  .then(result=> {
+    return result.records;
+  });
+
+  let wasCompiledTerm = new TaxonomyTerm({labelId:"wasCompiled"});
+  await wasCompiledTerm.load();
+  let hasTimeTerm = new TaxonomyTerm({labelId:"hasTime"});
+  await hasTimeTerm.load();
+  let compilationTerm = new TaxonomyTerm({labelId:"Compilation"});
+  await compilationTerm.load();
+
+  const parseLabelStart = (value) => {
+    let output = "01-01-"+value;
+    return output;
+  }
+  const parseLabelEnd = (start, value=null) => {
+    if (value!==null && value.length<4) {
+      let end = 4-value.length;
+      let pre = start.substring(0,end);
+      value = pre+value;
+    }
+    else if (value!==null && value.length===4) {
+      value = value;
+    }
+    else {
+      value = start;
+    }
+    let output = "31-12-"+value;
+    return output;
+  }
+
+  const parseLabel = (label) => {
+    let labelStart = "", labelEnd = "";
+    if (label.includes("-")) {
+      let newLabel = label.replace(/\(.\)/g,'');
+      let labelArr = newLabel.split("-");
+      labelStart = parseLabelStart(labelArr[0]);
+      labelEnd = parseLabelEnd(labelArr[0],labelArr[1]);
+    }
+    else {
+      labelStart = parseLabelStart(label);
+      labelEnd = parseLabelEnd(label);
+    }
+    let dateRange = {start: labelStart, end: labelEnd};
+    return dateRange;
+  }
+
+  const addNewEvent = async(label, type, userId) => {
+    let session = driver.session();
+    let now = new Date().toISOString();
+    let eventData = {
+      label: label,
+      eventType: type,
+      status: 'private',
+      createdBy: userId,
+      createdAt: now,
+      updatedBy: userId,
+      updatedAt: now,
+    }
+    let nodeProperties = helpers.prepareNodeProperties(eventData);
+    let params = helpers.prepareParams(eventData);
+    let query = `CREATE (n:Event ${nodeProperties}) RETURN n`;
+    let item = await session.writeTransaction(tx=>tx.run(query,params))
+    .then(result=> {
+      session.close();
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+    return item;
+  }
+
+  const addDate = async(startDate, endDate, userId) => {
+    let session = driver.session();
+    let query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" AND n.endDate="${endDate}" RETURN n`;
+    let temporal = await session.writeTransaction(tx=>tx.run(query,{}))
+    .then(result=> {
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+    if (temporal===null) {
+      let now = new Date().toISOString();
+      let label = startDate;
+      if (endDate!==null) {
+        label +=  ` - ${endDate}`;
+      }
+      let newItem = {
+        label: label,
+        startDate: startDate,
+        endDate: endDate,
+        createdBy: userId,
+        createdAt: now,
+        updatedBy: userId,
+        updatedAt: now,
+      }
+      let nodeProperties = helpers.prepareNodeProperties(newItem);
+      let params = helpers.prepareParams(newItem);
+      let query = `CREATE (n:Temporal ${nodeProperties}) RETURN n`;
+      temporal = await session.writeTransaction(tx=>tx.run(query,params))
+      .then(result=> {
+        session.close();
+        let records = result.records;
+        let outputRecord = null;
+        if (records.length>0) {
+          let record = records[0].toObject();
+          outputRecord = helpers.outputRecord(record.n);
+        }
+        return outputRecord;
+      }).catch((error) => {
+        console.log(error)
+      });
+    }
+    else {
+      session.close();
+    }
+    return temporal;
+  }
+
+  let output = [];
+  let classpieces = helpers.normalizeRecordsOutput(nodesPromise, "n");
+  for (let i=0;i<classpieces.length; i++) {
+    let classpiece = classpieces[i];
+    let dateRange = parseLabel(classpiece.label);
+    let compilationEvent = await addNewEvent(`Classpiece ${classpiece.label} compilation`,compilationTerm._id,userId);
+    let compilationReference = {
+      items: [
+        {_id: compilationEvent._id, type: "Event"},
+        {_id: classpiece._id, type: "Resource"}
+      ],
+      taxonomyTermId: wasCompiledTerm._id,
+    };
+    await referencesController.updateReference(compilationReference);
+
+    let compilationDate = await addDate(dateRange.start,dateRange.end,userId);
+    let compilationEventDateReference = {
+      items: [
+        {_id: compilationEvent._id, type: "Event"},
+        {_id: compilationDate._id, type: "Temporal"}
+      ],
+      taxonomyTermId: hasTimeTerm._id,
+    };
+    await referencesController.updateReference(compilationEventDateReference);
+    output.push({
+      label: classpiece.label,
+      dateRange: dateRange,
+      event: compilationEvent,
+      eventReference: compilationReference,
+      compilationDate: compilationDate,
+      compilationEventDateReference: compilationEventDateReference
+    });
+  }
+
+  resp.json({
+    status: true,
+    data: output,
+    error: false,
+    msg: [],
+  });
+}
+
 module.exports = {
   Resource: Resource,
   getResources: getResources,
@@ -1230,4 +1412,5 @@ module.exports = {
   deleteClasspiece: deleteClasspiece,
   updateAnnotationImage: updateAnnotationImage,
   updateStatus: updateStatus,
+  classpieceCompiledEvent: classpieceCompiledEvent,
 };

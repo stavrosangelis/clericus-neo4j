@@ -174,6 +174,7 @@ server.get('/people', personController.getPeople);
 server.delete('/person', auth.checkAdminToken, personController.deletePerson);
 server.delete('/people', auth.checkAdminToken, personController.deletePeople);
 server.post('/person-update-status', auth.checkAdminToken, personController.updateStatus);
+server.get('/fix-labels', auth.checkAdminToken, personController.fixLabels);
 //server.get('/patch-unknown', auth.checkAdminToken, personController.patchUnknown);
 
 // resources
@@ -186,6 +187,7 @@ server.delete('/delete-classpiece', auth.checkAdminToken, resourceController.del
 server.delete('/resources', auth.checkAdminToken, resourceController.deleteResources);
 server.put('/update-annotation-image', auth.checkAdminToken, resourceController.updateAnnotationImage);
 server.post('/resource-update-status', auth.checkAdminToken, resourceController.updateStatus);
+server.get('/classpiece-compiled-event', auth.checkAdminToken, resourceController.classpieceCompiledEvent);
 
 // organisations
 server.put('/organisation', auth.checkAdminToken, organisationController.putOrganisation);
@@ -251,6 +253,7 @@ server.get('/get-document-columns', cvisionController.getColumns);
 server.post('/update-document-columns', cvisionController.updateColumns);
 server.get('/prepare-hamell-ingestion', auth.checkAdminToken, cvisionController.prepareForIngestion);
 server.get('/after-hamell-ingestion', auth.checkAdminToken, cvisionController.afterIngestion);
+server.get('/hamell-ingest-csv', auth.checkAdminToken, cvisionController.ingestionFromCsv);
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);

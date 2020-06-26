@@ -34,7 +34,6 @@ const helpers = require("../../helpers");
 const getPeople = async (req, resp) => {
   let params = await getPeoplePrepareQueryParams(req);
   let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-  //console.log(query)
   let data = await getPeopleQuery(query, params.match, params.queryParams, params.limit);
   if (data.error) {
     resp.json({
@@ -293,7 +292,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
   }
 
   if (typeof parameters.label!=="undefined" && typeof parameters.advancedSearch==="undefined") {
-    label = helpers.addslashes(parameters.label);
+    label = helpers.addslashes(parameters.label).trim();
     if (label!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -302,7 +301,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
     }
   }
   if (typeof parameters.firstName!=="undefined" && typeof parameters.advancedSearch==="undefined") {
-    firstName = helpers.addslashes(parameters.firstName);
+    firstName = helpers.addslashes(parameters.firstName).trim();
     if (firstName!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -311,7 +310,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
     }
   }
   if (typeof parameters.lastName!=="undefined" && typeof parameters.advancedSearch==="undefined") {
-    lastName = helpers.addslashes(parameters.lastName);
+    lastName = helpers.addslashes(parameters.lastName).trim();
     if (lastName!=="") {
       if (queryParams !=="") {
         queryParams += " AND ";
@@ -320,21 +319,21 @@ const getPeoplePrepareQueryParams = async(req)=>{
     }
   }
   if (typeof parameters.fnameSoundex!=="undefined" && typeof parameters.advancedSearch==="undefined") {
-    fnameSoundex = helpers.soundex(parameters.fnameSoundex);
+    fnameSoundex = helpers.soundex(parameters.fnameSoundex).trim();
     if (queryParams !=="") {
       queryParams += " AND ";
     }
     queryParams += "LOWER(n.fnameSoundex) =~ LOWER('.*"+fnameSoundex+".*') ";
   }
   if (typeof parameters.lnameSoundex!=="undefined" && typeof parameters.advancedSearch==="undefined") {
-    lnameSoundex = helpers.soundex(parameters.lnameSoundex);
+    lnameSoundex = helpers.soundex(parameters.lnameSoundex).trim();
     if (queryParams !=="") {
       queryParams += " AND ";
     }
     queryParams += "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
   }
   if (typeof parameters.description!=="undefined" && typeof parameters.advancedSearch==="undefined") {
-    description = helpers.addslashes(parameters.description.toLowerCase());
+    description = helpers.addslashes(parameters.description).trim();
     if (queryParams !=="") {
       queryParams += " AND ";
     }

@@ -1393,6 +1393,262 @@ const prepareForIngestion = async (req,resp) => {
   })
 }
 
+const ingestionFromCsv = async (req,resp) => {
+  const parameters = req.query;
+  let fileName = parameters.fileName;
+  let headers = ['Surname','First Name','Diocese','Entered','Ordained','Class','Alternate Surname','Alternate First Name'];
+  const directory = `${archivePath}documents/hamell-extra/`;
+  let file = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(directory+fileName)
+    .pipe(csvParser(headers))
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    })
+  });
+  //console.log(file);
+  const outputDirectory = `${archivePath}documents/hamell-extra-output/`;
+
+  let userId = req.decoded.id;
+  let output = [];
+  let count = 0;
+  let hasTimeTerm = new TaxonomyTerm({labelId:"hasTime"});
+  await hasTimeTerm.load();
+  let matriculationClass = new Taxonomy({systemType:"matriculationClass"});
+  await matriculationClass.load();
+  let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "hasAffiliation"});
+  await organisationTaxonomyTerm.load();
+  let eventTypeMatriculation = new TaxonomyTerm({labelId: "matriculation"});
+  await eventTypeMatriculation.load();
+  let eventTypeOrdination = new TaxonomyTerm({labelId: "ordination"});
+  await eventTypeOrdination.load();
+  let moTaxonomyTerm = new TaxonomyTerm({labelId: "hasParticipant"});
+  await moTaxonomyTerm.load();
+  let referenceTerm = new TaxonomyTerm({labelId: "isReferencedIn"});
+  await referenceTerm.load();
+
+  let ordinationRanks = new Taxonomy({systemType:"ordinationRanks"});
+  await ordinationRanks.load();
+
+  let hamell1 = await loadHamellRef();
+  const isUpperCase = (str) => /^[A-Z']*$/.test(str);
+  const firstCapital = helpers.capitalCaseOnlyFirst;
+  const removeSpecialCharacters = (str)=>{
+    str = str.replace(/\*/g,'');
+    str = str.replace(/,/g,'');
+    str = str.replace(/\?/g,'');
+    str = str.replace(/\//g,'_');
+    return str;
+  }
+
+  const parseColClass = (str) => {
+    str = str.replace("Arts/Phil.", "Arts and Philosophy");
+    str = str.replace("Arts./Phil.", "Arts and Philosophy");
+    str = str.replace("Arts.Phil.", "Arts and Philosophy");
+    str = str.replace("Arts/Phil", "Arts and Philosophy");
+    str = str.replace("Arts/Div.", "Arts and Divinity");
+    str = str.replace("Div.", "Divinity");
+    let outputString = "";
+    let outputNum = "";
+    for (let i in str) {
+      let letter = str[i];
+      let num = Number(letter);
+      if (isNaN(num) || num===0) {
+        outputString += letter;
+      }
+      else outputNum += letter;
+    }
+    outputString = outputString.trim();
+    let label = outputString+" "+outputNum;
+    let newStr = removeSpecialCharacters(label);
+    newStr = newStr.replace(/\./g,'');
+    newStr = newStr.replace(/ /g,'_');
+    return {
+      label: label,
+      role: newStr
+    };
+  }
+
+  const parseDate = (str) => {
+    str = str.trim();
+    if (!str.includes("/")) {
+      let dateArr = str.split(" ");
+      let d = dateArr[0];
+      let m = dateArr[1];
+      let y = dateArr[2];
+      if (m==="January") m="01";
+      if (m==="February") m="02";
+      if (m==="March") m="03";
+      if (m==="April") m="04";
+      if (m==="May") m="05";
+      if (m==="June") m="06";
+      if (m==="July") m="07";
+      if (m==="August") m="08";
+      if (m==="September") m="09";
+      if (m==="October") m="10";
+      if (m==="November") m="11";
+      if (m==="December") m="12";
+      str = `${d}-${m}-${y}`;
+    }
+    else {
+      str = str.replace(/\//g,"-");
+    }
+    return str;
+  }
+
+  for (let line in file) {
+    let row = file[line];
+    if (Number(line)>0) {
+
+      let headers = ['Surname','First Name','Diocese','Entered','Ordained','Class','Alternate Surname','Alternate First Name'];
+      let colSurname = row[headers['0']];
+      let colFirstname = row[headers['1']];
+      let colDiocese = row[headers['2']];
+      let colMatriculated = row[headers['3']];
+      let colOrdained = row[headers['4']];
+      let colClass = row[headers['5']];
+      let colAlSurname = row[headers['6']];
+      let colAlFirstname = row[headers['7']];
+
+      let matriculationOutput = {};
+      if (typeof colMatriculated!=="undefined" && colMatriculated!=="") {
+        matriculationOutput.date = parseDate(colMatriculated);
+        if (colClass!=="") {
+          matriculationOutput.role = parseColClass(colClass);
+        }
+      }
+      let ordinationOutput = {};
+      if (typeof colOrdained!=="undefined" && colOrdained!=="") {
+        ordinationOutput.date = parseDate(colOrdained);
+      }
+
+
+      output.push({
+        lname: colSurname,
+        fname: colFirstname,
+        diocese: colDiocese,
+        matriculation: matriculationOutput,
+        ordination: ordinationOutput,
+        AlLname: colAlSurname,
+        AlFname: colAlFirstname,
+      });
+      let nameCol = {
+        lastName: colSurname,
+        firstName: colFirstname,
+      }
+      // 1. insert person
+      let match = await existingPerson(nameCol, colDiocese, [ordinationOutput]);
+      let person = null;
+      if (match.match) {
+        person = match.person;
+      }
+      else {
+        person = await addPerson(nameCol,userId);
+      }
+      if (typeof person._id==="undefined") {
+        continue;
+      }
+      // 2.1 insert organisation/diocese
+      let diocese = await addDiocese(colDiocese, userId);
+
+      // 2.2 link diocese with person
+      let dioceseReference = {
+        items: [
+          {_id: person._id, type: "Person"},
+          {_id: diocese._id, type: "Organisation"},
+        ],
+        taxonomyTermId: organisationTaxonomyTerm._id,
+      }
+      let dioceseRef = await references.updateReference(dioceseReference);
+
+      // 4.1 insert matriculation date
+      let matriculationDate = null;
+      if (typeof matriculationOutput.date!=="undefined") {
+        matriculationDate = await addDate(matriculationOutput.date,null,userId);
+      }
+
+      // 4.2 insert matriculation role
+      let matriculationRole = null;
+      if (typeof matriculationOutput.role!=="undefined" && matriculationOutput.role!=="") {
+        matriculationRole = await addTaxonomyRole(matriculationOutput.role.label, matriculationClass._id, userId);
+      }
+      // 4.3 add matriculation event
+      if (matriculationDate!==null) {
+        let matriculationLabel = `Matriculation`;
+        if (matriculationRole!==null) {
+          matriculationLabel += ` into ${matriculationOutput.role.label}`;
+        }
+        let matriculationEvent = await addNewEvent(matriculationLabel, eventTypeMatriculation._id, userId);
+        // 4.5 matriculation event/person reference
+        let matriculationReference = {
+          items: [
+            {_id: matriculationEvent._id, type: "Event"},
+            {_id: person._id, type: "Person"}
+          ],
+          taxonomyTermId: moTaxonomyTerm._id,
+        };
+        if (matriculationRole!==null) {
+          matriculationReference.items[1].role = null;
+          matriculationReference.items[0].role = matriculationRole._id;
+        }
+        await references.updateReference(matriculationReference);
+        // 4.6 matriculation event/date reference
+        let matriculationDateReference = {
+          items: [
+            {_id: matriculationEvent._id, type: "Event"},
+            {_id: matriculationDate._id, type: "Temporal"}
+          ],
+          taxonomyTermId: hasTimeTerm._id,
+        };
+        await references.updateReference(matriculationDateReference);
+      }
+
+
+      // 5. insert ordination event
+      let startDate="";
+      if (typeof ordinationOutput.date!=="undefined") {
+        startDate = ordinationOutput.date;
+      }
+      let label = "Ordination";
+      let ordinationDate = null;
+      let ordinationDateId = null;
+      if (startDate!=="") {
+        ordinationDate = await addDate(startDate,null,userId);
+        ordinationDateId = ordinationDate._id;
+      }
+      let ordinationEvent = await updateEvent(label, eventTypeOrdination._id, ordinationDateId, userId);
+      let ordinationReference = {
+        items: [
+          {_id: ordinationEvent._id, type: "Event"},
+          {_id: person._id, type: "Person"}
+        ],
+        taxonomyTermId: moTaxonomyTerm._id,
+      };
+      await references.updateReference(ordinationReference);
+
+      if (ordinationDate!==null) {
+        let ordinationDateReference = {
+          items: [
+            {_id: ordinationEvent._id, type: "Event"},
+            {_id: ordinationDate._id, type: "Temporal"}
+          ],
+          taxonomyTermId: hasTimeTerm._id,
+        };
+        await references.updateReference(ordinationDateReference);
+      }
+    }
+
+  }
+
+  resp.json({
+    status: true,
+    data: output,
+    error: false,
+    msg: '',
+  })
+}
+
 const existingPerson = async(name, diocese, ordination) => {
   if (diocese==="") {
     return {
@@ -1934,4 +2190,5 @@ module.exports = {
   updateColumns: updateColumns,
   prepareForIngestion: prepareForIngestion,
   afterIngestion: afterIngestion,
+  ingestionFromCsv: ingestionFromCsv,
 }
