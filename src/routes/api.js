@@ -42,6 +42,7 @@ const contentController = require('../controllers/ui/content.ctrl');
 const eventsUiController = require('../controllers/ui/events.ctrl');
 const organisationsUiController = require('../controllers/ui/organisations.ctrl');
 const peopleController = require('../controllers/ui/people.ctrl');
+const uiResourcesController = require('../controllers/ui/resources.ctrl');
 const searchController = require('../controllers/ui/search.ctrl');
 const uiMenuController = require('../controllers/ui/menu.ctrl');
 const visualisationsController = require('../controllers/ui/visualisations.ctrl');
@@ -57,6 +58,11 @@ server.get('/carousel', carouselController.getCarousel);
 server.get('/classpieces', classpiecesController.getClasspieces);
 server.get('/classpieces-active-filters', classpiecesController.getClasspiecesActiveFilters);
 server.get('/classpiece', classpiecesController.getClasspiece);
+
+// ******* ui resources ******** //
+server.get('/ui-resources', uiResourcesController.getResources);
+server.get('/ui-resources-active-filters', uiResourcesController.getResourcesActiveFilters);
+server.get('/ui-resource', uiResourcesController.getResource);
 
 // ******* ui content ******** //
 server.get('/content-articles', contentController.getArticles);
@@ -180,8 +186,8 @@ server.get('/fix-labels', auth.checkAdminToken, personController.fixLabels);
 // resources
 server.put('/resource', auth.checkAdminToken, resourceController.putResource);
 server.post('/upload-resource', auth.checkAdminToken, resourceController.uploadResource);
-server.get('/resource',  resourceController.getResource);
-server.get('/resources', resourceController.getResources);
+server.get('/resource',  auth.checkAdminToken, resourceController.getResource);
+server.get('/resources', auth.checkAdminToken, resourceController.getResources);
 server.delete('/resource', auth.checkAdminToken, resourceController.deleteResource);
 server.delete('/delete-classpiece', auth.checkAdminToken, resourceController.deleteClasspiece);
 server.delete('/resources', auth.checkAdminToken, resourceController.deleteResources);

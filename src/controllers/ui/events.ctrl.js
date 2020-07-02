@@ -231,8 +231,9 @@ const getEvent = async(req, resp) => {
   });
   let events = await helpers.loadRelations(_id, "Event", "Event", true);
   let organisations = await helpers.loadRelations(_id, "Event", "Organisation", true);
-  let people = await helpers.loadRelations(_id, "Event", "Person", true);
+  let people = await helpers.loadRelations(_id, "Event", "Person", true, null, "rn.lastName");
   let resources = await helpers.loadRelations(_id, "Event", "Resource", true);
+  let temporal = await helpers.loadRelations(_id, "Event", "Temporal", null);
 
   // get classpiece resource type id
   let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
@@ -252,6 +253,7 @@ const getEvent = async(req, resp) => {
   event.people = people;
   event.resources = resources;
   event.classpieces = classpieces;
+  event.temporal = temporal;
   resp.json({
     status: true,
     data: event,

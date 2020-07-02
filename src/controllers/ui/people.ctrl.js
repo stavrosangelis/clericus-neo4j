@@ -33,22 +33,12 @@ const helpers = require("../../helpers");
 */
 const getPeople = async (req, resp) => {
   let params = await getPeoplePrepareQueryParams(req);
-  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-  let data = await getPeopleQuery(query, params.match, params.queryParams, params.limit);
-  if (data.error) {
-    resp.json({
-      status: false,
+  if (!params.returnResults) {
+    responseData = {
+      currentPage: 1,
       data: [],
-      error: data.error,
-      msg: data.error.message,
-    })
-  }
-  else {
-    let responseData = {
-      currentPage: params.currentPage,
-      data: data.nodes,
-      totalItems: data.count,
-      totalPages: data.totalPages,
+      totalItems: 0,
+      totalPages: 1
     }
     resp.json({
       status: true,
@@ -56,6 +46,33 @@ const getPeople = async (req, resp) => {
       error: [],
       msg: "Query results",
     });
+    return false;
+  }
+  else {
+    let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
+    let data = await getPeopleQuery(query, params.match, params.queryParams, params.limit);
+    if (data.error) {
+      resp.json({
+        status: false,
+        data: [],
+        error: data.error,
+        msg: data.error.message,
+      })
+    }
+    else {
+      let responseData = {
+        currentPage: params.currentPage,
+        data: data.nodes,
+        totalItems: data.count,
+        totalPages: data.totalPages,
+      }
+      resp.json({
+        status: true,
+        data: responseData,
+        error: [],
+        msg: "Query results",
+      });
+    }
   }
 }
 
@@ -177,8 +194,12 @@ const getPerson = async(req, resp) => {
   });
   let events = await helpers.loadRelations(_id, "Person", "Event", true);
   let organisations = await helpers.loadRelations(_id, "Person", "Organisation", true);
-  let people = await helpers.loadRelations(_id, "Person", "Person", true);
+  let people = await helpers.loadRelations(_id, "Person", "Person", true, null, "rn.lastName");
   let resources = await helpers.loadRelations(_id, "Person", "Resource", true);
+  for (let i=0;i<events.length;i++) {
+    let eventItem = events[i];
+    eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+  }
   person.events = events;
   person.organisations = organisations;
   person.people = people;
@@ -223,10 +244,6 @@ const getPersonActiveFilters = async(req, resp) => {
   });
   let events = [];
   let organisations = [];
-  let people = [];
-  let resources = [];
-  let temporal = [];
-  let spatial = [];
   let eventsFind = nodes.filter(n=>n.type==="Event");
   if (eventsFind!=="undefined") {
     events = [];
@@ -239,26 +256,16 @@ const getPersonActiveFilters = async(req, resp) => {
   }
   let organisationsFind = nodes.filter(n=>n.type==="Organisation");
   if (organisationsFind!=="undefined") {
-    organisations = organisationsFind;
-  }
-  let peopleFind = nodes.filter(n=>n.type==="Person");
-  if (peopleFind!=="undefined") {
-    people = peopleFind;
-  }
-  let resourcesFind = nodes.filter(n=>n.type==="Resource");
-  if (resourcesFind!=="undefined") {
-    resources = resourcesFind;
-  }
-  let spatialFind = nodes.filter(n=>n.type==="Spatial");
-  if (spatialFind!=="undefined") {
-    spatial = spatialFind;
+    let organisationsResult = [];
+    for (let i=0;i<organisationsFind.length; i++) {
+      let org = organisationsFind[i];
+      organisationsResult.push(org._id);
+    }
+    organisations = organisationsResult;
   }
   let output = {
     events: events,
     organisations: organisations,
-    people: people,
-    resources: resources,
-    spatial: spatial,
   }
   resp.json({
     status: true,
@@ -277,10 +284,11 @@ const getPeoplePrepareQueryParams = async(req)=>{
   let lnameSoundex = "";
   let description = "";
   let page = 0;
-  let orderField = "label";
+  let orderField = "lastName";
   let queryPage = 0;
   let queryOrder = "";
   let limit = 25;
+  let returnResults = true;
 
   let match = "(n:Person)";
 
@@ -345,7 +353,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
   }
   if (orderField!=="") {
     queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
+    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc===true) {
       queryOrder += " DESC";
     }
   }
@@ -369,21 +377,10 @@ const getPeoplePrepareQueryParams = async(req)=>{
     if (typeof temporals==="string") {
       temporals = JSON.parse(temporals);
     }
-    if (temporals.startDate!=="" && temporals.startDate!==null) {
+    if (typeof temporals.startDate!=="undefined" && temporals.startDate!=="") {
       temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
       if (temporalEventIds.length===0) {
-         resp.json({
-           status: true,
-           data: {
-             currentPage: 1,
-             data: [],
-             totalItems: 0,
-             totalPages: 1,
-           },
-           error: [],
-           msg: "Query results",
-         })
-         return false;
+         returnResults = false;
        }
     }
     else if (typeof eventTypes!=="undefined") {
@@ -530,7 +527,8 @@ const getPeoplePrepareQueryParams = async(req)=>{
     skip: skip,
     limit: limit,
     currentPage: currentPage,
-    queryOrder: queryOrder
+    queryOrder: queryOrder,
+    returnResults: returnResults
   };
 }
 

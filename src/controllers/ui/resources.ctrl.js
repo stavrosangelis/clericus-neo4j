@@ -4,12 +4,12 @@ const Resource = require("../resource.ctrl").Resource;
 const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 /**
-* @api {get} /classpieces Classpieces
-* @apiName classpieces
-* @apiGroup Classpieces
+* @api {get} /resources Resources
+* @apiName resources
+* @apiGroup Resources
 *
-* @apiParam {string} [label] A string to match against a classpiece label
-* @apiParam {string} [description] A string to match against a classpiece description
+* @apiParam {string} [label] A string to match against a resource label
+* @apiParam {string} [description] A string to match against a resource description
 * @apiParam {array} [events] An array of event ids
 * @apiParam {array} [organisations] An array of organisations ids
 * @apiParam {array} [people] An array of people ids
@@ -21,23 +21,23 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 * @apiParam {number} [limit=25] The number of results per page
 *
 * @apiSuccess {number} currentPage The current page of results
-* @apiSuccess {array} data An array of classpieces objects
+* @apiSuccess {array} data An array of resources objects
 * @apiSuccess {number} totalItems The total number of results
 * @apiSuccess {number} totalPages The total number of available pages of results
 *
-* @apiSuccess (classpiece object) {object} Classpiece A classpiece object as part of the data array contains the following fields
-* @apiSuccess (classpiece object) {string} Classpiece[metadata] A stringified JSON object containing the classpiece metadata
-* @apiSuccess (classpiece object) {string} Classpiece[fileName] The file name of the classpiece
-* @apiSuccess (classpiece object) {array} Classpiece[paths] An array containing the path to the fullsize version of the classpiece and to the thumbnail of the classpiece
-* @apiSuccess (classpiece object) {string} Classpiece[systemType] The system type _id
-* @apiSuccess (classpiece object) {string} Classpiece[label] The label of the classpiece
-* @apiSuccess (classpiece object) {string} Classpiece[resourceType] The type of the classpiece, i.e. image
-* @apiSuccess (classpiece object) {string} Classpiece[status] If the classpiece is private or public.
-* @apiSuccess (classpiece object) {string} Classpiece[_id] The classpiece _id
-* @apiSuccess (classpiece object) {array} Classpiece[systemLabels] A list of system tags for the classpiece
+* @apiSuccess (resource object) {object} Resource A resource object as part of the data array contains the following fields
+* @apiSuccess (resource object) {string} Resource[metadata] A stringified JSON object containing the resource metadata
+* @apiSuccess (resource object) {string} Resource[fileName] The file name of the resource
+* @apiSuccess (resource object) {array} Resource[paths] An array containing the path to the fullsize version of the resource and to the thumbnail of the resource
+* @apiSuccess (resource object) {string} Resource[systemType] The system type _id
+* @apiSuccess (resource object) {string} Resource[label] The label of the resource
+* @apiSuccess (resource object) {string} Resource[resourceType] The type of the resource, i.e. image
+* @apiSuccess (resource object) {string} Resource[status] If the resource is private or public.
+* @apiSuccess (resource object) {string} Resource[_id] The resource _id
+* @apiSuccess (resource object) {array} Resource[systemLabels] A list of system tags for the resource
 *
 * @apiExample {request} Example:
-* http://localhost:5100/api/classpiece?label=1971&description=test&page=1&limit=25
+* http://localhost:5100/api/resource?label=1971&description=test&page=1&limit=25
 *
 * @apiSuccessExample {json} Success-Response:
 * {
@@ -70,48 +70,31 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 }
 */
 
-const getClasspieces = async (req, resp) => {
-  let params = await getClasspiecesPrepareQueryParams(req);
-  if (!params.returnResults) {
-    responseData = {
-      currentPage: 1,
+const getResources = async (req, resp) => {
+  let params = await getResourcesPrepareQueryParams(req);
+  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
+  let data = await getResourcesQuery(query, params.match, params.queryParams, params.limit);
+  if (data.error) {
+    resp.json({
+      status: false,
       data: [],
-      totalItems: 0,
-      totalPages: 1
+      error: data.error,
+      msg: data.error.message,
+    })
+  }
+  else {
+    let responseData = {
+      currentPage: params.currentPage,
+      data: data.nodes,
+      totalItems: data.count,
+      totalPages: data.totalPages,
     }
     resp.json({
       status: true,
       data: responseData,
       error: [],
       msg: "Query results",
-    });
-    return false;
-  }
-  else {
-    let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    let data = await getResourcesQuery(query, params.match, params.queryParams, params.limit);
-    if (data.error) {
-      resp.json({
-        status: false,
-        data: [],
-        error: data.error,
-        msg: data.error.message,
-      })
-    }
-    else {
-      let responseData = {
-        currentPage: params.currentPage,
-        data: data.nodes,
-        totalItems: data.count,
-        totalPages: data.totalPages,
-      }
-      resp.json({
-        status: true,
-        data: responseData,
-        error: [],
-        msg: "Query results",
-      });
-    }
+    })
   }
 }
 
@@ -157,28 +140,29 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
   return result;
 }
 
+
 /**
-* @api {get} /classpiece Classpiece
-* @apiName classpiece
-* @apiGroup Classpieces
+* @api {get} /resource Resource
+* @apiName resource
+* @apiGroup Resources
 *
-* @apiParam {string} _id The id of the requested classpiece
+* @apiParam {string} _id The id of the requested resource
 *
-* @apiSuccess (classpiece object) {object} metadata The classpiece metadata
-* @apiSuccess (classpiece object) {string} fileName The file name of the classpiece
-* @apiSuccess (classpiece object) {array} paths An array containing the path to the fullsize version of the classpiece and to the thumbnail of the classpiece
-* @apiSuccess (classpiece object) {string} systemType The system type _id
-* @apiSuccess (classpiece object) {string} label The label of the classpiece
-* @apiSuccess (classpiece object) {string} resourceType The type of the classpiece, i.e. image
-* @apiSuccess (classpiece object) {string} status If the classpiece is private or public
-* @apiSuccess (classpiece object) {string} _id The classpiece _id
-* @apiSuccess (classpiece object) {array} events A list of associated events
-* @apiSuccess (classpiece object) {array} organisations A list of associated organisations
-* @apiSuccess (classpiece object) {array} people A list of associated people
-* @apiSuccess (classpiece object) {array} resources A list of associated resources
+* @apiSuccess (resource object) {object} metadata The resource metadata
+* @apiSuccess (resource object) {string} fileName The file name of the resource
+* @apiSuccess (resource object) {array} paths An array containing the path to the fullsize version of the resource and to the thumbnail of the resource
+* @apiSuccess (resource object) {string} systemType The system type _id
+* @apiSuccess (resource object) {string} label The label of the resource
+* @apiSuccess (resource object) {string} resourceType The type of the resource, i.e. image
+* @apiSuccess (resource object) {string} status If the resource is private or public
+* @apiSuccess (resource object) {string} _id The resource _id
+* @apiSuccess (resource object) {array} events A list of associated events
+* @apiSuccess (resource object) {array} organisations A list of associated organisations
+* @apiSuccess (resource object) {array} people A list of associated people
+* @apiSuccess (resource object) {array} resources A list of associated resources
 *
 * @apiExample {request} Example:
-* http://localhost:5100/api/classpiece?_id=389
+* http://localhost:5100/api/resource?_id=389
 *
 * @apiSuccessExample {json} Success-Response:
 * {
@@ -210,7 +194,7 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
   "msg": "Query results"
 }
 */
-const getClasspiece = async(req, resp) => {
+const getResource = async(req, resp) => {
   let parameters = req.query;
   if (typeof parameters._id==="undefined" || parameters._id==="") {
     resp.json({
@@ -225,7 +209,7 @@ const getClasspiece = async(req, resp) => {
   let _id = parameters._id;
   let session = driver.session();
   let query = "MATCH (n:Resource) WHERE id(n)="+_id+" AND n.status='public' return n";
-  let classpiece = await session.writeTransaction(tx=>tx.run(query,{}))
+  let resource = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     session.close();
     let records = result.records;
@@ -237,14 +221,14 @@ const getClasspiece = async(req, resp) => {
   }).catch((error) => {
     console.log(error)
   });
-  if (typeof classpiece.metadata==="string") {
-    classpiece.metadata = JSON.parse(classpiece.metadata);
+  if (typeof resource.metadata==="string") {
+    resource.metadata = JSON.parse(resource.metadata);
   }
-  if (typeof classpiece.metadata==="string") {
-    classpiece.metadata = JSON.parse(classpiece.metadata);
+  if (typeof resource.metadata==="string") {
+    resource.metadata = JSON.parse(resource.metadata);
   }
-  if (typeof classpiece.paths[0]==="string") {
-    classpiece.paths = classpiece.paths.map(p=>{
+  if (typeof resource.paths[0]==="string") {
+    resource.paths = resource.paths.map(p=>{
       let path = JSON.parse(p);
       if (typeof path==="string") {
         path = JSON.parse(path)
@@ -256,7 +240,7 @@ const getClasspiece = async(req, resp) => {
   let events = await helpers.loadRelations(_id, "Resource", "Event", true);
   let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
   let people = await helpers.loadRelations(_id, "Resource", "Person", true, null, "rn.lastName");
-  let resources = await classpieceResources(_id, "Resource", "Resource", true);
+  let resources = await resourceResources(_id, "Resource", "Resource", true);
   for (let i=0;i<events.length;i++) {
     let eventItem = events[i];
     eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
@@ -267,19 +251,19 @@ const getClasspiece = async(req, resp) => {
       resource.ref.person.affiliations = await helpers.loadRelations(resource.ref.person._id, "Person", "Organisation", true, "hasAffiliation");
     }
   }
-  classpiece.events = events;
-  classpiece.organisations = organisations;
-  classpiece.people = people;
-  classpiece.resources = resources;
+  resource.events = events;
+  resource.organisations = organisations;
+  resource.people = people;
+  resource.resources = resources;
   resp.json({
     status: true,
-    data: classpiece,
+    data: resource,
     error: [],
     msg: "Query results",
   });
 }
 
-const classpieceResources = async (srcId=null, srcType=null, targetType=null, status=false) => {
+const resourceResources = async (srcId=null, srcType=null, targetType=null, status=false) => {
   if (srcId===null || srcType===null) {
     return false;
   }
@@ -329,8 +313,8 @@ const classpieceResources = async (srcId=null, srcType=null, targetType=null, st
   return relations;
 }
 
-const getClasspiecesActiveFilters = async(req, resp) => {
-  let params = await getClasspiecesPrepareQueryParams(req);
+const getResourcesActiveFilters = async(req, resp) => {
+  let params = await getResourcesPrepareQueryParams(req);
   let session = driver.session();
   let itemsIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
   let itemsIdsResults = await session.writeTransaction(tx=>tx.run(itemsIdsQuery,{}))
@@ -358,6 +342,10 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   });
   let events = [];
   let organisations = [];
+  let people = [];
+  let resources = [];
+  let temporal = [];
+  let spatial = [];
   let eventsFind = nodes.filter(n=>n.type==="Event");
   if (eventsFind!=="undefined") {
     events = [];
@@ -370,17 +358,32 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   }
   let organisationsFind = nodes.filter(n=>n.type==="Organisation");
   if (organisationsFind!=="undefined") {
-    let organisationsResult = [];
-    for (let i=0;i<organisationsFind.length; i++) {
-      let org = organisationsFind[i];
-      organisationsResult.push(org._id);
-    }
-    organisations = organisationsResult;
+    organisations = organisationsFind;
+  }
+  let peopleFind = nodes.filter(n=>n.type==="Person");
+  if (peopleFind!=="undefined") {
+    people = peopleFind;
+  }
+  let resourcesFind = nodes.filter(n=>n.type==="Resource");
+  if (resourcesFind!=="undefined") {
+    resources = resourcesFind;
+  }
+  let temporalFind = nodes.filter(n=>n.type==="Temporal");
+  if (temporalFind!=="undefined") {
+    temporal = temporalFind;
+  }
+  let spatialFind = nodes.filter(n=>n.type==="Spatial");
+  if (spatialFind!=="undefined") {
+    spatial = spatialFind;
   }
 
   let output = {
     events: events,
     organisations: organisations,
+    people: people,
+    resources: resources,
+    temporal: temporal,
+    spatial: spatial,
   }
   resp.json({
     status: true,
@@ -411,7 +414,7 @@ const relatedPerson = async (resourceId=null) => {
   return person;
 }
 
-const getClasspiecesPrepareQueryParams = async(req)=>{
+const getResourcesPrepareQueryParams = async(req)=>{
   let parameters = req.query;
   let label = "";
   let description = "";
@@ -426,12 +429,21 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
   let queryPage = 0;
   let queryOrder = "";
   let limit = 25;
-  let returnResults = true;
 
   let match = "(n:Resource)";
 
+  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  await classpieceSystemType.load();
+
   let query = "";
-  let queryParams = " n.status='public'";
+  let queryParams = ` NOT n.systemType="${classpieceSystemType._id}" AND  n.status="public" `;
+
+  if (typeof parameters.label!=="undefined") {
+    label = parameters.label;
+    if (label!=="") {
+      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+    }
+  }
 
   // temporal
   let temporalEventIds = [];
@@ -444,10 +456,10 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
     if (typeof temporals==="string") {
       temporals = JSON.parse(temporals);
     }
-    if (typeof temporals.startDate!=="undefined" && temporals.startDate!=="") {
+    if (temporals.startDate!=="" && temporals.startDate!==null) {
       temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
       if (temporalEventIds.length===0) {
-         returnResults = false;
+         console.log(temporalEventIds);
        }
     }
     else if (typeof eventTypes!=="undefined") {
@@ -473,23 +485,6 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
     }
   }
 
-  // get classpiece resource type id
-  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
-  await classpieceSystemType.load();
-
-  let systemType = classpieceSystemType._id;
-  if (typeof parameters.label!=="undefined") {
-    label = parameters.label;
-    if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
-    }
-  }
-  if (systemType!=="") {
-    if (queryParams!=="") {
-      queryParams += " AND ";
-    }
-    queryParams += `LOWER(n.systemType) = '${systemType}' `;
-  }
   if (typeof parameters.description!=="undefined") {
     description = parameters.description;
     if (description!=="") {
@@ -632,20 +627,19 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-
+  console.log(queryParams)
   return {
     match: match,
     queryParams: queryParams,
     skip: skip,
     limit: limit,
     currentPage: currentPage,
-    queryOrder: queryOrder,
-    returnResults: returnResults
+    queryOrder: queryOrder
   };
 }
 
 module.exports = {
-  getClasspieces: getClasspieces,
-  getClasspiece: getClasspiece,
-  getClasspiecesActiveFilters: getClasspiecesActiveFilters
+  getResources: getResources,
+  getResource: getResource,
+  getResourcesActiveFilters: getResourcesActiveFilters
 };
