@@ -559,6 +559,21 @@ const advancedQueryBuilder = (advancedSearch) => {
         query += ` single(x IN n.${item.select} WHERE x="${item.input}") `;
       }
     }
+    else if (item.select==="fnameSoundex" || item.select==="lnameSoundex"){
+      let inputVal = helpers.soundex(item.input).trim()
+      if (item.qualifier==="not_equals") {
+        query += ` NOT n.${item.select} = "${inputVal}" `;
+      }
+      if (item.qualifier==="not_contains") {
+        query += ` NOT LOWER(n.${item.select}) =~ LOWER(".*${inputVal}.*") `;
+      }
+      if (item.qualifier==="contains") {
+        query += ` LOWER(n.${item.select}) =~ LOWER(".*${inputVal}.*") `;
+      }
+      if (item.qualifier==="equals") {
+        query += ` n.${item.select} = "${inputVal}" `;
+      }
+    }
     else {
       if (item.qualifier==="not_equals") {
         query += ` NOT n.${item.select} = "${item.input}" `;
