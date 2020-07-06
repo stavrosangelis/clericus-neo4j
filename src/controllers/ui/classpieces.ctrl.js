@@ -237,46 +237,56 @@ const getClasspiece = async(req, resp) => {
   }).catch((error) => {
     console.log(error)
   });
-  if (typeof classpiece.metadata==="string") {
-    classpiece.metadata = JSON.parse(classpiece.metadata);
-  }
-  if (typeof classpiece.metadata==="string") {
-    classpiece.metadata = JSON.parse(classpiece.metadata);
-  }
-  if (typeof classpiece.paths[0]==="string") {
-    classpiece.paths = classpiece.paths.map(p=>{
-      let path = JSON.parse(p);
-      if (typeof path==="string") {
-        path = JSON.parse(path)
+  if(typeof classpiece!=="undefined") {
+    if (typeof classpiece.metadata==="string") {
+      classpiece.metadata = JSON.parse(classpiece.metadata);
+    }
+    if (typeof classpiece.metadata==="string") {
+      classpiece.metadata = JSON.parse(classpiece.metadata);
+    }
+    if (typeof classpiece.paths[0]==="string") {
+      classpiece.paths = classpiece.paths.map(p=>{
+        let path = JSON.parse(p);
+        if (typeof path==="string") {
+          path = JSON.parse(path)
+        }
+        return path;
+      });
+    }
+
+    let events = await helpers.loadRelations(_id, "Resource", "Event", true);
+    let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
+    let people = await helpers.loadRelations(_id, "Resource", "Person", true, null, "rn.lastName");
+    let resources = await classpieceResources(_id, "Resource", "Resource", true);
+    for (let i=0;i<events.length;i++) {
+      let eventItem = events[i];
+      eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+    }
+    for (let i=0;i<resources.length; i++) {
+      let resource = resources[i];
+      if (typeof resource.ref.person!=="undefined") {
+        resource.ref.person.affiliations = await helpers.loadRelations(resource.ref.person._id, "Person", "Organisation", true, "hasAffiliation");
       }
-      return path;
+    }
+    classpiece.events = events;
+    classpiece.organisations = organisations;
+    classpiece.people = people;
+    classpiece.resources = resources;
+    resp.json({
+      status: true,
+      data: classpiece,
+      error: [],
+      msg: "Query results",
     });
   }
-
-  let events = await helpers.loadRelations(_id, "Resource", "Event", true);
-  let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
-  let people = await helpers.loadRelations(_id, "Resource", "Person", true, null, "rn.lastName");
-  let resources = await classpieceResources(_id, "Resource", "Resource", true);
-  for (let i=0;i<events.length;i++) {
-    let eventItem = events[i];
-    eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+  else {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Classpiece not available!",
+    });
   }
-  for (let i=0;i<resources.length; i++) {
-    let resource = resources[i];
-    if (typeof resource.ref.person!=="undefined") {
-      resource.ref.person.affiliations = await helpers.loadRelations(resource.ref.person._id, "Person", "Organisation", true, "hasAffiliation");
-    }
-  }
-  classpiece.events = events;
-  classpiece.organisations = organisations;
-  classpiece.people = people;
-  classpiece.resources = resources;
-  resp.json({
-    status: true,
-    data: classpiece,
-    error: [],
-    msg: "Query results",
-  });
 }
 
 const classpieceResources = async (srcId=null, srcType=null, targetType=null, status=false) => {

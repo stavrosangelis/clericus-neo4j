@@ -72,29 +72,46 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 const getResources = async (req, resp) => {
   let params = await getResourcesPrepareQueryParams(req);
-  let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-  let data = await getResourcesQuery(query, params.match, params.queryParams, params.limit);
-  if (data.error) {
-    resp.json({
-      status: false,
+  if (!params.returnResults) {
+    responseData = {
+      currentPage: 1,
       data: [],
-      error: data.error,
-      msg: data.error.message,
-    })
-  }
-  else {
-    let responseData = {
-      currentPage: params.currentPage,
-      data: data.nodes,
-      totalItems: data.count,
-      totalPages: data.totalPages,
+      totalItems: 0,
+      totalPages: 1
     }
     resp.json({
       status: true,
       data: responseData,
       error: [],
       msg: "Query results",
-    })
+    });
+    return false;
+  }
+  else {
+    let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
+    let data = await getResourcesQuery(query, params.match, params.queryParams, params.limit);
+    if (data.error) {
+      resp.json({
+        status: false,
+        data: [],
+        error: data.error,
+        msg: data.error.message,
+      })
+    }
+    else {
+      let responseData = {
+        currentPage: params.currentPage,
+        data: data.nodes,
+        totalItems: data.count,
+        totalPages: data.totalPages,
+      }
+      resp.json({
+        status: true,
+        data: responseData,
+        error: [],
+        msg: "Query results",
+      })
+    }
   }
 }
 
@@ -221,46 +238,56 @@ const getResource = async(req, resp) => {
   }).catch((error) => {
     console.log(error)
   });
-  if (typeof resource.metadata==="string") {
-    resource.metadata = JSON.parse(resource.metadata);
-  }
-  if (typeof resource.metadata==="string") {
-    resource.metadata = JSON.parse(resource.metadata);
-  }
-  if (typeof resource.paths[0]==="string") {
-    resource.paths = resource.paths.map(p=>{
-      let path = JSON.parse(p);
-      if (typeof path==="string") {
-        path = JSON.parse(path)
+  if(typeof resource!=="undefined") {
+    if (typeof resource.metadata==="string") {
+      resource.metadata = JSON.parse(resource.metadata);
+    }
+    if (typeof resource.metadata==="string") {
+      resource.metadata = JSON.parse(resource.metadata);
+    }
+    if (typeof resource.paths[0]==="string") {
+      resource.paths = resource.paths.map(p=>{
+        let path = JSON.parse(p);
+        if (typeof path==="string") {
+          path = JSON.parse(path)
+        }
+        return path;
+      });
+    }
+
+    let events = await helpers.loadRelations(_id, "Resource", "Event", true);
+    let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
+    let people = await helpers.loadRelations(_id, "Resource", "Person", true, null, "rn.lastName");
+    let resources = await resourceResources(_id, "Resource", "Resource", true);
+    for (let i=0;i<events.length;i++) {
+      let eventItem = events[i];
+      eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+    }
+    for (let i=0;i<resources.length; i++) {
+      let resource = resources[i];
+      if (typeof resource.ref.person!=="undefined") {
+        resource.ref.person.affiliations = await helpers.loadRelations(resource.ref.person._id, "Person", "Organisation", true, "hasAffiliation");
       }
-      return path;
+    }
+    resource.events = events;
+    resource.organisations = organisations;
+    resource.people = people;
+    resource.resources = resources;
+    resp.json({
+      status: true,
+      data: resource,
+      error: [],
+      msg: "Query results",
     });
   }
-
-  let events = await helpers.loadRelations(_id, "Resource", "Event", true);
-  let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
-  let people = await helpers.loadRelations(_id, "Resource", "Person", true, null, "rn.lastName");
-  let resources = await resourceResources(_id, "Resource", "Resource", true);
-  for (let i=0;i<events.length;i++) {
-    let eventItem = events[i];
-    eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+  else {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Resource not available!",
+    });
   }
-  for (let i=0;i<resources.length; i++) {
-    let resource = resources[i];
-    if (typeof resource.ref.person!=="undefined") {
-      resource.ref.person.affiliations = await helpers.loadRelations(resource.ref.person._id, "Person", "Organisation", true, "hasAffiliation");
-    }
-  }
-  resource.events = events;
-  resource.organisations = organisations;
-  resource.people = people;
-  resource.resources = resources;
-  resp.json({
-    status: true,
-    data: resource,
-    error: [],
-    msg: "Query results",
-  });
 }
 
 const resourceResources = async (srcId=null, srcType=null, targetType=null, status=false) => {
@@ -429,6 +456,7 @@ const getResourcesPrepareQueryParams = async(req)=>{
   let queryPage = 0;
   let queryOrder = "";
   let limit = 25;
+  let returnResults = true;
 
   let match = "(n:Resource)";
 
@@ -441,7 +469,10 @@ const getResourcesPrepareQueryParams = async(req)=>{
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      if (queryParams!=="") {
+        queryParams += " AND ";
+      }
+      queryParams += " LOWER(n.label) =~ LOWER('.*"+label+".*') ";
     }
   }
 
@@ -459,7 +490,7 @@ const getResourcesPrepareQueryParams = async(req)=>{
     if (temporals.startDate!=="" && temporals.startDate!==null) {
       temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
       if (temporalEventIds.length===0) {
-         console.log(temporalEventIds);
+        returnResults = false;
        }
     }
     else if (typeof eventTypes!=="undefined") {
@@ -627,14 +658,15 @@ const getResourcesPrepareQueryParams = async(req)=>{
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-  console.log(queryParams)
+
   return {
     match: match,
     queryParams: queryParams,
     skip: skip,
     limit: limit,
     currentPage: currentPage,
-    queryOrder: queryOrder
+    queryOrder: queryOrder,
+    returnResults: returnResults,
   };
 }
 

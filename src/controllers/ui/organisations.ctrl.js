@@ -220,20 +220,30 @@ const getOrganisation = async(req, resp) => {
   }).catch((error) => {
     console.log(error)
   });
-  let events = await helpers.loadRelations(_id, "Organisation", "Event", true);
-  let organisations = await helpers.loadRelations(_id, "Organisation", "Organisation", true);
-  let people = await helpers.loadRelations(_id, "Organisation", "Person", true, null, "rn.lastName");
-  let resources = await helpers.loadRelations(_id, "Organisation", "Resource", true);
-  organisation.events = events;
-  organisation.organisations = organisations;
-  organisation.people = people;
-  organisation.resources = resources;
-  resp.json({
-    status: true,
-    data: organisation,
-    error: [],
-    msg: "Query results",
-  });
+  if(typeof organisation!=="undefined") {
+    let events = await helpers.loadRelations(_id, "Organisation", "Event", true);
+    let organisations = await helpers.loadRelations(_id, "Organisation", "Organisation", true);
+    let people = await helpers.loadRelations(_id, "Organisation", "Person", true, null, "rn.lastName");
+    let resources = await helpers.loadRelations(_id, "Organisation", "Resource", true);
+    organisation.events = events;
+    organisation.organisations = organisations;
+    organisation.people = people;
+    organisation.resources = resources;
+    resp.json({
+      status: true,
+      data: organisation,
+      error: [],
+      msg: "Query results",
+    });
+  }
+  else {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Organisation not available!",
+    });
+  }
 }
 
 const getOrganisationsActiveFilters = async(req, resp) => {

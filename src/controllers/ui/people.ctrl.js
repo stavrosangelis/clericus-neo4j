@@ -2,7 +2,7 @@ const driver = require("../../config/db-driver");
 const helpers = require("../../helpers");
 
 /**
-* @api {get} /people Get people
+* @api {post} /people Get people
 * @apiName get people
 * @apiGroup People
 *
@@ -78,9 +78,7 @@ const getPeople = async (req, resp) => {
 
 const getPeopleQuery = async (query, match, queryParams, limit) => {
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
+  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     return result.records;
   }).catch((error) => {
@@ -192,24 +190,34 @@ const getPerson = async(req, resp) => {
   }).catch((error) => {
     console.log(error)
   });
-  let events = await helpers.loadRelations(_id, "Person", "Event", true);
-  let organisations = await helpers.loadRelations(_id, "Person", "Organisation", true);
-  let people = await helpers.loadRelations(_id, "Person", "Person", true, null, "rn.lastName");
-  let resources = await helpers.loadRelations(_id, "Person", "Resource", true);
-  for (let i=0;i<events.length;i++) {
-    let eventItem = events[i];
-    eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+  if(typeof person!=="undefined") {
+    let events = await helpers.loadRelations(_id, "Person", "Event", true);
+    let organisations = await helpers.loadRelations(_id, "Person", "Organisation", true);
+    let people = await helpers.loadRelations(_id, "Person", "Person", true, null, "rn.lastName");
+    let resources = await helpers.loadRelations(_id, "Person", "Resource", true);
+    for (let i=0;i<events.length;i++) {
+      let eventItem = events[i];
+      eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+    }
+    person.events = events;
+    person.organisations = organisations;
+    person.people = people;
+    person.resources = resources;
+    resp.json({
+      status: true,
+      data: person,
+      error: [],
+      msg: "Query results",
+    });
   }
-  person.events = events;
-  person.organisations = organisations;
-  person.people = people;
-  person.resources = resources;
-  resp.json({
-    status: true,
-    data: person,
-    error: [],
-    msg: "Query results",
-  });
+  else {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Person entry unavailable!",
+    });
+  }
 }
 
 const getPersonActiveFilters = async(req, resp) => {
@@ -537,17 +545,33 @@ const advancedQueryBuilder = (advancedSearch) => {
   for (let i=0;i<advancedSearch.length;i++) {
     let item = advancedSearch[i];
     query += ` ${item.boolean.toUpperCase()}`;
-    if (item.qualifier==="not_equals") {
-      query += ` NOT n.${item.select} = "${item.input}" `;
+    if (item.select==="honorificPrefix") {
+      if (item.qualifier==="not_equals") {
+        query += ` NOT single(x IN n.${item.select} WHERE x="${item.input}")`;
+      }
+      if (item.qualifier==="not_contains") {
+        query += ` NOT single(x IN n.${item.select} WHERE LOWER(x) =~ LOWER(".*${item.input}.*"))`;
+      }
+      if (item.qualifier==="contains") {
+        query += ` single(x IN n.${item.select} WHERE LOWER(x) =~ LOWER(".*${item.input}.*")) `;
+      }
+      if (item.qualifier==="equals") {
+        query += ` single(x IN n.${item.select} WHERE x="${item.input}") `;
+      }
     }
-    if (item.qualifier==="not_contains") {
-      query += ` NOT LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
-    }
-    if (item.qualifier==="contains") {
-      query += ` LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
-    }
-    if (item.qualifier==="equals") {
-      query += ` n.${item.select} = "${item.input}" `;
+    else {
+      if (item.qualifier==="not_equals") {
+        query += ` NOT n.${item.select} = "${item.input}" `;
+      }
+      if (item.qualifier==="not_contains") {
+        query += ` NOT LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
+      }
+      if (item.qualifier==="contains") {
+        query += ` LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
+      }
+      if (item.qualifier==="equals") {
+        query += ` n.${item.select} = "${item.input}" `;
+      }
     }
   }
   return query;
