@@ -206,9 +206,7 @@ const getOrganisation = async(req, resp) => {
   let _id = parameters._id;
   let session = driver.session();
   let query = "MATCH (n:Organisation) WHERE id(n)="+_id+" AND n.status='public' return n";
-  let organisation = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
+  let organisation = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     session.close();
     let records = result.records;
@@ -225,10 +223,12 @@ const getOrganisation = async(req, resp) => {
     let organisations = await helpers.loadRelations(_id, "Organisation", "Organisation", true);
     let people = await helpers.loadRelations(_id, "Organisation", "Person", true, null, "rn.lastName");
     let resources = await helpers.loadRelations(_id, "Organisation", "Resource", true);
+    let spatial = await helpers.loadRelations(_id, "Organisation", "Spatial", false);
     organisation.events = events;
     organisation.organisations = organisations;
     organisation.people = people;
     organisation.resources = resources;
+    organisation.spatial = spatial;
     resp.json({
       status: true,
       data: organisation,

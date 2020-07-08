@@ -684,6 +684,7 @@ const uploadResource = async(req, resp) => {
   if (fileType0==="image" && newUploadFile.status) {
     let newWidth = null;
     let newHeight = null;
+    let newDimensions = null;
     if (newDimensions!==null) {
       if (typeof newDimensions.width!=="undefined" && newDimensions.width!=="") {
         newWidth = newDimensions.width;

@@ -48,9 +48,7 @@ class Spatial {
     }
     let session = driver.session()
     let query = "MATCH (n:Spatial) WHERE id(n)="+this._id+" return n";
-    let node = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
+    let node = await session.writeTransaction(tx=>tx.run(query,{}))
     .then(result=> {
       session.close();
       let records = result.records;
@@ -69,7 +67,9 @@ class Spatial {
     }
     // relations
     let events = await helpers.loadRelations(this._id, "Spatial", "Event");
+    let organisations = await helpers.loadRelations(this._id, "Spatial", "Organisation");
     this.events = events;
+    this.organisations = organisations;
   }
 
   async countRelations() {

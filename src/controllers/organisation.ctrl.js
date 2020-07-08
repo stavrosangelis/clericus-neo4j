@@ -83,10 +83,12 @@ class Organisation {
     let organisations = await helpers.loadRelations(this._id, "Organisation", "Organisation");
     let people = await helpers.loadRelations(this._id, "Organisation", "Person");
     let resources = await helpers.loadRelations(this._id, "Organisation", "Resource");
+    let spatial = await helpers.loadRelations(this._id, "Organisation", "Spatial");
     this.events = events;
     this.organisations = organisations;
     this.people = people;
     this.resources = resources;
+    this.spatial = spatial;
   }
 
   async save(userId) {

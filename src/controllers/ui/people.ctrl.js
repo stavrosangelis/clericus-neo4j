@@ -313,7 +313,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams +=` (LOWER(n.label) =~ LOWER(".*${label}.*") OR single(x IN n.alternateAppelations WHERE LOWER(x) =~ LOWER(".*${label}.*"))) `;
     }
   }
   if (typeof parameters.firstName!=="undefined" && typeof parameters.advancedSearch==="undefined") {

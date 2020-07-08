@@ -1,6 +1,5 @@
 const driver = require("../config/db-driver");
 const helpers = require("../helpers");
-const Article = require('./article.ctrl').Article;
 
 class ArticleCategory {
   constructor({_id=null,label=null,permalink=null,parentId=0,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {

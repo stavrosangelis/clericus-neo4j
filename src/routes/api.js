@@ -44,6 +44,7 @@ const organisationsUiController = require('../controllers/ui/organisations.ctrl'
 const peopleController = require('../controllers/ui/people.ctrl');
 const uiResourcesController = require('../controllers/ui/resources.ctrl');
 const searchController = require('../controllers/ui/search.ctrl');
+const temporalsUiController = require('../controllers/ui/temporals.ctrl');
 const uiMenuController = require('../controllers/ui/menu.ctrl');
 const visualisationsController = require('../controllers/ui/visualisations.ctrl');
 const contactController = require('../controllers/ui/contact.ctrl');
@@ -93,6 +94,11 @@ server.post('/ui-person-active-filters', peopleController.getPersonActiveFilters
 
 // ******* ui search ******** //
 server.post('/search', searchController.search);
+
+// ******* ui events ******** //
+server.get('/ui-temporals', temporalsUiController.getTemporals);
+server.get('/ui-temporal', temporalsUiController.getTemporal);
+
 
 // ******* ui visualisations ******** //
 server.get('/timeline', visualisationsController.getTimeline);
