@@ -258,21 +258,32 @@ const getResource = async(req, resp) => {
     let events = await helpers.loadRelations(_id, "Resource", "Event", true);
     let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
     let people = await helpers.loadRelations(_id, "Resource", "Person", true, null, "rn.lastName");
-    let resources = await resourceResources(_id, "Resource", "Resource", true);
+    let resources = await helpers.loadRelations(_id, "Resource", "Resource", true);
+
     for (let i=0;i<events.length;i++) {
       let eventItem = events[i];
       eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
     }
+
+    let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+    await classpieceSystemType.load();
+    let classpieces = [];
+    let systemType = classpieceSystemType._id;
     for (let i=0;i<resources.length; i++) {
       let resource = resources[i];
       if (typeof resource.ref.person!=="undefined") {
         resource.ref.person.affiliations = await helpers.loadRelations(resource.ref.person._id, "Person", "Organisation", true, "hasAffiliation");
+      }
+      if (resource.ref.systemType===systemType) {
+        classpieces.push(resource);
+        resources.splice(i, 1);
       }
     }
     resource.events = events;
     resource.organisations = organisations;
     resource.people = people;
     resource.resources = resources;
+    resource.classpieces = classpieces;
     resp.json({
       status: true,
       data: resource,
