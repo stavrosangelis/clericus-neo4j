@@ -259,6 +259,7 @@ server.get('/create-thumbnails', auth.checkAdminToken, toolsParseController.crea
 server.post('/query-texts', auth.checkAdminToken, toolsParseController.queryTexts);
 server.get('/prepare-dioceses-data', auth.checkAdminToken, toolsDiocesesLocationsController.prepareData);
 server.get('/dioceses-allocate-locations', auth.checkAdminToken, toolsDiocesesLocationsController.allocateLocations);
+server.get('/add-locations', auth.checkAdminToken, toolsDiocesesLocationsController.addLocations);
 server.get('/ocr-document', auth.checkAdminToken, cvisionController.analyseDocument);
 server.get('/read-document', auth.checkAdminToken, cvisionController.readDocumentResults);
 server.get('/get-document-columns', cvisionController.getColumns);

@@ -166,26 +166,11 @@ const getHeatmap = async (req, resp) => {
 
   let query = `MATCH (n:Organisation)-[r]->(p:Person) WHERE n.status='public' AND n.organisationType='Diocese' RETURN n, count(r) AS count`;
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
+  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     return result.records;
   })
-  let organisations = prepareOrganisations(nodesPromise);
-
-  // load features
-  let featuresDataPath = `${archivePath}documents/dioceses&cathedral-cities-features.json`;
-  let featuresData = await fs.readFileSync(featuresDataPath, 'utf8');
-  featuresData = JSON.parse(featuresData);
-  for (let i=0;i<organisations.length; i++) {
-    let organisation = organisations[i];
-    organisation.features = null;
-    let features = featuresData.find(o=>o.diocese===organisation.label);
-    if (typeof features!=="undefined") {
-      organisation.features = features;
-    }
-  }
+  let organisations = await prepareOrganisations(nodesPromise);
   resp.json({
     status: true,
     data: organisations,
@@ -194,7 +179,7 @@ const getHeatmap = async (req, resp) => {
   })
 }
 
-const prepareOrganisations = (records) => {
+const prepareOrganisations = async(records) => {
   let output = [];
   for (let i=0; i<records.length; i++) {
     let record = records[i];
@@ -209,7 +194,9 @@ const prepareOrganisations = (records) => {
     if (labels!==null) {
       outputItem.systemLabels = labels;
     }
-    outputItem.count = recordObject.count;
+    outputItem.count = Number(recordObject.count);
+    let spatial = await helpers.loadRelations(outputItem._id, "Organisation", "Spatial", null, "hasLocation");
+    outputItem.features = spatial;
     output.push(outputItem)
   }
   return output;

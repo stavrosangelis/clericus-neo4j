@@ -83,7 +83,89 @@ const queryOpenStreetMaps = async(row) => {
   return results;
 }
 
+const addLocations = async(req, resp) => {
+  let session = driver.session();
+  let query = `MATCH (n:Organisation) WHERE n.status="public" AND n.organisationType="Diocese" RETURN n`;
+  let results = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    session.close()
+    return result.records;
+  });
+  let nodes = helpers.normalizeRecordsOutput(results);
+  let jsonPath = `${archivePath}documents/dioceses&cathedral-cities-features.json`;
+  let jsonFile = await fs.readFileSync(jsonPath, 'utf8');
+  let jsonData = JSON.parse(jsonFile);
+  let locations = [];
+  locations.push(jsonData[0])
+  for (let i=0;i<jsonData.length; i++) {
+    let locationItem = jsonData[i];
+    let location = locationItem.features;
+    let diocese = nodes.find(item=>item.label.toLowerCase().trim()===locationItem.diocese.toLowerCase().trim());
+    let label = '',
+        streetAddress = '',
+        locality = '',
+        region = '',
+        postalCode = '',
+        country = '',
+        latitude = '',
+        longitude = '',
+        locationType = '';
+    if (typeof location.display_name!=="undefined") {
+      label = location.display_name;
+    }
+    if (typeof location.address!=="undefined") {
+      if (typeof location.address.road!=="undefined") {
+        streetAddress = location.address.road;
+      }
+      if (typeof location.address.locality!=="undefined") {
+        locality = location.address.locality;
+      }
+      if (typeof location.address.region!=="undefined") {
+        region = location.address.region;
+      }
+      if (typeof location.address.postcode!=="undefined") {
+        postalCode = location.address.postcode;
+      }
+      if (typeof location.address.country!=="undefined") {
+        country = location.address.country;
+      }
+    }
+    if (typeof location.lat!=="undefined") {
+      latitude = location.lat;
+    }
+    if (typeof location.lon!=="undefined") {
+      longitude = location.lon;
+    }
+    if (typeof location.type!=="undefined") {
+      locationType = location.type;
+    }
+    if (typeof location.address!=="undefined" &&
+      (typeof location.address.region==="undefined" || location.address.region==="") && location.address.county!=="") {
+      region = location.address.county;
+    }
+    let newLocation = {
+      label: label,
+      streetAddress: streetAddress,
+      locality: locality,
+      region: region,
+      postalCode: postalCode,
+      country: country,
+      latitude: latitude,
+      longitude: longitude,
+      locationType: locationType,
+    }
+    locations.push(newLocation);
+  }
+  resp.json({
+    status: true,
+    data: {locations:locations},
+    error: false,
+    msg: '',
+  });
+}
+
 module.exports = {
   prepareData: prepareData,
   allocateLocations: allocateLocations,
+  addLocations: addLocations,
 }
