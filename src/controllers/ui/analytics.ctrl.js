@@ -1,5 +1,6 @@
 const driver = require("../../config/db-driver");
 const helpers = require("../../helpers");
+const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 /**
 * @api {get} /generic-stats Generic statistics
@@ -9,15 +10,19 @@ const helpers = require("../../helpers");
 {"status":true,"data":{"people":220,"resources":220,"organisations":80,"events":0},"error":false,"msg":""}
 */
 const genericStats = async (req, resp) => {
+  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  await classpieceSystemType.load();
+
   let countPeoplePromise = countNodes("Person");
   let countResourcesPromise = countNodes("Resource");
-  let countUniqueLastNamesPromise = countUniqueLastNames();
   let countDiocesesPromise = countNodes("Organisation", "Diocese");
-  /*let countOrganisationsPromise = countNodes("Organisation");
+  let countUniqueLastNamesPromise = countUniqueLastNames();
+  let countOrganisationsPromise = countNodes("Organisation");
   let countEventsPromise = countNodes("Event");
   let countSpatialPromise = countNodes("Spatial");
-  let countTemporalPromise = countNodes("Temporal");*/
-  let stats = await Promise.all([countPeoplePromise,countResourcesPromise,countDiocesesPromise,countUniqueLastNamesPromise]).then((data)=> {
+  let countTemporalPromise = countNodes("Temporal");
+  let countClasspiecesPromise = countNodes("Classpieces",classpieceSystemType._id);
+  let stats = await Promise.all([countPeoplePromise,countResourcesPromise,countDiocesesPromise,countUniqueLastNamesPromise,countOrganisationsPromise,countEventsPromise,countSpatialPromise,countTemporalPromise,countClasspiecesPromise]).then((data)=> {
     return data;
   });
   let response = {
@@ -25,6 +30,11 @@ const genericStats = async (req, resp) => {
     resources: stats[1],
     dioceses: stats[2],
     lastNames: stats[3],
+    organisations: stats[4],
+    events: stats[5],
+    spatial: stats[6],
+    temporal: stats[7],
+    classpieces: stats[8],
   }
   resp.json({
     status: true,
@@ -38,7 +48,13 @@ const countNodes = async (type, systemType=null) => {
   let session = driver.session();
   let query = `MATCH (n:${type}) WHERE n.status="public" RETURN count(*)`;
   if (systemType!==null && type==="Organisation") {
-    query = `MATCH (n:${type}) WHERE n.organisationType="${systemType}" RETURN count(*)`;
+    query = `MATCH (n:${type}) WHERE n.organisationType="${systemType}" AND n.status="public" RETURN count(*)`;
+  }
+  if (systemType!==null && type==="Classpieces") {
+    query = `MATCH (n:Resource) WHERE n.systemType="${systemType}" AND n.status="public" RETURN count(*)`;
+  }
+  if (type==="Spatial" || type==="Temporal" ) {
+    query = `MATCH (n:${type}) RETURN count(*)`;
   }
 
   let count = await session.writeTransaction(tx=>

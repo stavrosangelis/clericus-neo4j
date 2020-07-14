@@ -97,7 +97,7 @@ class Article {
       return permalink;
     }
     else {
-      await makePermalink(permalink+"-2");
+      await this.makePermalink(permalink+"-2");
     }
   }
 
