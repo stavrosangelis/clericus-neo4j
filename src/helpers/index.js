@@ -161,7 +161,10 @@ const normalizeRelationsOutput = (records) => {
 const readJSONFile = (path) => {
   return new Promise((resolve, reject) => {
     fs.readFile(path, 'utf-8', (error, data)=>{
-      let dataJson = JSON.parse(data);
+      let dataJson = null;
+      if (error===null) {
+        dataJson = JSON.parse(data);
+      }
       let output = {data: dataJson, error:error};
       resolve(output);
     });

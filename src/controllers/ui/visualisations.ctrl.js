@@ -22,6 +22,80 @@ const getGraphNetwork = async (req, resp) => {
 }
 
 const produceGraphNetwork = async () => {
+  // Event, Organisation, Person, Resource
+  let eventsCountQuery = `MATCH (n:Event) WHERE n.status='public' RETURN count(n) AS count`;
+  let organisationsCountQuery = `MATCH (n:Organisation) WHERE n.status='public' RETURN count(n) AS count`;
+  let peopleCountQuery = `MATCH (n:Person) WHERE n.status='public' RETURN count(n) AS count`;
+  let resourcesCountQuery = `MATCH (n:Resource) WHERE n.status='public' RETURN count(n) AS count`;
+  let session = driver.session();
+  let eventsCount = await session.writeTransaction(tx=>tx.run(eventsCountQuery,{}))
+  .then(result=> {
+    let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['count'];
+    return output;
+  })
+  let organisationsCount = await session.writeTransaction(tx=>tx.run(organisationsCountQuery,{}))
+  .then(result=> {
+    let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['count'];
+    return output;
+  })
+  let peopleCount = await session.writeTransaction(tx=>tx.run(peopleCountQuery,{}))
+  .then(result=> {
+    let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['count'];
+    return output;
+  })
+  let resourcesCount = await session.writeTransaction(tx=>tx.run(resourcesCountQuery,{}))
+  .then(result=> {
+    let resultRecord = result.records[0];
+    let countObj = resultRecord.toObject();
+    helpers.prepareOutput(countObj);
+    let output = countObj['count'];
+    return output;
+  });
+  let count = {
+    events: Number(eventsCount),
+    organisations: Number(organisationsCount),
+    people: Number(peopleCount),
+    resources: Number(resourcesCount),
+  }
+  // read file and compare
+  let countFile = `${archivePath}network-graph-count.json`;
+  let readFile = await helpers.readJSONFile(countFile);
+  if (readFile.data===null) {
+    let writeCountFile = await new Promise((resolve,reject)=>{
+      fs.writeFile(countFile, JSON.stringify(count), 'utf8', (error) => {
+        if (error) throw err;
+        resolve(true);
+      });
+    });
+  }
+  else {
+    let fileData = readFile.data;
+    if (fileData.events===count.events &&
+      fileData.organisations===count.organisations &&
+      fileData.people===count.people &&
+      fileData.resources===count.resources
+    ) {
+      return false;
+    }
+    else {
+      let writeCountFile = await new Promise((resolve,reject)=>{
+        fs.writeFile(countFile, JSON.stringify(count), 'utf8', (error) => {
+          if (error) throw err;
+          resolve(true);
+        });
+      });
+    }
+  }
+
   let t0 = performance.now()
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
@@ -767,4 +841,5 @@ module.exports = {
   getGraphNetwork: getGraphNetwork,
   getTimeline: getTimeline,
   getItemTimeline: getItemTimeline,
+  produceGraphNetwork: produceGraphNetwork,
 }
