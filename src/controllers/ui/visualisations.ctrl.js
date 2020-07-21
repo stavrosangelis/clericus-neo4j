@@ -12,7 +12,6 @@ const getGraphNetwork = async (req, resp) => {
   let params = req.query;
   let networkFileDir = `${archivePath}network-graph.json`;
   let file = await helpers.readJSONFile(networkFileDir);
-  //produceGraphNetwork();
   resp.json({
     status: true,
     data: JSON.stringify(file.data),
@@ -130,13 +129,14 @@ const produceGraphNetwork = async () => {
       type: nType,
       color: colors.color,
       strokeColor: colors.strokeColor,
-      size: size
+      size: size,
+      count: count
     }
     nodesOutput.push(newNode);
   }
   nodesOutput.sort((a, b) =>{
-    let akey = a.size;
-    let bkey = b.size;
+    let akey = a.count;
+    let bkey = b.count;
     if (akey<bkey) {
       return -1;
     }
@@ -238,7 +238,7 @@ let cronJob = schedule.scheduleJob('0 4 * * *', async()=> {
 const getHeatmap = async (req, resp) => {
   let data = [];
 
-  let query = `MATCH (n:Organisation)-[r]->(p:Person) WHERE n.status='public' AND n.organisationType='Diocese' RETURN n, count(r) AS count`;
+  let query = `MATCH (n:Organisation)-[r]->(p:Person) WHERE n.status='public' AND n.organisationType='Diocese' RETURN n, count(r) AS count ORDER BY n.label`;
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {

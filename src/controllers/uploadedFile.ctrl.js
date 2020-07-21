@@ -580,7 +580,7 @@ const createThumbnail = async(srcPath=null,targetPath=null,fileName=null,customW
       var out = fs.createWriteStream(targetPath);
       var stream = canvas.createJPEGStream({
         bufsize: 2048,
-        quality: 80
+        quality: 20
       });
 
       stream.pipe(out);
