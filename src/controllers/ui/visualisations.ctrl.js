@@ -192,11 +192,11 @@ const graphSimulation = async(data) => {
     d3.forceLink(links)
         .id(d => d.id)
         .strength(d=>1)
-        .distance(d=>400)
+        .distance(d=>300)
       )
     //.force("charge", d32.forceManyBodyReuse().strength(strength))
     .force("center", d3.forceCenter(0, 0))
-    .force('collide', d3.forceCollide(100))
+    .force('collide', d3.forceCollide(80))
     //.alphaDecay(0.06)
     .stop();
 
