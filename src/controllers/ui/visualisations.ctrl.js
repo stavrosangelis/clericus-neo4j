@@ -192,11 +192,11 @@ const graphSimulation = async(data) => {
     d3.forceLink(links)
         .id(d => d.id)
         .strength(d=>1)
-        .distance(d=>200)
+        .distance(d=>400)
       )
-    .force("charge", d32.forceManyBodyReuse().strength(strength))
-    .force("center", d3.forceCenter(0, 0))
-    .force('collide', d3.forceCollide(60))
+    //.force("charge", d32.forceManyBodyReuse().strength(strength))
+    //.force("center", d3.forceCenter(0, 0))
+    .force('collide', d3.forceCollide(100))
     //.alphaDecay(0.06)
     .stop();
 
@@ -229,6 +229,34 @@ const graphSimulation = async(data) => {
     });
   });
   return writeFile;
+}
+
+const itemGraphSimulation = (data) => {
+  let nodes = data.nodes;
+  let links = data.links;
+  nodes[0].x = data.centerX;
+  nodes[0].y = data.centerY;
+  let strength = -500;
+  const simulation = d3.forceSimulation(nodes)
+    .force("link",
+    d3.forceLink(links)
+        .id(d => d.id)
+        .strength(d=>1)
+        .distance(d=>200)
+      )
+    .force("charge", d32.forceManyBodyReuse().strength(strength))
+    .force("center", d3.forceCenter(data.centerX, data.centerY))
+    .force('collide', d3.forceCollide(100))
+    .alphaDecay(1)
+    .stop();
+
+  let max = 10 //Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay()));
+  for (let i = 0; i < max; i++) {
+    simulation.tick();
+  }
+  delete nodes['update']
+  simulation.stop();
+  return {nodes: nodes, links:links};
 }
 
 let cronJob = schedule.scheduleJob('0 4 * * *', async()=> {
@@ -277,6 +305,7 @@ const prepareOrganisations = async(records) => {
 }
 
 const getItemNetwork = async (req, resp) => {
+  let t0 = performance.now();
   let params = req.query;
   let _id = 0;
   if (typeof params._id==="undefined" || params._id==="") {
@@ -291,127 +320,74 @@ const getItemNetwork = async (req, resp) => {
   else {
     _id = params._id;
   }
+  let session = driver.session();
+  let nodeQuery = `MATCH (n) WHERE id(n)=${_id} AND n.status='public' RETURN n`;
+  let node = await session.writeTransaction(tx=>tx.run(nodeQuery,{}))
+  .then(result=> {
+    let output;
+    if (result.records.length>0) {
+      let record = result.records[0];
+      helpers.prepareOutput(record);
+      let recordObject = record.toObject();
+      output = helpers.outputRecord(recordObject['n']);
+      output.recordType = recordObject['n'].labels[0];
+    }
+    return output;
+  });
   if (typeof params.step!=="undefined" || params.step==="") {
     step = parseInt(params.step,10);
     if (step<1) step=1;
     if (step>6) step=6;
   }
   // nodes
-  let query = `MATCH (n) WHERE id(n)=${_id} AND n.status='public'
-  OPTIONAL MATCH (n)-[r*..${step}]->(t) WHERE t.status='public' RETURN n, r, t`;
+  /*let query = `MATCH (n) WHERE id(n)=${_id} AND n.status="public" CALL apoc.neighbors.tohop(n, "${taxonomyTerms}", ${step}) YIELD node WHERE node.status="public" RETURN DISTINCT id(node) AS _id, node.label AS label, labels(node) as type`;*/
+  let firstLevelQuery = `MATCH (n) WHERE id(n)=${_id} AND n.status='public' OPTIONAL MATCH (n)-[r]-(t) WHERE (t:Event OR t:Organisation OR t:Person OR t:Resource) AND t.status='public' RETURN n, r, t`;
+  let firstLevelNodes = await loadNodes(firstLevelQuery);
+
+  let query = `MATCH (n) WHERE id(n)=${_id} AND n.status="public"
+  MATCH (blacklist)
+  WHERE (blacklist:Event OR blacklist:Organisation OR blacklist:Person OR blacklist:Resource) AND NOT blacklist.status='public'
+  WITH n, collect(blacklist) AS blacklistNodes
+  CALL apoc.path.subgraphAll(n, {
+    labelFilter:"Event|Organisation|Person|Resource",
+    minLevel:1,
+    maxLevel:${step},
+    blacklistNodes: blacklistNodes
+  }) YIELD nodes, relationships
+  RETURN nodes, relationships`;
   let nodesPromise = await loadNodes(query);
-  let results = prepareItemOutput(nodesPromise.records);
-  let nodes = [];
-  let links = [];
-  let item = results.node;
-  let colors = nodeColors(item.type);
+  let t1 = performance.now();
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
-  let itemType = item.type;
-  if (typeof item.systemType!=="undefined" && item.systemType===classpieceTerm._id) {
-    itemType = "classpiece";
+  let defaultItemType = node.recordType;
+  if (typeof node.systemType!=="undefined" && node.systemType===classpieceTerm._id) {
+    defaultItemType = "Classpiece";
   }
-  let nodeOutput = {
-    id: item._id,
-    label: item.label,
-    itemId: item._id,
-    type: item.type,
+  let colors = nodeColors(defaultItemType);
+  let defaultItem = {
+    id: node._id,
+    label: node.label,
+    itemId: node._id,
+    type: defaultItemType,
     color: colors.color,
     strokeColor: colors.strokeColor,
-    size: 40
+    size: 50
   }
-  nodes.push(nodeOutput);
-
-  let relations = results.relations;
-  let nodeIds = [item._id];
-  for (let l=0;l<relations.length; l++) {
-    let relation = relations[l];
-    if (relation!==null) {
-      if (relation.target!==null) {
-        let targetId = relation.target._id;
-        if (nodeIds.indexOf(targetId)===-1) {
-          nodeIds.push(targetId);
-        }
-      }
-    }
-  }
-
-  let allowedTypes = ["Event", "Organisation", "Person", "Resource"];
-  /*for (let i=0;i<relations.length; i++) {
-    let relation = relations[i];
-    let ref = relation.relation[0];
-    let target = relation.target;
-    let targetType = target.type;
-    if (target!==null) {
-      if (allowedTypes.indexOf(targetType)>-1) {
-        let newRelation = {
-          source: ref.start,
-          target: ref.end,
-          refId: ref._id,
-          label: ref.type,
-        };
-        if (typeof target.systemType!=="undefined" && target.systemType===classpieceTerm._id) {
-          targetType = "Classpiece";
-        }
-        let colors = nodeColors(targetType);
-        let newTarget = {
-          id: target._id,
-          label: target.label,
-          itemId: target._id,
-          type: targetType,
-          color: colors.color,
-          strokeColor: colors.strokeColor,
-          size: 30
-        }
-        if (nodeIds.indexOf(ref.start)>-1 && nodeIds.indexOf(ref.end)) {
-          links.push(newRelation);
-          nodes.push(newTarget);
-        }
-      }
-    }
-
-  }*/
-  if (step>0) {
-    let nodeIds = [];
-    let relatedNodes = await loadRelatedNodes(_id, step);
-    for (let j=0;j<relatedNodes.length; j++) {
-      let relatedNode = relatedNodes[j];
-      let type = relatedNode.type;
-      if (allowedTypes.indexOf(type)>-1 && nodeIds.indexOf(relatedNode._id)===-1) {
-        nodeIds.push(relatedNode._id);
-        let newRelation = {
-          source: item._id,
-          target: relatedNode._id,
-          refId: `ref_${item._id}_${relatedNode._id}`,
-          label: "",
-        };
-        if (typeof relatedNode.systemType!=="undefined" && relatedNode.systemType===classpieceTerm._id) {
-          type = "Classpiece";
-        }
-        let colors = nodeColors(type);
-        let newTarget = {
-          id: relatedNode._id,
-          label: relatedNode.label,
-          itemId: relatedNode._id,
-          type: type,
-          color: colors.color,
-          strokeColor: colors.strokeColor,
-          size: 30
-        }
-        links.push(newRelation);
-        nodes.push(newTarget);
-      }
-    }
-  }
-
-  let responseData = {
-    nodes: nodes,
-    links: links
-  }
-
+  let prepareItemOutputParams = {
+    defaultItem: defaultItem,
+    firstLevel: firstLevelNodes,
+    subgraphs: nodesPromise.records,
+    classpieceTermId:classpieceTerm._id
+  };
+  let data = await prepareItemOutput(prepareItemOutputParams);
+  /*let t2 = performance.now();
+  let responseData = itemGraphSimulation(data);
+  let t3 = performance.now();
+  let perf = {load: (t1-t0), parse: (t2-t1), simulate: (t3-t2)};
+  responseData.perf = perf;*/
   resp.json({
     status: true,
-    data: JSON.stringify(responseData),
+    data: JSON.stringify(data),
     error: [],
     msg: "Query results",
   })
@@ -419,9 +395,7 @@ const getItemNetwork = async (req, resp) => {
 
 const loadNodes = async (query) => {
   let session = driver.session();
-  let nodes = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
+  let nodes = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     return result;
   });
@@ -494,46 +468,69 @@ const prepareItemsOutput = (records) => {
   return {nodes: nodes, relations: relationsOutput};
 }
 
-const prepareItemOutput = (records) => {
-  let results = [];
-  for (let i=0; i<records.length; i++) {
-    let record = records[i];
-    helpers.prepareOutput(record);
-    let recordObject = record.toObject();
-    let node = helpers.outputRecord(recordObject['n']);
-    if (typeof recordObject['n'].labels!=="undefined") {
-      node.type = recordObject['n'].labels[0];
+const prepareItemOutput = async({defaultItem=null,firstLevel=[],subgraphs=[],classpieceTermId=null}) => {
+  if (firstLevel.length===0) {
+    return [];
+  }
+  let recordsNodes = [];
+  let recordsLinks = [];
+  if (firstLevel.records.length>0) {
+    for (let i=0;i<firstLevel.records.length;i++) {
+      let firstLevelRow = firstLevel.records[i];
+      recordsNodes.push(firstLevelRow._fields[0])
+      recordsNodes.push(firstLevelRow._fields[2])
+      recordsLinks.push(firstLevelRow._fields[1])
     }
-    let target = null;
-    if (recordObject['t']!==null) {
-      target = helpers.outputRecord(recordObject['t']);
-      if (typeof recordObject['t'].labels!=="undefined") {
-        target.type = recordObject['t'].labels[0];
+  }
+  if (subgraphs.length>0) {
+    recordsNodes = [...recordsNodes, ...subgraphs[0]._fields[0]];
+    recordsLinks = [...recordsLinks, ...subgraphs[0]._fields[1]];
+  }
+  let nodes = [defaultItem];
+  let links = [];
+  let nodeIds = [];
+  let linksIds = [];
+  for (let i=0; i<recordsNodes.length; i++) {
+    let record = recordsNodes[i];
+    let item = helpers.outputRecord(record);
+    item.type = record.labels[0];
+    let itemType = item.type;
+    if (typeof item.systemType!=="undefined" && item.systemType===classpieceTermId) {
+      itemType = "Classpiece";
+    }
+    if (item._id!==defaultItem.id && nodeIds.indexOf(item._id)===-1) {
+      nodeIds.push(item._id);
+      let colors = nodeColors(itemType);
+      let node = {
+        id: item._id,
+        label: item.label,
+        itemId: item._id,
+        type: itemType,
+        color: colors.color,
+        strokeColor: colors.strokeColor,
+        size: 30
       }
+      nodes.push(node);
     }
-
-    // relations are strange
-    let relation = null;
-    if (recordObject['r']!==null) {
-      relation = helpers.outputRelation(recordObject['r']);
-    }
-    results.push({
-      node: node,
-      relation: relation,
-      target: target,
-    });
   }
-  let node = results[0].node;
-  let relations = results.map(r=>{
-    return {
-      relation: r.relation,
-      target: r.target
+  for (let j=0;j<recordsLinks.length;j++) {
+    let rel = helpers.outputRelation(recordsLinks[j]);
+    let start = rel.start, end = rel.end;
+    let pair = `${start}-${end}`;
+    let inversePair = `${end}-${start}`;
+    if (linksIds.indexOf(pair)>-1 || linksIds.indexOf(inversePair)>-1) {
+      continue;
     }
-  });
-  let output = {
-    node: node,
-    relations: relations
+    let link = {
+      source: start,
+      target: end,
+      refId: `ref_${rel._id}_${start}_${end}`,
+      label: rel.type
+    };
+    links.push(link);
+    linksIds.push(pair);
   }
+  let output = {nodes:nodes, links: links};
   return output;
 }
 
