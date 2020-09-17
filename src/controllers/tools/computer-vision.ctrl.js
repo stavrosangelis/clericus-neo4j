@@ -1664,7 +1664,7 @@ const existingPerson = async(name, diocese, ordination) => {
   lastName = helpers.addslashes(lastName);
   let firstName = name.firstName.toLowerCase().trim();
   firstName = helpers.addslashes(firstName);
-  let query = `MATCH (n:Person) WHERE LOWER(n.lastName)="${lastName}" AND LOWER(n.firstName)="${firstName}" RETURN n`;
+  let query = `MATCH (n:Person) WHERE toLower(n.lastName)="${lastName}" AND toLower(n.firstName)="${firstName}" RETURN n`;
   let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     session.close();
@@ -1770,7 +1770,7 @@ const addDiocese = async(diocese, userId) => {
   diocese = diocese.trim();
   let escapeDiocese = helpers.addslashes(diocese);
   let session = driver.session();
-  let query = `MATCH (n:Organisation) WHERE n.organisationType="Diocese" AND LOWER(n.label)="${escapeDiocese.toLowerCase()}" RETURN n`;
+  let query = `MATCH (n:Organisation) WHERE n.organisationType="Diocese" AND toLower(n.label)="${escapeDiocese.toLowerCase()}" RETURN n`;
   let organisation = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -1823,7 +1823,7 @@ const addReligiousOrder = async(religiousOrder, userId) => {
   religiousOrder = religiousOrder.replace(/\./g,"").trim();
   let escapeReligiousOrder = helpers.addslashes(religiousOrder);
   let session = driver.session();
-  let query = `MATCH (n:Organisation) WHERE n.organisationType="ReligiousOrder" AND LOWER(n.label)="${escapeReligiousOrder.toLowerCase()}" RETURN n`;
+  let query = `MATCH (n:Organisation) WHERE n.organisationType="ReligiousOrder" AND toLower(n.label)="${escapeReligiousOrder.toLowerCase()}" RETURN n`;
   let organisation = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -1996,7 +1996,7 @@ const updateEvent = async(label, type, temporalId, userId) => {
   if (temporalId!==null) {
     let session = driver.session();
     let escapeLabel = helpers.addslashes(label);
-    let query = `MATCH (n:Event)-->(t:Temporal) WHERE LOWER(n.label)="${escapeLabel.toLowerCase()}" AND n.eventType="${type}" AND id(t)=${temporalId} RETURN n`;
+    let query = `MATCH (n:Event)-->(t:Temporal) WHERE toLower(n.label)="${escapeLabel.toLowerCase()}" AND n.eventType="${type}" AND id(t)=${temporalId} RETURN n`;
     event = await session.writeTransaction(tx=>
       tx.run(query,{})
     )
@@ -2021,7 +2021,7 @@ const updateEvent = async(label, type, temporalId, userId) => {
 
 const loadHamellRef = async() => {
   let session = driver.session();
-  let query = `MATCH (n:Resource) WHERE LOWER(n.label)="hamell 1" return n`;
+  let query = `MATCH (n:Resource) WHERE toLower(n.label)="hamell 1" return n`;
   let node = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     session.close();

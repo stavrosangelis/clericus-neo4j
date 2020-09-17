@@ -308,7 +308,7 @@ const getPeople = async (req, resp) => {
   if (typeof parameters.label!=="undefined") {
     label = helpers.addslashes(parameters.label);
     if (label!=="") {
-      queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams +="toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
   if (typeof parameters.firstName!=="undefined") {
@@ -317,7 +317,7 @@ const getPeople = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
+      queryParams += "toLower(n.firstName) =~ toLower('.*"+firstName+".*') ";
     }
   }
   if (typeof parameters.lastName!=="undefined") {
@@ -326,7 +326,7 @@ const getPeople = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.lastName) =~ LOWER('.*"+lastName+".*') ";
+      queryParams += "toLower(n.lastName) =~ toLower('.*"+lastName+".*') ";
     }
   }
   if (typeof parameters.fnameSoundex!=="undefined") {
@@ -334,21 +334,21 @@ const getPeople = async (req, resp) => {
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams += "LOWER(n.fnameSoundex) =~ LOWER('.*"+fnameSoundex+".*') ";
+    queryParams += "toLower(n.fnameSoundex) =~ toLower('.*"+fnameSoundex+".*') ";
   }
   if (typeof parameters.lnameSoundex!=="undefined") {
     lnameSoundex = helpers.soundex(parameters.lnameSoundex);
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams += "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
+    queryParams += "toLower(n.lnameSoundex) =~ toLower('.*"+lnameSoundex+".*') ";
   }
   if (typeof parameters.description!=="undefined") {
     description = helpers.addslashes(parameters.description.toLowerCase());
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+    queryParams += "toLower(n.description) =~ toLower('.*"+description+".*') ";
   }
   if (typeof parameters.status!=="undefined") {
     status = parameters.status;
@@ -356,7 +356,7 @@ const getPeople = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams += "toLower(n.status) =~ toLower('.*"+status+".*') ";
     }
   }
   if (typeof parameters.orderField!=="undefined") {
@@ -691,7 +691,7 @@ const patchUnknown = async(req, resp) => {
   });
 
   // 3. label
-  let queryLabel = `match (n:Person) where LOWER(n.label) =~ LOWER('.*Unknown.*') return n`;
+  let queryLabel = `match (n:Person) where toLower(n.label) =~ toLower('.*Unknown.*') return n`;
   let transactionLabel = await session.writeTransaction(tx=>
     tx.run(queryLabel,{})
   )

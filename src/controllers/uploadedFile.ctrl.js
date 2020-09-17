@@ -225,7 +225,7 @@ const getUploadedFiles = async (req, resp) => {
   if (typeof parameters.filename!=="undefined") {
     filename = parameters.filename;
     if (filename!=="") {
-      queryParams +="LOWER(n.filename) =~ LOWER('.*"+filename+".*') ";
+      queryParams +="toLower(n.filename) =~ toLower('.*"+filename+".*') ";
     }
   }
 

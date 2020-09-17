@@ -921,7 +921,7 @@ const queryTexts = async(req, resp) => {
 const countWordType = async(word, type) => {
   let queryWord = helpers.escapeRegExp(word);
   let session = driver.session();
-  let query = "MATCH (n:Person) WHERE LOWER(n."+type+") =~ LOWER('.*"+queryWord+".*') RETURN count(*) AS count";
+  let query = "MATCH (n:Person) WHERE toLower(n."+type+") =~ toLower('.*"+queryWord+".*') RETURN count(*) AS count";
   let count = await session.writeTransaction(tx=>
     tx.run(query,{})
   )

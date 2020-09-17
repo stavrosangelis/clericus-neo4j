@@ -127,7 +127,7 @@ const getEventsPrepareQueryParams = async(req)=>{
       if (queryParams!=="") {
         queryParams +=" AND ";
       }
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
 
@@ -164,7 +164,7 @@ const getEventsPrepareQueryParams = async(req)=>{
       if (queryParams!=="") {
         queryParams +=" AND ";
       }
-      queryParams += `LOWER(n.eventType)= "${eventType}" `;
+      queryParams += `toLower(n.eventType)= "${eventType}" `;
     }
   }
   if (typeof parameters.orderField!=="undefined") {

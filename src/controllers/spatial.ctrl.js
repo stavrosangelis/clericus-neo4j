@@ -217,7 +217,7 @@ const getSpatials = async (req, resp) => {
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams +="LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams +="toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
   if (typeof parameters.orderField!=="undefined") {

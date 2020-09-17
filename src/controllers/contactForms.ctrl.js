@@ -17,19 +17,19 @@ const getContactForms = async (req, resp) => {
   if (typeof parameters.name!=="undefined") {
     name = parameters.name;
     if (name!=="") {
-      queryParams +="LOWER(n.name) =~ LOWER('.*"+name+".*') ";
+      queryParams +="toLower(n.name) =~ toLower('.*"+name+".*') ";
     }
   }
   if (typeof parameters.email!=="undefined") {
     email = parameters.email;
     if (email!=="") {
-      queryParams +="LOWER(n.email) =~ LOWER('.*"+email+".*') ";
+      queryParams +="toLower(n.email) =~ toLower('.*"+email+".*') ";
     }
   }
   if (typeof parameters.subject!=="undefined") {
     subject = parameters.subject;
     if (subject!=="") {
-      queryParams +="LOWER(n.subject) =~ LOWER('.*"+subject+".*') ";
+      queryParams +="toLower(n.subject) =~ toLower('.*"+subject+".*') ";
     }
   }
 

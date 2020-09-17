@@ -195,7 +195,7 @@ const classPieceIdentifyDuplicates = async(req, resp) => {
       if (typeof face.firstName!=="undefined") {
         firstName = face.firstName.toLowerCase();
         if (firstName!=="") {
-          queryParams = "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
+          queryParams = "toLower(n.firstName) =~ toLower('.*"+firstName+".*') ";
         }
       }
       if (typeof face.lastName!=="undefined") {
@@ -203,7 +203,7 @@ const classPieceIdentifyDuplicates = async(req, resp) => {
         if (queryParams !=="") {
           queryParams += " AND ";
         }
-        queryParams = "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
+        queryParams = "toLower(n.firstName) =~ toLower('.*"+firstName+".*') ";
       }
       if (queryParams!=="") {
         queryParams = "WHERE "+queryParams;

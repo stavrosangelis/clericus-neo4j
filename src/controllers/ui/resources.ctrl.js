@@ -483,7 +483,7 @@ const getResourcesPrepareQueryParams = async(req)=>{
       if (queryParams!=="") {
         queryParams += " AND ";
       }
-      queryParams += " LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams += " toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
 
@@ -533,7 +533,7 @@ const getResourcesPrepareQueryParams = async(req)=>{
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+      queryParams += "toLower(n.description) =~ toLower('.*"+description+".*') ";
     }
   }
 

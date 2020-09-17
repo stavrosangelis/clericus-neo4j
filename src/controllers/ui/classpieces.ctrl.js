@@ -501,14 +501,14 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
   if (systemType!=="") {
     if (queryParams!=="") {
       queryParams += " AND ";
     }
-    queryParams += `LOWER(n.systemType) = '${systemType}' `;
+    queryParams += `toLower(n.systemType) = '${systemType}' `;
   }
   if (typeof parameters.description!=="undefined") {
     description = parameters.description;
@@ -516,7 +516,7 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+      queryParams += "toLower(n.description) =~ toLower('.*"+description+".*') ";
     }
   }
 

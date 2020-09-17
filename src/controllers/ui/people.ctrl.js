@@ -326,7 +326,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams +=` (LOWER(n.label) =~ LOWER(".*${label}.*") OR single(x IN n.alternateAppelations WHERE LOWER(x) =~ LOWER(".*${label}.*"))) `;
+      queryParams +=` (toLower(n.label) =~ toLower(".*${label}.*") OR single(x IN n.alternateAppelations WHERE toLower(x) =~ toLower(".*${label}.*"))) `;
     }
   }
   if (typeof parameters.firstName!=="undefined" && typeof parameters.advancedSearch==="undefined") {
@@ -335,7 +335,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.firstName) =~ LOWER('.*"+firstName+".*') ";
+      queryParams += "toLower(n.firstName) =~ toLower('.*"+firstName+".*') ";
     }
   }
   if (typeof parameters.lastName!=="undefined" && typeof parameters.advancedSearch==="undefined") {
@@ -344,7 +344,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.lastName) =~ LOWER('.*"+lastName+".*') ";
+      queryParams += "toLower(n.lastName) =~ toLower('.*"+lastName+".*') ";
     }
   }
   if (typeof parameters.fnameSoundex!=="undefined" && typeof parameters.advancedSearch==="undefined") {
@@ -352,21 +352,21 @@ const getPeoplePrepareQueryParams = async(req)=>{
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams += "LOWER(n.fnameSoundex) =~ LOWER('.*"+fnameSoundex+".*') ";
+    queryParams += "toLower(n.fnameSoundex) =~ toLower('.*"+fnameSoundex+".*') ";
   }
   if (typeof parameters.lnameSoundex!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     lnameSoundex = helpers.soundex(parameters.lnameSoundex).trim();
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams += "LOWER(n.lnameSoundex) =~ LOWER('.*"+lnameSoundex+".*') ";
+    queryParams += "toLower(n.lnameSoundex) =~ toLower('.*"+lnameSoundex+".*') ";
   }
   if (typeof parameters.description!=="undefined" && typeof parameters.advancedSearch==="undefined") {
     description = helpers.addslashes(parameters.description).trim();
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams += "LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+    queryParams += "toLower(n.description) =~ toLower('.*"+description+".*') ";
   }
 
   if (typeof parameters.orderField!=="undefined") {
@@ -563,10 +563,10 @@ const advancedQueryBuilder = (advancedSearch) => {
         query += ` NOT single(x IN n.${item.select} WHERE x="${item.input}")`;
       }
       if (item.qualifier==="not_contains") {
-        query += ` NOT single(x IN n.${item.select} WHERE LOWER(x) =~ LOWER(".*${item.input}.*"))`;
+        query += ` NOT single(x IN n.${item.select} WHERE toLower(x) =~ toLower(".*${item.input}.*"))`;
       }
       if (item.qualifier==="contains") {
-        query += ` single(x IN n.${item.select} WHERE LOWER(x) =~ LOWER(".*${item.input}.*")) `;
+        query += ` single(x IN n.${item.select} WHERE toLower(x) =~ toLower(".*${item.input}.*")) `;
       }
       if (item.qualifier==="equals") {
         query += ` single(x IN n.${item.select} WHERE x="${item.input}") `;
@@ -578,10 +578,10 @@ const advancedQueryBuilder = (advancedSearch) => {
         query += ` NOT n.${item.select} = "${inputVal}" `;
       }
       if (item.qualifier==="not_contains") {
-        query += ` NOT LOWER(n.${item.select}) =~ LOWER(".*${inputVal}.*") `;
+        query += ` NOT toLower(n.${item.select}) =~ toLower(".*${inputVal}.*") `;
       }
       if (item.qualifier==="contains") {
-        query += ` LOWER(n.${item.select}) =~ LOWER(".*${inputVal}.*") `;
+        query += ` toLower(n.${item.select}) =~ toLower(".*${inputVal}.*") `;
       }
       if (item.qualifier==="equals") {
         query += ` n.${item.select} = "${inputVal}" `;
@@ -592,10 +592,10 @@ const advancedQueryBuilder = (advancedSearch) => {
         query += ` NOT n.${item.select} = "${item.input}" `;
       }
       if (item.qualifier==="not_contains") {
-        query += ` NOT LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
+        query += ` NOT toLower(n.${item.select}) =~ toLower(".*${item.input}.*") `;
       }
       if (item.qualifier==="contains") {
-        query += ` LOWER(n.${item.select}) =~ LOWER(".*${item.input}.*") `;
+        query += ` toLower(n.${item.select}) =~ toLower(".*${item.input}.*") `;
       }
       if (item.qualifier==="equals") {
         query += ` n.${item.select} = "${item.input}" `;

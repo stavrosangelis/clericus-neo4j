@@ -289,7 +289,7 @@ const getResources = async (req, resp) => {
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
   if (typeof parameters.systemType!=="undefined") {
@@ -298,7 +298,7 @@ const getResources = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams +="LOWER(n.systemType) =~ LOWER('.*"+systemType+".*') ";
+      queryParams +="toLower(n.systemType) =~ toLower('.*"+systemType+".*') ";
     }
   }
   if (typeof parameters.description!=="undefined") {
@@ -307,7 +307,7 @@ const getResources = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams +="LOWER(n.description) =~ LOWER('.*"+description+".*') ";
+      queryParams +="toLower(n.description) =~ toLower('.*"+description+".*') ";
     }
   }
   if (typeof parameters.status!=="undefined") {
@@ -316,7 +316,7 @@ const getResources = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams +="LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams +="toLower(n.status) =~ toLower('.*"+status+".*') ";
     }
   }
   if (typeof parameters.orderField!=="undefined") {

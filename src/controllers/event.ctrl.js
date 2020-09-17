@@ -195,7 +195,7 @@ const getEvents = async (req, resp) => {
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
   if (typeof parameters.temporal!=="undefined") {
@@ -207,7 +207,7 @@ const getEvents = async (req, resp) => {
   if (typeof parameters.eventType!=="undefined") {
     eventType = parameters.eventType;
     if (eventType!=="") {
-      queryParams += `LOWER(n.eventType)= "${eventType}" `;
+      queryParams += `toLower(n.eventType)= "${eventType}" `;
     }
   }
   if (typeof parameters.orderField!=="undefined") {
@@ -273,7 +273,7 @@ const getEvents = async (req, resp) => {
       if (queryTemporalParams!=="") {
         querySpatialParams = `AND `;
       }
-      querySpatialParams += `LOWER(s.label)=~LOWER('.*${spatial}.*')`;
+      querySpatialParams += `toLower(s.label)=~toLower('.*${spatial}.*')`;
     }
     query = `MATCH ${matchTemporal} ${matchSpatial} WHERE ${queryTemporalParams} ${querySpatialParams} ${newQueryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
   }

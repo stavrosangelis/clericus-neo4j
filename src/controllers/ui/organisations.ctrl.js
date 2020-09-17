@@ -52,7 +52,7 @@ const getOrganisations = async (req, resp) => {
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams = "LOWER(n.label) =~ LOWER('.*"+label+".*') ";
+      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
     }
   }
   if (typeof parameters.orderField!=="undefined") {
@@ -64,7 +64,7 @@ const getOrganisations = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.organisationType) =~ LOWER('.*"+organisationType+".*') ";
+      queryParams += "toLower(n.organisationType) =~ toLower('.*"+organisationType+".*') ";
     }
   }
   if (orderField!=="") {
@@ -79,7 +79,7 @@ const getOrganisations = async (req, resp) => {
       if (queryParams !=="") {
         queryParams += " AND ";
       }
-      queryParams += "LOWER(n.status) =~ LOWER('.*"+status+".*') ";
+      queryParams += "toLower(n.status) =~ toLower('.*"+status+".*') ";
     }
   }
 
