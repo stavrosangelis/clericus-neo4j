@@ -735,7 +735,6 @@ const updateColumns = async (req, resp) => {
   })
 }
 
-
 const prepareForIngestion = async (req,resp) => {
   const directory = `${archivePath}documents/hamell-csv/`;
   const outputDirectory = `${archivePath}documents/hamell-csv-output/`;

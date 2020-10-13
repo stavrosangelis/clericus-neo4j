@@ -29,5 +29,6 @@
 /.nyc_output
 
 /backup-container.txt
+/backup-container-4.txt
 /recreate-api.txt
 /download-archive.txt

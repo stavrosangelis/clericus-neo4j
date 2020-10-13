@@ -345,14 +345,14 @@ const getItemNetwork = async (req, resp) => {
   let firstLevelNodes = await loadNodes(firstLevelQuery);
 
   let query = `MATCH (n) WHERE id(n)=${_id} AND n.status="public"
-  MATCH (blacklist)
-  WHERE (blacklist:Event OR blacklist:Organisation OR blacklist:Person OR blacklist:Resource) AND NOT blacklist.status='public'
-  WITH n, collect(blacklist) AS blacklistNodes
+  MATCH (whitelist)
+  WHERE (whitelist:Event OR whitelist:Organisation OR whitelist:Person OR whitelist:Resource) AND whitelist.status='public'
+  WITH n, collect(whitelist) AS whitelistNodes
   CALL apoc.path.subgraphAll(n, {
-    labelFilter:"Event|Organisation|Person|Resource",
+    labelFilter:"+Event|+Organisation|+Person|+Resource",
     minLevel:1,
     maxLevel:${step},
-    blacklistNodes: blacklistNodes
+    whitelistNodes: whitelistNodes
   }) YIELD nodes, relationships
   RETURN nodes, relationships`;
   let nodesPromise = await loadNodes(query);

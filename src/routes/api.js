@@ -8,6 +8,7 @@ const articleController = require('../controllers/article.ctrl')
 const articleCategoryController = require('../controllers/articleCategory.ctrl')
 const authController = require('../controllers/authentication.ctrl')
 const cvisionController = require('../controllers/tools/computer-vision.ctrl');
+const ocrController = require('../controllers/tools/ocr.ctrl');
 const contactFormsController = require('../controllers/contactForms.ctrl');
 const dashboardController = require('../controllers/dashboard.ctrl')
 const entityController = require('../controllers/entity.ctrl');
@@ -267,6 +268,17 @@ server.post('/update-document-columns', cvisionController.updateColumns);
 server.get('/prepare-hamell-ingestion', auth.checkAdminToken, cvisionController.prepareForIngestion);
 server.get('/after-hamell-ingestion', auth.checkAdminToken, cvisionController.afterIngestion);
 server.get('/hamell-ingest-csv', auth.checkAdminToken, cvisionController.ingestionFromCsv);
+
+// ocr
+server.get('/ocr-meath', auth.checkAdminToken, ocrController.ocrDocumentsDir);
+server.get('/ocr-meath-get-columns', auth.checkAdminToken, ocrController.identifyColumns);
+server.get('/ocr-meath-export-to-csv', auth.checkAdminToken, ocrController.exportToCsv);
+server.get('/ocr-meath-export-organisations', auth.checkAdminToken, ocrController.exportOrganisations);
+server.get('/ocr-meath-correct-organisations', auth.checkAdminToken, ocrController.correctOrganisations);
+server.get('/ocr-meath-process-items', auth.checkAdminToken, ocrController.processItems);
+server.get('/ocr-meath-compare-processed-items', auth.checkAdminToken, ocrController.compareToDBProcessedItems);
+server.get('/ocr-meath-ingest-processed-items', auth.checkAdminToken, ocrController.ingestProcessedItems);
+
 
 // uploaded file
 server.post('/upload-file', auth.checkAdminToken, uploadedFileController.postUploadedFile);
