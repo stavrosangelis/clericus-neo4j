@@ -1259,6 +1259,7 @@ const ingestProcessedItems = async(req,resp) => {
     "Salesians of Don Bosco"
   ];
 
+
   const directory = `${archivePath}documents/meath/`;
   const organisationsFileHeaders = ['Organisation','Organisation type','Cathedral city','Corrected organisation label'];
   var organisationsList = await new Promise((resolve,reject)=>{
@@ -1458,16 +1459,16 @@ const ingestProcessedItems = async(req,resp) => {
           appRelationType = "wasServingAs";
         }
         if (appTitle==="Retired Parish Priest" || appTitle==="Retired") {
-          eventLabel = `retired to ${appointmentOrg.label}`;
+          eventLabel = `Parish Priest`;
           eventTypeLabel = `Retirement`;
-          appRelationType = "retiredTo";
+          appRelationType = "wasRetired";
         }
         if (appointmentType==="School" && seminaries.indexOf(appTitle)===-1) {
           eventLabel = "Teaching post";
           appRelationType = "wasAppointedTo";
         }
         if (seminaries.indexOf(appTitle)>-1) {
-          eventLabel = "was appointed as Parish Priest";
+          eventLabel = "Parish Priest";
         }
         // 1. add event
         // 1.1 save event
@@ -1578,6 +1579,39 @@ const ingestProcessedItems = async(req,resp) => {
           };
           let addPersonSeminaryReference = await updateReference(personSeminaryRef);
         }
+      }
+      if (appointmentDiocese!=="") {
+        let appointmentDioceseOrg = await session.writeTransaction(tx=>
+          tx.run(`MATCH (n:Organisation) WHERE n.label="${appointmentDiocese}" return n`,{})
+        )
+        .then(result=> {
+          let records = result.records;
+          if (records.length>0) {
+            let record = records[0].toObject();
+            let outputRecord = helpers.outputRecord(record.n);
+            return outputRecord;
+          }
+          return null;
+        });
+        if (appointmentDioceseOrg==null) {
+          let appointmentDioceseData = {
+            label: appointmentDiocese,
+            labelSoundex: helpers.soundex(appointmentDiocese),
+            status: "public",
+            organisationType: "Diocese"
+          }
+          let newAppointmentDioceseOrg = new Organisation(appointmentDioceseData);
+          let newAppointmentDioceseOrgSave = await newAppointmentDioceseOrg.save(userId);
+          appointmentDioceseOrg = newAppointmentDioceseOrgSave.data;
+        }
+        let appointmentDioceseAffiliationRef = {
+          items: [
+            {_id:person._id, type: "Person", role: ""},
+            {_id:appointmentDioceseOrg._id, type: "Organisation", role: ""},
+          ],
+          taxonomyTermLabel: "hasAffiliation"
+        };
+        let addAppointmentDioceseAffiliationReference = await updateReference(appointmentDioceseAffiliationRef);
       }
       if (row['Died']!=="") {
         let deathDate = row['Died'].trim();
