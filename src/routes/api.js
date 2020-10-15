@@ -187,7 +187,7 @@ server.get('/people', personController.getPeople);
 server.delete('/person', auth.checkAdminToken, personController.deletePerson);
 server.delete('/people', auth.checkAdminToken, personController.deletePeople);
 server.post('/person-update-status', auth.checkAdminToken, personController.updateStatus);
-server.get('/fix-labels', auth.checkAdminToken, personController.fixLabels);
+//server.get('/fix-labels', auth.checkAdminToken, personController.fixLabels);
 //server.get('/patch-unknown', auth.checkAdminToken, personController.patchUnknown);
 
 // resources
@@ -278,6 +278,7 @@ server.get('/ocr-meath-correct-organisations', auth.checkAdminToken, ocrControll
 server.get('/ocr-meath-process-items', auth.checkAdminToken, ocrController.processItems);
 server.get('/ocr-meath-compare-processed-items', auth.checkAdminToken, ocrController.compareToDBProcessedItems);
 server.get('/ocr-meath-ingest-processed-items', auth.checkAdminToken, ocrController.ingestProcessedItems);
+//server.get('/ocr-meath-fix-db-ids', auth.checkAdminToken, ocrController.fixDBIDS);
 
 
 // uploaded file

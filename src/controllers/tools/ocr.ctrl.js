@@ -1334,7 +1334,8 @@ const ingestProcessedItems = async(req,resp) => {
 
   const files = await fs.readdirSync(`${directory}source-csv/`);
 
-  const headers = ['First name','Middle name','Last name','Native of','Native of type','Native of Cathedral city','Native Diocese','App.','Title','Appointment','Appointment type','Appointment Cathedral city','Appointment Diocese','Died','DB ID'];
+  const headers = ['First name','Middle name','Last name','Native of','Native of type','Native of Cathedral city',
+  'Native  Diocese','App.','Title','Appointment','Appointment type','Appointment Cathedral city','Appointment Diocese','Died','DB ID'];
   for (let i=0;i<files.length; i++) {
     let file = files[i];
     if (!file.includes(".csv")) {
@@ -1399,14 +1400,32 @@ const ingestProcessedItems = async(req,resp) => {
           }
           return null;
         });
-        let nativeRef = {
-          items: [
-            {_id:person._id, type: "Person", role: ""},
-            {_id:nativeOfOrg._id, type: "Organisation", role: ""},
-          ],
-          taxonomyTermLabel: "wasNativeOf"
-        };
-        let addNativeReference = await updateReference(nativeRef);
+        let affiliationTypes = ["Diocese","Religious order","Seminary","School","Hospital",];
+        let nativeOfTypes = ["Parish","Townland"];
+
+        // has affiliation
+        if (affiliationTypes.indexOf(row['Native of type'])>-1) {
+          let nativeAffiliationRef = {
+            items: [
+              {_id:person._id, type: "Person", role: ""},
+              {_id:nativeOfOrg._id, type: "Organisation", role: ""},
+            ],
+            taxonomyTermLabel: "hasAffiliation"
+          };
+          let addNativeAffiliationReference = await updateReference(nativeAffiliationRef);
+        }
+        // native of
+        if (nativeOfTypes.indexOf(row['Native of type'])>-1) {
+          let nativeRef = {
+            items: [
+              {_id:person._id, type: "Person", role: ""},
+              {_id:nativeOfOrg._id, type: "Organisation", role: ""},
+            ],
+            taxonomyTermLabel: "wasNativeOf"
+          };
+          let addNativeReference = await updateReference(nativeRef);
+        }
+
       }
 
       // 4. appointment event
@@ -1439,16 +1458,21 @@ const ingestProcessedItems = async(req,resp) => {
           appRelationType = "wasServingAs";
         }
         if (appTitle==="Retired Parish Priest" || appTitle==="Retired") {
-          eventTypeLabel = "Retirement"
+          eventLabel = `retired to ${appointmentOrg.label}`;
+          eventTypeLabel = `Retirement`;
           appRelationType = "retiredTo";
         }
         if (appointmentType==="School" && seminaries.indexOf(appTitle)===-1) {
           eventLabel = "Teaching post";
+          appRelationType = "wasAppointedTo";
+        }
+        if (seminaries.indexOf(appTitle)>-1) {
+          eventLabel = "was appointed as Parish Priest";
         }
         // 1. add event
         // 1.1 save event
         let eventType = await session.writeTransaction(tx=>
-          tx.run(`MATCH (n:TaxonomyTerm) WHERE n.labelId="${eventTypeLabel}" return n`,{})
+          tx.run(`MATCH (n:TaxonomyTerm) WHERE n.labelId="${helpers.normalizeLabelId(eventTypeLabel)}" return n`,{})
         )
         .then(result=> {
           let records = result.records;
@@ -1678,9 +1702,9 @@ const insertOrganisation = async(organisation, userId, organisationTypesTaxonomy
 const insertOrganisationType = async(organisationType, userId, organisationTypesTaxonomyId) => {
   let organisationTypeData = {
     label: organisationType,
-    labelId: organisationType,
+    labelId: helpers.normalizeLabelId(organisationType),
     inverseLabel: organisationType,
-    inverseLabelId: organisationType,
+    inverseLabelId: helpers.normalizeLabelId(organisationType),
   }
   let newOrganisationType = new TaxonomyTerm(organisationTypeData);
   await newOrganisationType.load();
@@ -1730,6 +1754,84 @@ const insertCathedralCity = async(city, userId) => {
   return data;
 }
 
+const fixDBIDS = async(req, resp) => {
+  const directory = `${archivePath}documents/meath/`;
+  const files = await fs.readdirSync(`${directory}source-csv/`);
+  const filesHeaders = ['First name','Middle name','Last name','Native of','Native of type','Native of Cathedral city','Native Diocese','App.','Title','Appointment','Appointment type','Appointment Cathedral city','Appointment Diocese','Died','DB ID'];
+  const dbFilesHeaders = ['#','ID','First name','Middle name','Last name','Native of','Native of type','Native of Cathedral city','Native Diocese','App.','Title','Appointment','Appointment type','Appointment Cathedral city','Appointment Diocese','Died','Location of death','Native event','Appointment event','Death event'];
+
+  for (let i=0;i<files.length; i++) {
+    let file = files[i];
+    if (!file.includes(".csv")) {
+      continue;
+    }
+    let csv = await new Promise((resolve,reject)=>{
+      let results = [];
+      fs.createReadStream(`${directory}source-csv/${file}`)
+      .pipe(csvParser(filesHeaders))
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+    });
+
+    let dbCsv = await new Promise((resolve,reject)=>{
+      let results = [];
+      fs.createReadStream(`${directory}xlsx/${file}`)
+      .pipe(csvParser(dbFilesHeaders))
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+    });
+    for (let line in dbCsv) {
+      let row = dbCsv[line];
+      if (Number(line)===0) {
+        continue;
+      }
+      if (row['ID']!=="") {
+        let prevRowIndex = Number(line)-1;
+        let prevRow = dbCsv[prevRowIndex];
+        let index = Number(prevRow['0'])+1;
+        let csvRow = csv[index];
+        if (typeof csvRow==="undefined" || csvRow['DB ID']!=="") {
+          continue;
+        }
+        csvRow['DB ID'] = row['1'];
+      }
+    }
+
+    let csvData = "";
+    for (let line in csv) {
+      let row = csv[line];
+      let lineText = "";
+      for (let key in row) {
+        lineText +=`${row[key]},`
+      }
+      lineText += `\n`;
+      csvData += lineText;
+    }
+    let csvPath = `${directory}target-csv/${file}`;
+    let writeFile = await new Promise ((resolve,reject)=> {
+      fs.writeFile(csvPath, csvData, 'utf8', function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          csvStatus = true;
+          resolve(true);
+        }
+      });
+    });
+
+  }
+  return resp.json({
+    status: true,
+    data: [],
+    error: false,
+    msg: '',
+  })
+}
+
 module.exports = {
   ocrDocumentsDir: ocrDocumentsDir,
   identifyColumns: identifyColumns,
@@ -1739,4 +1841,5 @@ module.exports = {
   processItems: processItems,
   compareToDBProcessedItems: compareToDBProcessedItems,
   ingestProcessedItems: ingestProcessedItems,
+  fixDBIDS: fixDBIDS,
 }
