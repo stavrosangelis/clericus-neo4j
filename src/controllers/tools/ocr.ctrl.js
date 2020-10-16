@@ -1401,6 +1401,16 @@ const ingestProcessedItems = async(req,resp) => {
           }
           return null;
         });
+        if (nativeOfOrg===null) {
+          let nativeOfOrgData = {
+            label: row['Native of'].trim(),
+            labelSoundex: helpers.soundex(row['Native of'].trim()),
+            organisationType: row['Native of type']
+          }
+          let newNativeOfOrg = new Organisation(nativeOfOrgData);
+          let newNativeOfOrgSave = await newNativeOfOrg.save(userId);
+          nativeOfOrg = newNativeOfOrgSave.data;
+        }
         let affiliationTypes = ["Diocese","Religious order","Seminary","School","Hospital",];
         let nativeOfTypes = ["Parish","Townland"];
 

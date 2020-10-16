@@ -199,6 +199,8 @@ const getPerson = async(req, resp) => {
     for (let i=0;i<events.length;i++) {
       let eventItem = events[i];
       eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+      eventItem.spatial = await helpers.loadRelations(eventItem.ref._id, "Event", "Spatial", true);
+      eventItem.organisations = await helpers.loadRelations(eventItem.ref._id, "Event", "Organisation", true);
     }
     let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
     await classpieceSystemType.load();
