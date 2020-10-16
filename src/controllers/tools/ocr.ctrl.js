@@ -1614,10 +1614,22 @@ const ingestProcessedItems = async(req,resp) => {
         let addAppointmentDioceseAffiliationReference = await updateReference(appointmentDioceseAffiliationRef);
       }
       if (row['Died']!=="") {
+        let deathEventType = await session.writeTransaction(tx=>
+          tx.run(`MATCH (n:TaxonomyTerm) WHERE n.labelId="${helpers.normalizeLabelId("Death")}" return n`,{})
+        )
+        .then(result=> {
+          let records = result.records;
+          if (records.length>0) {
+            let record = records[0].toObject();
+            let outputRecord = helpers.outputRecord(record.n);
+            return outputRecord;
+          }
+          return null;
+        });
         let deathDate = row['Died'].trim();
         let deceasedEventData = {
           label: "Deceased",
-          eventType: "Death"
+          eventType: deathEventType._id
         }
         let newDeceasedEvent = new Event(deceasedEventData);
         let newDeceasedEventSave = await newDeceasedEvent.save(userId);
