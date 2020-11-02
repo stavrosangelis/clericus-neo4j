@@ -218,6 +218,7 @@ const normalizeLabelId = (label) => {
   }
   // trim spaces
   label = label.trim();
+  label = label.replace(/[\W_]+/g," ");
   let output = "";
   let labelArr = label.split(" ");
   // for each space in string split the string parts and normalize them

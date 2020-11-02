@@ -90,7 +90,7 @@ class TaxonomyTerm {
       return false;
     }
     let session = driver.session();
-    let query = "MATCH ()-[r:"+this.labelId+"]->() RETURN count(*) AS c";
+    let query = `MATCH ()-[r:\`${this.labelId}\`]->() RETURN count(*) AS c`;
     let count = await session.writeTransaction(tx=>
       tx.run(query, {})
     )
@@ -114,7 +114,7 @@ class TaxonomyTerm {
       return false;
     }
     let session = driver.session();
-    let query = `MATCH (s)-[r:${this.labelId}]->(t) RETURN s,t ORDER BY s.labels[0] SKIP 0 LIMIT 25`;
+    let query = `MATCH (s)-[r:\`${this.labelId}\`]->(t) RETURN s,t ORDER BY s.labels[0] SKIP 0 LIMIT 25`;
     let relations = await session.writeTransaction(tx=>
       tx.run(query, {})
     )

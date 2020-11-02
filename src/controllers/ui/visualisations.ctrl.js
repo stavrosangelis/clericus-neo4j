@@ -22,10 +22,10 @@ const getGraphNetwork = async (req, resp) => {
 
 const produceGraphNetwork = async () => {
   // Event, Organisation, Person, Resource
-  let eventsCountQuery = `MATCH (n:Event) WHERE n.status='public' RETURN count(n) AS count`;
-  let organisationsCountQuery = `MATCH (n:Organisation) WHERE n.status='public' RETURN count(n) AS count`;
-  let peopleCountQuery = `MATCH (n:Person) WHERE n.status='public' RETURN count(n) AS count`;
-  let resourcesCountQuery = `MATCH (n:Resource) WHERE n.status='public' RETURN count(n) AS count`;
+  let eventsCountQuery = `MATCH (n:Event {status:'public'}) RETURN count(n) AS count`;
+  let organisationsCountQuery = `MATCH (n:Organisation {status:'public'}) RETURN count(n) AS count`;
+  let peopleCountQuery = `MATCH (n:Person {status:'public'}) RETURN count(n) AS count`;
+  let resourcesCountQuery = `MATCH (n:Resource {status:'public'}) RETURN count(n) AS count`;
   let session = driver.session();
   let eventsCount = await session.writeTransaction(tx=>tx.run(eventsCountQuery,{}))
   .then(result=> {
@@ -98,16 +98,16 @@ const produceGraphNetwork = async () => {
   let t0 = performance.now()
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
-  let query = `OPTIONAL MATCH (n1:Event) WHERE n1.status='public'
+  let query = `OPTIONAL MATCH (n1:Event {status='public'})
   WITH collect(distinct n1) as c1
-  OPTIONAL MATCH (n2:Organisation) WHERE n2.status='public'
+  OPTIONAL MATCH (n2:Organisation {status='public'})
   WITH collect(distinct n2) + c1 as c2
-  OPTIONAL MATCH (n3:Person) WHERE n3.status='public'
+  OPTIONAL MATCH (n3:Person {status='public'})
   WITH collect(distinct n3) + c2 as c3
-  OPTIONAL MATCH (n4:Resource) WHERE n4.status='public'
+  OPTIONAL MATCH (n4:Resource {status='public'})
   WITH collect(distinct n4) + c3 as c4
   UNWIND c4 as n
-  OPTIONAL MATCH (n)-[r]-(t) WHERE t.status='public' RETURN n, r, t`;
+  OPTIONAL MATCH (n)-[r]-(t {status='public'}) RETURN n, r, t`;
   let resultsPromise = await loadNodes(query);
   let results = prepareItemsOutput(resultsPromise.records);
   let nodes = results.nodes;
@@ -341,18 +341,19 @@ const getItemNetwork = async (req, resp) => {
   }
   // nodes
   /*let query = `MATCH (n) WHERE id(n)=${_id} AND n.status="public" CALL apoc.neighbors.tohop(n, "${taxonomyTerms}", ${step}) YIELD node WHERE node.status="public" RETURN DISTINCT id(node) AS _id, node.label AS label, labels(node) as type`;*/
-  let firstLevelQuery = `MATCH (n) WHERE id(n)=${_id} AND n.status='public' OPTIONAL MATCH (n)-[r]-(t) WHERE (t:Event OR t:Organisation OR t:Person OR t:Resource) AND t.status='public' RETURN n, r, t`;
+  let firstLevelQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} OPTIONAL MATCH (n)-[r]-(t) WHERE (t:Event OR t:Organisation OR t:Person OR t:Resource) AND t.status='public' RETURN n, r, t`;
   let firstLevelNodes = await loadNodes(firstLevelQuery);
 
-  let query = `MATCH (n) WHERE id(n)=${_id} AND n.status="public"
-  MATCH (whitelist)
-  WHERE (whitelist:Event OR whitelist:Organisation OR whitelist:Person OR whitelist:Resource) AND whitelist.status='public'
+  let query = `MATCH (n {status:'public'}) WHERE id(n)=${_id}
+  MATCH (whitelist {status:"private"})
+  WHERE (whitelist:Event OR whitelist:Organisation OR whitelist:Person OR whitelist:Resource)
   WITH n, collect(whitelist) AS whitelistNodes
   CALL apoc.path.subgraphAll(n, {
     labelFilter:"+Event|+Organisation|+Person|+Resource",
     minLevel:1,
     maxLevel:${step},
-    whitelistNodes: whitelistNodes
+    whitelistNodes: whitelistNodes,
+    uniqueness: "true"
   }) YIELD nodes, relationships
   RETURN nodes, relationships`;
   let nodesPromise = await loadNodes(query);
