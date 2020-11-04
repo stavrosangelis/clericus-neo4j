@@ -94,6 +94,7 @@ const getPeopleQuery = async (query, match, queryParams, limit) => {
       let relations = {};
       relations.nodeId = node._id;
       relations.resources = await helpers.loadRelations(node._id, "Person", "Resource", true);
+      relations.affiliations = await helpers.loadRelations(node._id, "Person", "Organisation", false, "hasAffiliation");
       resolve(relations);
     })
     return newPromise;
@@ -107,8 +108,10 @@ const getPeopleQuery = async (query, match, queryParams, limit) => {
     console.log(error)
   });
 
+
   let nodesPopulated = nodes.map(node=> {
     let resources = [];
+    let affiliations = [];
     let nodeResources = nodesResourcesRelations.find(relation=>relation.nodeId===node._id);
     if (typeof nodeResources!=="undefined") {
       resources = nodeResources.resources.map(item=>{
@@ -130,8 +133,10 @@ const getPeopleQuery = async (query, match, queryParams, limit) => {
         item.ref.paths = paths;
         return item;
       });
+      affiliations = nodeResources.affiliations;
     }
     node.resources = nodeResources.resources;
+    node.affiliations = affiliations;
     return node;
   });
   let count = await session.writeTransaction(tx=>
@@ -249,7 +254,7 @@ const getPersonActiveFilters = async(req, resp) => {
     helpers.prepareOutput(record);
     peopleIds.push(record.toObject()['_id']);
   }
-  let query = `MATCH (p:Person)-->(n) WHERE p.status='public' AND n.status='public' AND id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.eventType as eventType`;
+  let query = `MATCH (p:Person {status:'public'})-->(n {status:'public'}) WHERE id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.eventType as eventType`;
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )

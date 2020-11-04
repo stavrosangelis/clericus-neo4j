@@ -91,12 +91,16 @@ const getMonthlyStats = async(req, resp) => {
     year = date.getFullYear();
     month = date.getMonth()+1;
     nextMonth = month+2;
+    nextYear = year;
+    if (nextMonth>12) {
+      nextMonth = nextMonth-12;
+      nextYear = year+1;
+    }
   }
 
   let session = driver.session();
-  let query = "MATCH (n) WHERE (datetime(n.createdAt))>=datetime({year:"+year+", month:"+month+"}) AND datetime(n.createdAt)<datetime({year:"+year+", month:"+nextMonth+"}) RETURN date(datetime(n.createdAt)) as newDate, count(*) as c ORDER BY newDate"
-  "MATCH (n) WHERE datetime(n.createdAt)>=datetime({year:"+year+", month:"+month+"}) AND datetime(n.createdAt)<datetime({year:"+year+", month:"+nextMonth+"}) RETURN collect(n.createdAt) as timestamp ORDER BY timestamp";
-
+  let query = "MATCH (n) WHERE (datetime(n.createdAt))>=datetime({year:"+year+", month:"+month+"}) AND datetime(n.createdAt)<datetime({year:"+nextYear+", month:"+nextMonth+"}) RETURN date(datetime(n.createdAt)) as newDate, count(*) as c ORDER BY newDate"
+  "MATCH (n) WHERE datetime(n.createdAt)>=datetime({year:"+year+", month:"+month+"}) AND datetime(n.createdAt)<datetime({year:"+nextYear+", month:"+nextMonth+"}) RETURN collect(n.createdAt) as timestamp ORDER BY timestamp";
   let items = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
