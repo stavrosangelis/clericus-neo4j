@@ -31,6 +31,7 @@ const argv = yargs
     .command('fixa', 'Fix automatic entries matriculation events')
     .command('fixm', 'Fix manual entries matriculation events')
     .command('rmom', 'Relate people related to matriculation and ordination events to maynooth university')
+    .command('rh2', 'Relate people added before October 2020 to Hamell 2')
     .example('$0 parse -i data.csv', 'parse the contents of the csv file')
     .option('csv', {
         alias: 'c',
@@ -1297,6 +1298,58 @@ const relateMatOrdMay = async() => {
   process.exit();
 }
 
+const relateHamell2 = async() => {
+  const session = driver.session();
+  // load spcm organisation
+  let hamellQuery = `MATCH (n:Resource {label:"Hamell 2"}) RETURN n`;
+  let hamell2 = await session.writeTransaction(tx=>tx.run(hamellQuery,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0];
+      let orgRecord = record.toObject().n;
+      let org = helpers.outputRecord(orgRecord);
+      return org;
+    }
+    return null;
+  }).catch((error) => {
+    console.log(error)
+  });
+  if (hamell2===null) {
+    console.log(`Hamell 2 not found.`);
+    // stop executing
+    process.exit();
+    return false;
+  }
+  // load people
+  let query = `MATCH (n:Person) WHERE date(datetime({epochmillis: apoc.date.parse(n.createdAt,"ms","yyyy-MM-dd")}))<date(datetime({epochmillis: apoc.date.parse("2020-10-15","ms","yyyy-MM-dd")}))
+return distinct n`
+  let transaction = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let people = helpers.normalizeRecordsOutput(transaction);
+  session.close();
+
+  for (let i=0;i<people.length; i++) {
+    let person = people[i];
+    let newRef = {
+      items: [
+        {_id:person._id, type: "Person", role: ""},
+        {_id:hamell2._id, type: "Resource", role: ""},
+      ],
+      taxonomyTermLabel: "isReferencedIn"
+    };
+    let addRef = await updateReference(newRef);
+  }
+
+  console.log(`Update complete`);
+  // stop executing
+  process.exit();
+}
+
 if (argv._.includes('parse')) {
   parseCsv();
 }
@@ -1323,4 +1376,7 @@ if (argv._.includes('fixm')) {
 }
 if (argv._.includes('rmom')) {
   relateMatOrdMay();
+}
+if (argv._.includes('rh2')) {
+  relateHamell2();
 }
