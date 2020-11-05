@@ -30,6 +30,7 @@ const argv = yargs
     .command('duplia', 'Identify duplicates from the list of automatic entries')
     .command('fixa', 'Fix automatic entries matriculation events')
     .command('fixm', 'Fix manual entries matriculation events')
+    .command('rmom', 'Relate people related to matriculation and ordination events to maynooth university')
     .example('$0 parse -i data.csv', 'parse the contents of the csv file')
     .option('csv', {
         alias: 'c',
@@ -1248,7 +1249,52 @@ const fixManualEntries = async() => {
   session.close();
   // stop executing
   process.exit();
+}
 
+const relateMatOrdMay = async() => {
+  const session = driver.session();
+  // load spcm organisation
+  let orgQuery = `MATCH (n:Organisation {label:"Saint Patrick\'s College Maynooth (SPCM)"}) RETURN n`;
+  let organisation = await session.writeTransaction(tx=>tx.run(orgQuery,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0];
+      let orgRecord = record.toObject().n;
+      let org = helpers.outputRecord(orgRecord);
+      return org;
+    }
+    return null;
+  }).catch((error) => {
+    console.log(error)
+  });
+
+  // load people
+  let query = `MATCH (n:Person)-[r]->(e:Event) WHERE e.eventType="529" OR e.eventType="12035" return distinct n`
+  let transaction = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let people = helpers.normalizeRecordsOutput(transaction);
+  session.close();
+
+  for (let i=0;i<people.length; i++) {
+    let person = people[i];
+    let newRef = {
+      items: [
+        {_id:person._id, type: "Person", role: ""},
+        {_id:organisation._id, type: "Organisation", role: ""},
+      ],
+      taxonomyTermLabel: "wasStudentOf"
+    };
+    let addRef = await updateReference(newRef);
+  }
+
+  console.log(`Update complete`);
+  // stop executing
+  process.exit();
 }
 
 if (argv._.includes('parse')) {
@@ -1274,4 +1320,7 @@ if (argv._.includes('fixa')) {
 }
 if (argv._.includes('fixm')) {
   fixManualEntries();
+}
+if (argv._.includes('rmom')) {
+  relateMatOrdMay();
 }
