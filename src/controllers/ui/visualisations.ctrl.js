@@ -321,16 +321,89 @@ const getItemNetwork = async (req, resp) => {
     _id = params._id;
   }
   let session = driver.session();
-  let nodeQuery = `MATCH (n) WHERE id(n)=${_id} AND n.status='public' RETURN n`;
+  let nodeQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} RETURN n._id as _id, n.label as label, labels(n)[0] as recordType, n.systemType as systemType`;
   let node = await session.writeTransaction(tx=>tx.run(nodeQuery,{}))
   .then(result=> {
     let output;
     if (result.records.length>0) {
       let record = result.records[0];
-      helpers.prepareOutput(record);
-      let recordObject = record.toObject();
-      output = helpers.outputRecord(recordObject['n']);
-      output.recordType = recordObject['n'].labels[0];
+      output = {
+        _id: record._fields[0],
+        label: record._fields[1],
+        recordType: record._fields[2],
+        systemType: record._fields[3],
+      }
+    }
+    return output;
+  });
+  // nodes
+  let firstLevelQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} OPTIONAL MATCH (n)-[r]->(t) WHERE (t:Event OR t:Organisation OR t:Person OR t:Resource) AND t.status='public' RETURN n, r, t`;
+  let firstLevelNodes = await loadNodes(firstLevelQuery);
+
+  let t1 = performance.now();
+  let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
+  await classpieceTerm.load();
+  let defaultItemType = node.recordType;
+  if (node.systemType!==null && node.systemType===classpieceTerm._id) {
+    defaultItemType = "Classpiece";
+  }
+  let colors = nodeColors(defaultItemType);
+  let defaultItem = {
+    id: node._id,
+    label: node.label,
+    itemId: node._id,
+    type: defaultItemType,
+    color: colors.color,
+    strokeColor: colors.strokeColor,
+    size: 50
+  }
+  let prepareItemOutputParams = {
+    defaultItem: defaultItem,
+    firstLevel: firstLevelNodes
+  };
+  let data = await prepareItemOutput(prepareItemOutputParams);
+  /*let t2 = performance.now();
+  let responseData = itemGraphSimulation(data);
+  let t3 = performance.now();
+  let perf = {load: (t1-t0), parse: (t2-t1), simulate: (t3-t2)};
+  responseData.perf = perf;*/
+  resp.json({
+    status: true,
+    data: JSON.stringify(data),
+    error: [],
+    msg: "Query results",
+  })
+}
+
+/*const getItemNetwork_old = async (req, resp) => {
+  let t0 = performance.now();
+  let params = req.query;
+  let _id = 0;
+  if (typeof params._id==="undefined" || params._id==="") {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: "Please select a valid id to continue.",
+    });
+    return false;
+  }
+  else {
+    _id = params._id;
+  }
+  let session = driver.session();
+  let nodeQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} RETURN n._id as _id, n.label as label, labels(n)[0] as recordType`;
+  let node = await session.writeTransaction(tx=>tx.run(nodeQuery,{}))
+  .then(result=> {
+    let output;
+    if (result.records.length>0) {
+      let record = result.records[0];
+      output = {
+        _id: record._fields[0],
+        label: record._fields[1],
+        recordType: record._fields[2],
+      }
+      console.log(output)
     }
     return output;
   });
@@ -340,7 +413,7 @@ const getItemNetwork = async (req, resp) => {
     if (step>6) step=6;
   }
   // nodes
-  /*let query = `MATCH (n) WHERE id(n)=${_id} AND n.status="public" CALL apoc.neighbors.tohop(n, "${taxonomyTerms}", ${step}) YIELD node WHERE node.status="public" RETURN DISTINCT id(node) AS _id, node.label AS label, labels(node) as type`;*/
+  //let query = `MATCH (n) WHERE id(n)=${_id} AND n.status="public" CALL apoc.neighbors.tohop(n, "${taxonomyTerms}", ${step}) YIELD node WHERE node.status="public" RETURN DISTINCT id(node) AS _id, node.label AS label, labels(node) as type`;/
   let firstLevelQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} OPTIONAL MATCH (n)-[r]-(t) WHERE (t:Event OR t:Organisation OR t:Person OR t:Resource) AND t.status='public' RETURN n, r, t`;
   let firstLevelNodes = await loadNodes(firstLevelQuery);
 
@@ -381,18 +454,18 @@ const getItemNetwork = async (req, resp) => {
     classpieceTermId:classpieceTerm._id
   };
   let data = await prepareItemOutput(prepareItemOutputParams);
-  /*let t2 = performance.now();
-  let responseData = itemGraphSimulation(data);
-  let t3 = performance.now();
-  let perf = {load: (t1-t0), parse: (t2-t1), simulate: (t3-t2)};
-  responseData.perf = perf;*/
+  //let t2 = performance.now();
+  //let responseData = itemGraphSimulation(data);
+  //let t3 = performance.now();
+  //let perf = {load: (t1-t0), parse: (t2-t1), simulate: (t3-t2)};
+  //responseData.perf = perf;
   resp.json({
     status: true,
     data: JSON.stringify(data),
     error: [],
     msg: "Query results",
   })
-}
+}*/
 
 const loadNodes = async (query) => {
   let session = driver.session();
@@ -525,6 +598,7 @@ const prepareItemOutput = async({defaultItem=null,firstLevel=[],subgraphs=[],cla
     let link = {
       source: start,
       target: end,
+      id: rel._id,
       refId: `ref_${rel._id}_${start}_${end}`,
       label: rel.type
     };
@@ -616,9 +690,9 @@ const getRelatedPaths = async(req, resp) => {
   let sourceId = params.sourceId;
   let targetId = params.targetId;
   let session = driver.session();
-  let query = `MATCH (n) WHERE id(n)=${sourceId} AND n.status='public'
-  MATCH (t) WHERE id(t)=${targetId} AND t.status='public'
-  MATCH p=allShortestPaths((n)-[*..${step}]->(t)) RETURN p ORDER BY length(p) SKIP 0 LIMIT 25`;
+  let query = `MATCH (n {status: 'public'}) WHERE id(n)=${sourceId}
+  MATCH (t {status:'public'}) WHERE id(t)=${targetId}
+  MATCH p=allShortestPaths((n)-[*]->(t)) RETURN p ORDER BY length(p) SKIP 0 LIMIT 25`;
   let results = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
