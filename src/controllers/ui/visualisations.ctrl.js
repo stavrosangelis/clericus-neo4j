@@ -321,12 +321,13 @@ const getItemNetwork = async (req, resp) => {
     _id = params._id;
   }
   let session = driver.session();
-  let nodeQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} RETURN n._id as _id, n.label as label, labels(n)[0] as recordType, n.systemType as systemType`;
+  let nodeQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} RETURN id(n) as _id, n.label as label, labels(n)[0] as recordType, n.systemType as systemType`;
   let node = await session.writeTransaction(tx=>tx.run(nodeQuery,{}))
   .then(result=> {
     let output;
     if (result.records.length>0) {
       let record = result.records[0];
+      helpers.prepareOutput(record);
       output = {
         _id: record._fields[0],
         label: record._fields[1],
@@ -336,11 +337,12 @@ const getItemNetwork = async (req, resp) => {
     }
     return output;
   });
+
   // nodes
   let firstLevelQuery = `MATCH (n {status:'public'}) WHERE id(n)=${_id} OPTIONAL MATCH (n)-[r]->(t) WHERE (t:Event OR t:Organisation OR t:Person OR t:Resource) AND t.status='public' RETURN n, r, t`;
   let firstLevelNodes = await loadNodes(firstLevelQuery);
 
-  let t1 = performance.now();
+  //let t1 = performance.now();
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
   let defaultItemType = node.recordType;
@@ -357,6 +359,9 @@ const getItemNetwork = async (req, resp) => {
     strokeColor: colors.strokeColor,
     size: 50
   }
+  console.log(node)
+  console.log(defaultItem)
+
   let prepareItemOutputParams = {
     defaultItem: defaultItem,
     firstLevel: firstLevelNodes
