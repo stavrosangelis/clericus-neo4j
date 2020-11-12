@@ -231,7 +231,9 @@ const graphSimulation = async(data) => {
   return writeFile;
 }
 
-const itemGraphSimulation = (data) => {
+const itemGraphSimulation = (req, resp) => {
+  let data = req.body;
+  let t0 = performance.now();
   let nodes = data.nodes;
   let links = data.links;
   nodes[0].x = data.centerX;
@@ -246,17 +248,25 @@ const itemGraphSimulation = (data) => {
       )
     .force("charge", d32.forceManyBodyReuse().strength(strength))
     .force("center", d3.forceCenter(data.centerX, data.centerY))
-    .force('collide', d3.forceCollide(100))
-    .alphaDecay(1)
+    .force('collide', d3.forceCollide(80))
+    //.alphaDecay(1)
     .stop();
 
-  let max = 10 //Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay()));
+    let max = (Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay())))/2;
+    if (max>80) max=80;
   for (let i = 0; i < max; i++) {
     simulation.tick();
   }
   delete nodes['update']
   simulation.stop();
-  return {nodes: nodes, links:links};
+  let t1 = performance.now();
+  let diff = t1-t0;
+  return resp.json({
+    status: true,
+    data: JSON.stringify({nodes: nodes, links:links, executionTime:diff}),
+    error: [],
+    msg: "Query results",
+  })
 }
 
 let cronJob = schedule.scheduleJob('0 4 * * *', async()=> {
@@ -359,8 +369,6 @@ const getItemNetwork = async (req, resp) => {
     strokeColor: colors.strokeColor,
     size: 50
   }
-  console.log(node)
-  console.log(defaultItem)
 
   let prepareItemOutputParams = {
     defaultItem: defaultItem,
@@ -919,4 +927,5 @@ module.exports = {
   getTimeline: getTimeline,
   getItemTimeline: getItemTimeline,
   produceGraphNetwork: produceGraphNetwork,
+  itemGraphSimulation: itemGraphSimulation,
 }

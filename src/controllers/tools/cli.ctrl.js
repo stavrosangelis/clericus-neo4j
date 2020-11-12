@@ -1300,6 +1300,28 @@ const relateMatOrdMay = async() => {
 
 const relateHamell2 = async() => {
   const session = driver.session();
+
+  // load classpieces
+  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  await classpieceSystemType.load();
+
+  let classpiecesQuery = `MATCH (n:Resource {status:'public', systemType:'${classpieceSystemType._id}'}) RETURN distinct n ORDER BY n.label`;
+  let classpiecesPromise = await session.writeTransaction(tx=>tx.run(classpiecesQuery,{}))
+  .then(result=> {
+    return result.records;
+  });
+  let classpieces = helpers.normalizeRecordsOutput(classpiecesPromise, "n");
+  let classpiecesPeople = [];
+  for (let c=0;c<classpieces.length; c++) {
+    let cp = classpieces[c];
+    if (!isNaN(Number(cp.label)) && Number(cp.label)>2002) {
+      let newPeopleRef = await helpers.loadRelations(cp._id, "Resource", "Person", true, "depicts");
+      for (let i=0;i<newPeopleRef.length;i++) {
+        let p = newPeopleRef[i];
+        classpiecesPeople.push(p.ref._id);
+      }
+    }
+  }
   // load spcm organisation
   let hamellQuery = `MATCH (n:Resource {label:"Hamell 2"}) RETURN n`;
   let hamell2 = await session.writeTransaction(tx=>tx.run(hamellQuery,{}))
@@ -1322,8 +1344,7 @@ const relateHamell2 = async() => {
     return false;
   }
   // load people
-  let query = `MATCH (n:Person) WHERE date(datetime({epochmillis: apoc.date.parse(n.createdAt,"ms","yyyy-MM-dd")}))<date(datetime({epochmillis: apoc.date.parse("2020-10-15","ms","yyyy-MM-dd")}))
-return distinct n`
+  let query = `MATCH (n:Person) WHERE date(datetime({epochmillis: apoc.date.parse(n.createdAt,"ms","yyyy-MM-dd")}))<date(datetime({epochmillis: apoc.date.parse("2020-10-15","ms","yyyy-MM-dd")})) return distinct n`;
   let transaction = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
     return result.records;
@@ -1335,14 +1356,20 @@ return distinct n`
 
   for (let i=0;i<people.length; i++) {
     let person = people[i];
-    let newRef = {
-      items: [
-        {_id:person._id, type: "Person", role: ""},
-        {_id:hamell2._id, type: "Resource", role: ""},
-      ],
-      taxonomyTermLabel: "isReferencedIn"
-    };
-    let addRef = await updateReference(newRef);
+    if (classpiecesPeople.indexOf(person._id)>-1) {
+      console.log(person._id);
+      continue;
+    }
+    else {
+      let newRef = {
+        items: [
+          {_id:person._id, type: "Person", role: ""},
+          {_id:hamell2._id, type: "Resource", role: ""},
+        ],
+        taxonomyTermLabel: "isReferencedIn"
+      };
+      let addRef = await updateReference(newRef);
+    }
   }
 
   console.log(`Update complete`);

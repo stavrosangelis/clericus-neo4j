@@ -109,6 +109,7 @@ server.get('/graph-network', visualisationsController.getGraphNetwork);
 server.get('/item-network', visualisationsController.getItemNetwork);
 server.get('/item-network-related-nodes', visualisationsController.getRelatedNodes);
 server.get('/item-network-related-paths', visualisationsController.getRelatedPaths);
+server.post('/item-network-simulation', visualisationsController.itemGraphSimulation);
 
 
 /**
