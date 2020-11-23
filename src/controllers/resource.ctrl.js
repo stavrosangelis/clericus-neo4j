@@ -11,15 +11,17 @@ const referencesController = require('./references.ctrl')
 const archivePath = process.env.ARCHIVEPATH;
 
 class Resource {
-  constructor({_id=null,label=null,description=null,fileName=null,metadata=[],paths=[],resourceType=null,systemType=null,uploadedFile=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,alternateLabels=[],description=null,fileName=null,metadata=[],originalLocation="",paths=[],resourceType=null,systemType=null,uploadedFile=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     this._id = null;
     if (_id!==null) {
       this._id = _id;
     }
     this.label = label;
+    this.alternateLabels = alternateLabels;
     this.description = description;
     this.fileName = fileName;
     this.metadata = metadata;
+    this.originalLocation = originalLocation;
     this.paths = paths;
     this.resourceType = resourceType;
     this.systemType = systemType;
@@ -111,6 +113,14 @@ class Resource {
         }
         this.metadata = metadata;
       }
+      if (key==="alternateLabels"&& node[key].length>0) {
+        let newAlternateLabels = [];
+        for (let akey in node[key]) {
+          let alternateLabel = JSON.parse(node[key][akey]);
+          newAlternateLabels.push(alternateLabel);
+        }
+        this[key] = newAlternateLabels;
+      }
     }
 
     // relations
@@ -139,8 +149,16 @@ class Resource {
           newPaths.push(path);
         }
       }
+      let newAlternateLabels = [];
+      if (this.alternateLabels.length>0) {
+        for (let key in this.alternateLabels) {
+          let alternateLabel = JSON.stringify(this.alternateLabels[key]);
+          newAlternateLabels.push(alternateLabel);
+        }
+      }
       this.paths = newPaths;
       this.metadata = JSON.stringify(this.metadata);
+      this.alternateLabels = newAlternateLabels;
 
       // timestamps
       let now = new Date().toISOString();
@@ -496,7 +514,7 @@ const getResource = async(req, resp) => {
 {"status":true,"data":{"error":[],"status":true,"data":{"fileName":"logo-transparent.png","metadata":"{\"image\":{\"default\":{\"height\":275,\"width\":269,\"extension\":\"png\",\"x\":0,\"y\":0,\"rotate\":0}}}","updatedBy":"260","paths":["{\"path\":\"images/fullsize/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"source\"}","{\"path\":\"images/thumbnails/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"thumbnail\"}"],"systemType":"{\"ref\":\"295\"}","description":"","_id":"2069","label":"logo-transparent.png","updatedAt":"2020-01-14T16:30:00.338Z","resourceType":"image","status":false}},"error":[],"msg":"Query results"}
 */
 const putResource = async(req, resp) => {
-  let postData = await helpers.parseRequestData(req);
+  let postData = req.body;
   if (postData===null || Object.keys(postData).length===0) {
     resp.json({
       status: false,

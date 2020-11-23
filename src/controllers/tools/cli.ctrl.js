@@ -14,6 +14,10 @@ const driver = require("../../config/db-driver");
 const fs = require('fs');
 const readFile = promisify(fs.readFile);
 const archivePath = process.env.ARCHIVEPATH;
+
+const Resource = require('../resource.ctrl').Resource;
+const Person = require('../person.ctrl').Person;
+const Organisation = require('../organisation.ctrl').Organisation;
 const Taxonomy = require("../taxonomy.ctrl").Taxonomy;
 const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 const updateReference = require("../references.ctrl").updateReference;
@@ -32,6 +36,10 @@ const argv = yargs
     .command('fixm', 'Fix manual entries matriculation events')
     .command('rmom', 'Relate people related to matriculation and ordination events to maynooth university')
     .command('rh2', 'Relate people added before October 2020 to Hamell 2')
+    .command('1704ep', 'Export places from 1704 excel')
+    .command('1704ls', 'Export Lay Sureties from 1704 excel')
+    .command('ed', 'Export dioceses')
+    .command('ingesticp', 'Ingest ICP data')
     .example('$0 parse -i data.csv', 'parse the contents of the csv file')
     .option('csv', {
         alias: 'c',
@@ -1377,6 +1385,1158 @@ const relateHamell2 = async() => {
   process.exit();
 }
 
+const extractLocations = async() => {
+  const path =`${archivePath}documents/1704/1704-master.csv`;
+  var csv = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(path)
+    .pipe(csvParser())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    });
+  });
+  let newCsv = [];
+  for (let rowKey in csv) {
+    let row = csv[rowKey];
+    let rowKeys = Object.keys(row);
+    let placeName = row['Place of ordination'].trim();
+    if (placeName!=="" && newCsv.indexOf(`"${placeName}"`)===-1) {
+      newCsv.push(`"${placeName}"`);
+    }
+  }
+  newCsv.sort();
+  let csvPath = `${archivePath}documents/1704/locations.csv`;
+  let csvText = newCsv.join("\n");
+  let writeFile = await new Promise ((resolve,reject)=> {
+    fs.writeFile(csvPath, csvText, 'utf8', function(err) {
+      if (err) {
+        reject(err);
+      } else {
+        csvStatus = true;
+        resolve(true);
+      }
+    });
+  });
+  if (writeFile) {
+    console.log(`Completed successfully`);
+  }
+  // stop executing
+  process.exit();
+}
+
+const extractLaySureties = async() => {
+  const path =`${archivePath}documents/1704/1704-master.csv`;
+  var csv = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(path)
+    .pipe(csvParser())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    });
+  });
+  let newCsv = [];
+  for (let rowKey in csv) {
+    let row = csv[rowKey];
+    let rowKeys = Object.keys(row);
+    let ls = row['Lay sureties'].trim();
+    if (ls!=="") {
+      let lss = ls.split(";");
+      for (let key in lss) {
+        let newLss = lss[key].trim();
+        let count =
+        newCsv.push({name: `"${newLss}"`, row: Number(rowKey)});
+      }
+    }
+  }
+  let newCsv2 = [];
+  for (let i=0;i<newCsv.length; i++) {
+    let item = newCsv[i];
+    let rows = [];
+    let count = newCsv.filter(r=>{
+      if(r.name===item.name) {
+        rows.push(Number(r.row)+1);
+        return true;
+      }
+      return false;
+    })?.length ?? 0;
+    let newItem = {name: item.name, row: item.row, count: count, rows: rows.join("|")};
+    let exists = newCsv2.find(i=>i.name===item.name)??false;
+    if (!exists) {
+      newCsv2.push(newItem);
+    }
+  }
+  let csvPath = `${archivePath}documents/1704/lay-sureties.csv`;
+  let csvText = `Name,Count,Rows\n`;
+  for (let key in newCsv2) {
+    let r = newCsv2[key];
+    let text = `${r.name},${r.count},${r.rows}\n`;
+    csvText += text;
+  }
+  let writeFile = await new Promise ((resolve,reject)=> {
+    fs.writeFile(csvPath, `\ufeff`+csvText, 'utf8', function(err) {
+      if (err) {
+        reject(err);
+      } else {
+        csvStatus = true;
+        resolve(true);
+      }
+    });
+  });
+  if (writeFile) {
+    console.log(`Completed successfully`);
+  }
+  session.close();
+  // stop executing
+  process.exit();
+}
+
+const exportDioceses = async() => {
+  const session = driver.session();
+  let query = `MATCH (n:Organisation {organisationType:"Diocese"}) RETURN n.label as label ORDER BY n.label`;
+  let records = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    let output = [];
+    for (let i=0;i<result.records.length;i++) {
+      let r = result.records[i];
+      let newR = r.toObject()['label'];
+      output.push(`"${newR}"`);
+    }
+    return output;
+  });
+  let csvPath = `${archivePath}documents/1704/dioceses.csv`;
+  let csvText = records.join("\n");
+  let writeFile = await new Promise ((resolve,reject)=> {
+    fs.writeFile(csvPath, csvText, 'utf8', function(err) {
+      if (err) {
+        reject(err);
+      } else {
+        csvStatus = true;
+        resolve(true);
+      }
+    });
+  });
+  if (writeFile) {
+    console.log(`Completed successfully`);
+  }
+  // stop executing
+  process.exit();
+}
+
+const ingesticp = async() => {
+  const userId = await getAdminId();
+  const session = driver.session();
+
+  let iLocations = [];
+  let ipath = `${archivePath}documents/icp/i.csv`;
+  let icsv = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(ipath)
+    .pipe(csvParser())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    });
+  });
+  let ikeys = Object.keys(icsv['0']);
+  for (let key in icsv) {
+    let row = icsv[key];
+    iLocations.push({name:row['﻿Location name'].trim(),nameUpdated:row['Name updated'].trim(),type:row['Organisation type'].trim()})
+  }
+
+  const matriculationClassDB = async(mc, userId) => {
+    let newMC = null;
+    let searchQuery = `MATCH (n:TaxonomyTerm {label:"${mc}"}) RETURN n`;
+    newMC = await session.writeTransaction(tx=>tx.run(searchQuery,{}))
+    .then(result=> {
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0];
+        let key = record.keys[0];
+        let output = record.toObject()[key];
+        output = helpers.outputRecord(output);
+        return output;
+      }
+      else {
+        return null;
+      }
+    });
+    if (newMC===null) {
+      let newMCData = {
+        label: mc,
+        inverseLabel: mc
+      }
+      let newMCTerm = new TaxonomyTerm(newMCData);
+      let newMCSave = await newMCTerm.save(userId);
+      newMC = newMCSave.data;
+    }
+    return newMC;
+  }
+
+  let matriculationClasses = [];
+  let vpath = `${archivePath}documents/icp/v.csv`;
+  let vcsv = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(vpath)
+    .pipe(csvParser())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    });
+  });
+  let vkeys = Object.keys(vcsv['0']);
+  for (let key in vcsv) {
+    let row = vcsv[key];
+    // check if matriculation class is in the db or add it
+    let mc = await matriculationClassDB(row['Name updated'].trim(), userId);
+    matriculationClasses.push({name:row['﻿Name'].trim(), nameUpdated:row['Name updated'].trim(), _id:mc._id});
+  }
+
+  const normaliseDate = (date) => {
+    date = date.replace(/ /g,'');
+    let startDate = "";
+    let endDate = null;
+    if (date==="") {
+      return date;
+    }
+    if (!date.includes("-")) {
+      if (date.includes("?")) {
+        let count = date.match(/\?/g).length || [].length;
+        let year = date.replace(/\?/g,"");
+        if (count===1) {
+        	startDate = `01-01-${year}0`;
+        	endDate = `31-12-${year}9`;
+        }
+        else if (count===2) {
+        	startDate = `01-01-${year}00`;
+        	endDate = `31-12-${year}99`;
+        }
+      }
+      else {
+        startDate = `01-01-${date}`;
+        endDate = `31-12-${date}`;
+      }
+    }
+    else {
+      let parts = date.split("-");
+      let d = parts[2];
+      let m = parts[1];
+      let y = parts[0];
+      if (typeof m==="undefined" || m==="??") {
+        startDate = `1-1-${y}`;
+        endDate = `31-12-${date}`;
+      }
+      else if (typeof d==="undefined" || d==="??") {
+        startDate = `1-${m}-${y}`;
+        let lastDay = getDaysInMonth(m,y);
+        endDate = `${lastDay}-${m}-${y}`;
+      }
+      else {
+        startDate = `${d}-${m}-${y}`;
+      }
+    }
+    let output = {
+      startDate: startDate,
+      endDate: endDate
+    };
+    return output;
+  }
+
+  const ingestPerson = async(firstName="",middleName="",lastName="",dbID="") => {
+    let person = {};
+    // insert person
+    if (dbID==="") {
+      let fnameSoundex = helpers.soundex(firstName);
+      let lnameSoundex = helpers.soundex(lastName);
+      let personData = {
+        status: 'private',
+        firstName:firstName,
+        middleName:middleName,
+        lastName:lastName,
+        fnameSoundex:fnameSoundex,
+        lnameSoundex:lnameSoundex,
+        personType: 'Clergy'
+      };
+      let newPerson = new Person(personData);
+      let personSave = await newPerson.save(userId);
+      person = personSave.data;
+    }
+    // update person
+    else {
+      let personData = {_id:dbID};
+      person = new Person(personData);
+      await person.load();
+    }
+    console.log(person._id)
+    return person;
+  }
+
+  const addArchivalReference = async(archivalReferenceId, person) => {
+    let archivalReferenceIds = archivalReferenceId.split(";");
+    for (let key in archivalReferenceIds) {
+      let archivalReferenceId = archivalReferenceIds[key];
+      archivalReferenceId = archivalReferenceId.replace("[ICPA] ","").trim();
+      let query = `match (n:Resource) WHERE toLower(n.label) =~ toLower('.*${archivalReferenceId}.*') return n`;
+      if (archivalReferenceId==="MS A2.d1") {
+        query = `match (n:Resource) WHERE toLower(n.label) =~ toLower('.*MS A2.d1.*')  and not toLower(n.label) =~ toLower('.*MS A2.d15.*') return n`;
+      }
+      let resource = await session.writeTransaction(tx=>tx.run(query,{}))
+      .then(result=> {
+        let records = result.records;
+        if (records.length>0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        return null;
+      }).catch((error) => {
+        console.log(error)
+      });
+      if (resource!==null) {
+        let reference = {
+          items: [
+            {_id: person._id, type: "Person"},
+            {_id: resource._id, type: "Resource"}
+          ],
+          taxonomyTermLabel: `isReferencedIn`
+        };
+        await updateReference(reference);
+      }
+    }
+    return true;
+
+  }
+
+  const addNewEvent = async(label, type, userId, description=null) => {
+    let session = driver.session();
+    let now = new Date().toISOString();
+    let eventData = {
+      label: label,
+      eventType: type,
+      status: 'private',
+      createdBy: userId,
+      createdAt: now,
+      updatedBy: userId,
+      updatedAt: now,
+    }
+    if (description!=="") {
+      eventData.description = description;
+    }
+    let nodeProperties = helpers.prepareNodeProperties(eventData);
+    let params = helpers.prepareParams(eventData);
+    let query = `CREATE (n:Event ${nodeProperties}) RETURN n`;
+    let item = await session.writeTransaction(tx=>tx.run(query,params))
+    .then(result=> {
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+    return item;
+  }
+
+  const addDate = async(startDate, endDate=null, userId) => {
+    let queryEndDate = "";
+    if (endDate!==null && endDate!=="") {
+      queryEndDate = `AND n.endDate="${endDate}" `;
+    }
+    let query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" ${queryEndDate} RETURN n`;
+    let temporal = await session.writeTransaction(tx=>tx.run(query,{}))
+    .then(result=> {
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+    if (temporal===null) {
+      let now = new Date().toISOString();
+      let label = startDate;
+      if (endDate!==null) {
+        label +=  ` - ${endDate}`;
+      }
+      let newItem = {
+        label: label,
+        startDate: startDate,
+        endDate: endDate,
+        createdBy: userId,
+        createdAt: now,
+        updatedBy: userId,
+        updatedAt: now,
+      }
+      let nodeProperties = helpers.prepareNodeProperties(newItem);
+      let params = helpers.prepareParams(newItem);
+      let query = `CREATE (n:Temporal ${nodeProperties}) RETURN n`;
+      temporal = await session.writeTransaction(tx=>tx.run(query,params))
+      .then(result=> {
+        let records = result.records;
+        let outputRecord = null;
+        if (records.length>0) {
+          let record = records[0].toObject();
+          outputRecord = helpers.outputRecord(record.n);
+        }
+        return outputRecord;
+      }).catch((error) => {
+        console.log(error)
+      });
+    }
+    return temporal;
+  }
+
+  const birthEventType = new TaxonomyTerm({labelId: "Birth"});
+  await birthEventType.load();
+
+  const addBirthEvent = async(dateOfBirth,birthEventType,person) => {
+    let birthDate = await addDate(dateOfBirth.startDate, dateOfBirth.endDate, userId);
+
+    let birthEvent = await addNewEvent(`Born`, birthEventType._id, userId);
+    let birthReference = {
+      items: [
+        {_id: birthEvent._id, type: "Event"},
+        {_id: person._id, type: "Person"}
+      ],
+      taxonomyTermLabel: `wasStatusOf`
+    };
+    await updateReference(birthReference);
+    let birthTemporalReference = {
+      items: [
+        {_id: birthEvent._id, type: "Event"},
+        {_id: birthDate._id, type: "Temporal"}
+      ],
+      taxonomyTermLabel: `hasTime`
+    };
+    await updateReference(birthTemporalReference);
+    return true;
+  }
+
+  const addRelative = async({firstName="",lastName="",maidenName="",type="",person=null,referenceTermLabel=""}) => {
+    let session = driver.session();
+    if (firstName==="") {
+      return null;
+    }
+    let relative = {};
+    // insert person
+    let fnameSoundex = helpers.soundex(firstName);
+    let lnameSoundex = helpers.soundex(lastName);
+    let relativeData = {
+      status: 'private',
+      firstName:firstName,
+      lastName:lastName,
+      fnameSoundex:fnameSoundex,
+      lnameSoundex:lnameSoundex,
+      personType: 'Laity'
+    };
+    if (maidenName!=="") {
+      relativeData.alternateAppelations = [{firstName:firstName, lastName:maidenName}]
+    }
+    let newRelative = new Person(relativeData);
+    let relativeSave = await newRelative.save(userId);
+    relative = relativeSave.data;
+    let reference = {
+      items: [
+        {_id: person._id, type: "Person"},
+        {_id: relative._id, type: "Person"}
+      ],
+      taxonomyTermLabel: referenceTermLabel
+    };
+    await updateReference(reference);
+
+    return relative;
+  }
+
+  const addLocation = async(location, diocese, person, userId) => {
+    let escapeLocation = helpers.addslashes(location.name);
+    if (location.nameUpdated!=="") {
+      escapeLocation = helpers.addslashes(location.nameUpdated);
+    }
+    let type = location.type;
+    let session = driver.session();
+    let query = `MATCH (n:Organisation) WHERE toLower(n.label)="${escapeLocation.toLowerCase()}" RETURN n`;
+    let organisation = await session.writeTransaction(tx=>tx.run(query,{}))
+    .then(result=> {
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    }).catch((error) => {
+      console.log(error)
+    });
+    if (organisation===null) {
+      let newOrganisation = {};
+      let now = new Date().toISOString();
+      newOrganisation.label = escapeLocation;
+      newOrganisation.createdBy = userId;
+      newOrganisation.createdAt = now;
+      newOrganisation.updatedBy = userId;
+      newOrganisation.updatedAt = now;
+      newOrganisation.organisationType = location.type;
+      newOrganisation.status = "private";
+      newOrganisation.labelSoundex = helpers.soundex(diocese);
+      let nodeProperties = helpers.prepareNodeProperties(newOrganisation);
+      let params = helpers.prepareParams(newOrganisation);
+      let query = `CREATE (n:Organisation ${nodeProperties}) RETURN n`;
+      organisation = await session.writeTransaction(tx=>tx.run(query,params))
+      .then(result=> {
+        let records = result.records;
+        let outputRecord = null;
+        if (records.length>0) {
+          let record = records[0].toObject();
+          outputRecord = helpers.outputRecord(record.n);
+        }
+        return outputRecord;
+      }).catch((error) => {
+        console.log(error)
+      });
+    }
+    let reference = {
+      items: [
+        {_id: person._id, type: "Person"},
+        {_id: organisation._id, type: "Organisation"}
+      ],
+      taxonomyTermLabel: `wasNativeOf`
+    };
+    await updateReference(reference);
+
+    // add relation to location
+    let escapeDiocese = helpers.addslashes(diocese);
+    let queryDiocese = `MATCH (n:Organisation) WHERE toLower(n.label)="${escapeDiocese.toLowerCase()}" RETURN n`;
+    let dioceseNode = await session.writeTransaction(tx=>tx.run(queryDiocese,{}))
+    .then(result=> {
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        let outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+    })
+    let spatial = await helpers.loadRelations(dioceseNode._id, "Organisation", "Spatial");
+
+    if (spatial.length>0) {
+      for (let key in spatial) {
+        let s = spatial[key];
+        let locationReference = {
+          items: [
+            {_id: organisation._id, type: "Organisation"},
+            {_id: s.ref._id, type: "Spatial"},
+          ],
+          taxonomyTermLabel: `hasLocation`
+        };
+        await updateReference(locationReference);
+      }
+    }
+    return organisation;
+  }
+
+  const addDioceseRef = async(diocese, person, userId) => {
+    let escapeDiocese = helpers.addslashes(diocese);
+    let query = `MATCH (n:Organisation) WHERE toLower(n.label)="${escapeDiocese.toLowerCase()}" RETURN n`;
+    let node = await session.writeTransaction(tx=>tx.run(query,{}))
+    .then(result=> {
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        let outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+      return null;
+    });
+    if (node!==null) {
+      let reference = {
+        items: [
+          {_id: person._id, type: "Person"},
+          {_id: node._id, type: "Organisation"}
+        ],
+        taxonomyTermLabel: `hasAffiliation`
+      };
+      await updateReference(reference);
+      return true;
+    }
+    else {
+      console.log(diocese)
+    }
+    return false;
+  }
+
+  const baptismTaxonomyTerm = new TaxonomyTerm({labelId:"Baptism"});
+  await baptismTaxonomyTerm.load();
+
+  const addBaptisedEvent = async(baptisedDate, person, userId) => {
+    let baptismDate = await addDate(baptisedDate.startDate, baptisedDate.endDate, userId);
+
+    let baptismEvent = await addNewEvent(`Baptised`, baptismTaxonomyTerm._id, userId);
+    let baptismReference = {
+      items: [
+        {_id: baptismEvent._id, type: "Event"},
+        {_id: person._id, type: "Person"}
+      ],
+      taxonomyTermLabel: `wasStatusOf`
+    };
+    await updateReference(baptismReference);
+    let baptismTemporalReference = {
+      items: [
+        {_id: baptismEvent._id, type: "Event"},
+        {_id: baptismDate._id, type: "Temporal"}
+      ],
+      taxonomyTermLabel: `hasTime`
+    };
+    await updateReference(baptismTemporalReference);
+    return true;
+  }
+
+  const matriculationTaxonomyTerm = new TaxonomyTerm({labelId:"matriculation"});
+  await matriculationTaxonomyTerm.load();
+
+  const icpSpatialQuery = `MATCH (n:Spatial {label:"Irish College Paris"}) RETURN n`
+  let icpSpatialNode = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+    else return {};
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  const addMatriculationEvent = async(matriculationDate, matriculationClass, person, userId) => {
+    let newDate = await addDate(matriculationDate.startDate, matriculationDate.endDate, userId);
+    let label = `Matriculation`;
+    let newMatriculationClass = "";
+    let newMatriculationClassId = "";
+    if (matriculationClass!=="") {
+      let normClass = matriculationClasses.find(mc=>mc.name===matriculationClass);
+      if (typeof normClass!=="undefined") {
+        newMatriculationClass = normClass.nameUpdated;
+        newMatriculationClassId = normClass._id;
+      }
+    }
+    if (newMatriculationClass!=="") {
+      label = `Matriculation into ${newMatriculationClass}`;
+    }
+    let matriculationEventQuery = `match (n:Event)
+      match (t:Temporal)
+      match (s:Spatial)
+      WHERE exists((n)-[:hasTime]->(t)) AND id(t)=${newDate._id}
+      AND exists((n)-[:hasLocation]->(s)) AND id(s)=${icpSpatialNode._id}
+      return n,t`;
+    let matriculationEvent = await session.writeTransaction(tx=>tx.run(matriculationEventQuery,{}))
+    .then(result=> {
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0].toObject();
+        let outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+      return null;
+    }).catch((error) => {
+      console.log(error)
+    });
+    if (matriculationEvent===null) {
+      matriculationEvent = await addNewEvent(label, matriculationTaxonomyTerm._id, userId);
+    }
+    let matriculationReference = {
+      items: [
+        {_id: matriculationEvent._id, type: "Event"},
+        {_id: person._id, type: "Person"}
+      ],
+      taxonomyTermLabel: `hasParticipant`
+    };
+    if (newMatriculationClass!=="") {
+      matriculationReference.items[1].role = null;
+      matriculationReference.items[0].role = newMatriculationClassId;
+    }
+    await updateReference(matriculationReference);
+    let matriculationTemporalReference = {
+      items: [
+        {_id: matriculationEvent._id, type: "Event"},
+        {_id: newDate._id, type: "Temporal"}
+      ],
+      taxonomyTermLabel: `hasTime`
+    };
+    await updateReference(matriculationTemporalReference);
+    let matriculationSpatialReference = {
+      items: [
+        {_id: matriculationEvent._id, type: "Event"},
+        {_id: icpSpatialNode._id, type: "Spatial"}
+      ],
+      taxonomyTermLabel: `hasLocation`
+    };
+    await updateReference(matriculationSpatialReference);
+
+    return true;
+  }
+
+  const ordinationTaxonomyTerm = new TaxonomyTerm({labelId:"ordination"});
+  await ordinationTaxonomyTerm.load();
+
+  const addOrdinationEvent = async(date, location, role, description, person, userId) => {
+    let label = `Ordination`;
+    if (role!=="") {
+      label = `Ordained as ${role}`;
+    }
+    let ordinationEvent = await addNewEvent(label, ordinationTaxonomyTerm._id, userId, description);
+    let personReference = {
+      items: [
+        {_id: ordinationEvent._id, type: "Event"},
+        {_id: person._id, type: "Person"}
+      ],
+      taxonomyTermLabel: `hasParticipant`
+    };
+    await updateReference(personReference);
+    if (date!=="") {
+      if (typeof date==="string") {
+        date = normaliseDate(date);
+      }
+      let newDate = await addDate(date.startDate, date.endDate, userId);
+      let temporalReference = {
+        items: [
+          {_id: ordinationEvent._id, type: "Event"},
+          {_id: newDate._id, type: "Temporal"}
+        ],
+        taxonomyTermLabel: `hasTime`
+      };
+      await updateReference(temporalReference);
+    }
+    if (location!=="") {
+      const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
+      let spatial = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+      .then(result=> {
+        let records = result.records;
+        if (records.length>0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        else return null;
+      })
+      .catch((error) => {
+        console.log(error)
+      });
+      if (spatial===null) {
+        console.log(`No spatial for location: "${location}" and person: "${person.label}"`);
+      }
+      let spatialReference = {
+        items: [
+          {_id: ordinationEvent._id, type: "Event"},
+          {_id: spatial._id, type: "Spatial"}
+        ],
+        taxonomyTermLabel: `hasLocation`
+      };
+      await updateReference(spatialReference);
+    }
+    return true;
+  }
+
+  const addDeathEvent = async(date, location, description, person, userId) => {
+    let newEvent = await addNewEvent("Deceased", ordinationTaxonomyTerm._id, userId, description);
+    let personReference = {
+      items: [
+        {_id: newEvent._id, type: "Event"},
+        {_id: person._id, type: "Person"}
+      ],
+      taxonomyTermLabel: `Death`
+    };
+    await updateReference(personReference);
+    if (date!=="") {
+      if (typeof date==="string") {
+        date = normaliseDate(date);
+      }
+      let newDate = await addDate(date.startDate, date.endDate, userId);
+      let temporalReference = {
+        items: [
+          {_id: newEvent._id, type: "Event"},
+          {_id: newDate._id, type: "Temporal"}
+        ],
+        taxonomyTermLabel: `hasTime`
+      };
+      await updateReference(temporalReference);
+    }
+    if (location!=="") {
+      const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
+      let spatial = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+      .then(result=> {
+        let records = result.records;
+        if (records.length>0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        else return null;
+      })
+      .catch((error) => {
+        console.log(error)
+      });
+      if (spatial===null) {
+        console.log(`No spatial for location: "${location}" and person: "${person.label}"`);
+      }
+      let spatialReference = {
+        items: [
+          {_id: newEvent._id, type: "Event"},
+          {_id: spatial._id, type: "Spatial"}
+        ],
+        taxonomyTermLabel: `hasLocation`
+      };
+      await updateReference(spatialReference);
+    }
+    return true;
+  }
+
+  const bursaryScholarshipTaxonomyTerm = new TaxonomyTerm({labelId:"BursaryScholarship"});
+  await bursaryScholarshipTaxonomyTerm.load();
+
+  const addBursaryScholarshipEvent = async(date, location, description, person, userId) => {
+    let label = helpers.addslashes("Bursary/Scholarship");
+    let newEvent = await addNewEvent(label, bursaryScholarshipTaxonomyTerm._id, userId, description);
+    let personReference = {
+      items: [
+        {_id: newEvent._id, type: "Event"},
+        {_id: person._id, type: "Person"}
+      ],
+      taxonomyTermLabel: `wasAwarded`
+    };
+    await updateReference(personReference);
+    if (date!=="") {
+      if (typeof date==="string") {
+        date = normaliseDate(date);
+      }
+      let newDate = await addDate(date.startDate, date.endDate, userId);
+      let temporalReference = {
+        items: [
+          {_id: newEvent._id, type: "Event"},
+          {_id: newDate._id, type: "Temporal"}
+        ],
+        taxonomyTermLabel: `hasTime`
+      };
+      await updateReference(temporalReference);
+    }
+    if (location!=="") {
+      const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
+      let spatial = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+      .then(result=> {
+        let records = result.records;
+        if (records.length>0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        else return null;
+      })
+      .catch((error) => {
+        console.log(error)
+      });
+      if (spatial===null) {
+        console.log(`No spatial for location: "${location}" and person: "${person.label}"`);
+      }
+      let spatialReference = {
+        items: [
+          {_id: newEvent._id, type: "Event"},
+          {_id: spatial._id, type: "Spatial"}
+        ],
+        taxonomyTermLabel: `hasLocation`
+      };
+      await updateReference(spatialReference);
+    }
+    return true;
+  }
+
+  const confirmationTaxonomyTerm = new TaxonomyTerm({labelId:"Confirmation"});
+  await confirmationTaxonomyTerm.load();
+
+  const addConfirmationEvent = async(confirmationDate, person, userId) => {
+    if (typeof confirmationDate==="string") {
+      confirmationDate = normaliseDate(confirmationDate);
+    }
+    let newDate = await addDate(confirmationDate.startDate, confirmationDate.endDate, userId);
+    let confirmationEvent = await addNewEvent(`Confirmation`, confirmationTaxonomyTerm._id, userId);
+    let confirmationReference = {
+      items: [
+        {_id: confirmationEvent._id, type: "Event"},
+        {_id: person._id, type: "Person"}
+      ],
+      taxonomyTermLabel: `hasParticipant`
+    };
+    await updateReference(confirmationReference);
+    let confirmationTemporalReference = {
+      items: [
+        {_id: confirmationEvent._id, type: "Event"},
+        {_id: newDate._id, type: "Temporal"}
+      ],
+      taxonomyTermLabel: `hasTime`
+    };
+    await updateReference(confirmationTemporalReference);
+    return true;
+  }
+
+  const departureTaxonomyTerm = new TaxonomyTerm({labelId:"Departure"});
+  await departureTaxonomyTerm.load();
+
+  const addDateOfDepartureEvent = async(dateOfDeparture, dateOfDepartureDescription, person, userId) => {
+    let datesOfDeparture = dateOfDeparture.split(";");
+    for (let key in datesOfDeparture) {
+      let newDateOfDeparture = datesOfDeparture[key];
+      let normNewDateOfDeparture = normaliseDate(newDateOfDeparture);
+      let description = null;
+      if (dateOfDepartureDescription!=="") {
+        description = dateOfDepartureDescription;
+      }
+      let newDate = await addDate(normNewDateOfDeparture.startDate, normNewDateOfDeparture.endDate, userId);
+      let newEvent = await addNewEvent(`Departed from Irish College Paris (ICP)`, departureTaxonomyTerm._id, userId, dateOfDepartureDescription);
+      let personReference = {
+        items: [
+          {_id: newEvent._id, type: "Event"},
+          {_id: person._id, type: "Person"}
+        ],
+        taxonomyTermLabel: `wasStatusOf`
+      };
+      await updateReference(personReference);
+      let temporalReference = {
+        items: [
+          {_id: newEvent._id, type: "Event"},
+          {_id: newDate._id, type: "Temporal"}
+        ],
+        taxonomyTermLabel: `hasTime`
+      };
+      await updateReference(temporalReference);
+    }
+    return true;
+  }
+
+  const icpOrgQuery = `MATCH (n:Organisation {label:"Irish College Paris (ICP)"}) RETURN n`;
+  const icpOrg = await session.writeTransaction(tx=>tx.run(icpOrgQuery,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+  });
+
+  const addRelationToICP = async(person,userId) => {
+    let reference = {
+      items: [
+        {_id: person._id, type: "Person"},
+        {_id: icpOrg._id, type: "Organisation"}
+      ],
+      taxonomyTermLabel: `wasStudentOf`
+    };
+    await updateReference(reference);
+  }
+
+  const extraEventTaxonomyTerm = new TaxonomyTerm({labelId:"wasAwarded"});
+  await extraEventTaxonomyTerm.load();
+
+  const addExtraEvents = async(extraEventColumn, extraEventColumnDescription, person, userId) => {
+    let events = extraEventColumn.split(";");
+    for (let eKey in events) {
+      let e = events[eKey];
+      let parts = e.split(",");
+      let newObject = {
+        event: "",
+        spatial: "",
+        temporal: ""
+      }
+      for (let key in parts) {
+        let part = parts[key].trim();
+        if (part.includes("e =")) {
+          newObject.event = part.replace("e =","").trim();
+        }
+        if (part.includes("s =")) {
+          newObject.spatial = part.replace("s =","").trim();
+        }
+        if (part.includes("t =")) {
+          newObject.temporal = part.replace("t =","").trim();
+        }
+      }
+      // ordination
+      if (newObject.event === "o" || newObject.event === "o1" || newObject.event === "o2") {
+        let role = "";
+        if (newObject.event === "o1") {
+          role = "Deacon";
+        }
+        if (newObject.event === "o2") {
+          role = "Subdeacon";
+        }
+        await addOrdinationEvent(newObject.temporal, newObject.spatial, role, extraEventColumnDescription, person, userId);
+      }
+      // death
+      if (newObject.event === "d") {
+        await addDeathEvent(newObject.temporal, newObject.spatial, extraEventColumnDescription,person, userId);
+      }
+      // = bursary/scholarship
+      if (newObject.event === "b") {
+        await addBursaryScholarshipEvent(newObject.temporal, newObject.spatial, extraEventColumnDescription, person, userId);
+      }
+    }
+
+    return true;
+  }
+
+  let path = `${archivePath}documents/icp/ICP-Database.csv`;
+  var csv = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(path)
+    .pipe(csvParser())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    });
+  });
+  let keys = Object.keys(csv['0']);
+  for (let rowKey in csv) {
+    let row = csv[rowKey];
+    let int = row[keys[0]].trim();
+    if (Number(int)<1110) {
+      continue;
+    }
+    let archivalReferenceId = row['Archival Reference'].trim();
+    let lastName = row['Last Name'].trim();
+    let firstName = row['First name'].trim();
+    let middleName = "";
+    if (firstName.includes(" ")) {
+      let firstNameArr = firstName.split(" ");
+      firstName = firstNameArr[0].trim();
+      middleName = firstNameArr[1].trim();
+    }
+    let dateOfBirth = normaliseDate(row['Date of Birth'].trim());
+
+    // father
+    let fatherFirstName = row["Father's Forename"].trim();
+    let fatherLastName = lastName;
+
+    //mother
+    let motherFirstName = row["Mother's Forename"].trim();
+    let motherLastName = lastName;
+    let motherMaidenName = row["Mother's Surname"].trim();
+
+    let placeOfOrigin = row['Place of Origin'].trim();
+    let diocese = row['Diocese'].trim();
+    let baptisedDate = normaliseDate(row['Baptized'].trim());
+    let matriculationDate = normaliseDate(row['Date of Entry'].trim());
+    let matriculationClass = row['Passe for'].trim();
+    let confirmationDate = row['Confirmed'].trim();
+    if (confirmationDate!=="yes") {
+      confirmationDate = normaliseDate(row['Confirmed'].trim());
+    }
+    let dateOfDeparture = row['Date of Departure'].trim();
+    let dateOfDepartureDescription = row['Add to column S description'].trim();
+
+    let extraEventColumn = row['Add as distinct event to entry'].trim();
+    let extraEventColumnDescription = row['Add to column AU description in db'].trim();
+
+    let dbID = row['﻿DB ID']?.trim() || "";
+
+    // 1. ingest person
+    let person = await ingestPerson(firstName, middleName, lastName, dbID);
+
+    // 2. reference to archival number
+    // add the reources to the db if not exist
+    let archivalReference = await addArchivalReference(archivalReferenceId, person);
+
+    // 3. create birth event
+    let newBirthEvent = null;
+    if (row['Date of Birth'].trim()!=="") {
+      newBirthEvent = await addBirthEvent(dateOfBirth,birthEventType,person);
+    }
+
+    // 4. father info
+    let addFather = null;
+    if (fatherFirstName!=="") {
+      let fatherData = {
+        firstName: fatherFirstName,
+        lastName: fatherLastName,
+        type: "father",
+        person: person,
+        referenceTermLabel: "isSonOf"
+      }
+      addFather = await addRelative(fatherData)
+    }
+
+    // 5. mother info
+    let addMother = null;
+    if (motherFirstName!=="") {
+      let motherData = {
+        firstName: motherFirstName,
+        lastName: motherLastName,
+        maidenName: motherMaidenName,
+        type: "mother",
+        person: person,
+        referenceTermLabel: "isSonOf"
+      }
+      addMother = await addRelative(motherData);
+    }
+
+    // 6. add place of origin
+    let newPlaceOfOrigin = null;
+    let organisationOfOrigin = iLocations.find(l=>l.name===placeOfOrigin);
+    if (typeof organisationOfOrigin!=="undefined" && organisationOfOrigin.type!=="Incorrect entry") {
+      newPlaceOfOrigin = await addLocation(organisationOfOrigin, diocese, person, userId);
+    }
+
+    // 7. add diocese reference
+    let dioceseRef = null;
+    if (diocese!=="") {
+      dioceseRef = await addDioceseRef(diocese, person, userId);
+    }
+
+    // 8. Baptism
+    let baptismEvent = null;
+    if (baptisedDate!=="") {
+      baptismEvent = await addBaptisedEvent(baptisedDate, person, userId);
+    }
+
+    // 9. Matriculation
+    let matriculationEvent = null;
+    if (matriculationDate!=="") {
+      matriculationEvent = await addMatriculationEvent(matriculationDate, matriculationClass, person, userId);
+    }
+
+    // 10. Confirmation
+    let confirmationEvent = null;
+    if (confirmationDate!=="") {
+      confirmationEvent = await addConfirmationEvent(confirmationDate, person, userId);
+    }
+
+    // 11. date of departure
+    let dateOfDepartureEvent = null;
+    if (dateOfDeparture!=="") {
+      dateOfDepartureEvent = await addDateOfDepartureEvent(dateOfDeparture, dateOfDepartureDescription, person, userId);
+    }
+
+    // 12. add relation to ICP
+    let relationICP = await addRelationToICP(person,userId);
+
+    // 13. add extra events
+    let extraEvent = null;
+    if (extraEventColumn!=="") {
+      extraEvent = await addExtraEvents(extraEventColumn, extraEventColumnDescription, person, userId);
+    }
+  }
+  console.log("Completed successfully.");
+  // stop executing
+  process.exit();
+}
+
+const getDaysInMonth = (m,y) => {
+  return new Date(y, m+1, 0).getDate();
+}
+
 if (argv._.includes('parse')) {
   parseCsv();
 }
@@ -1406,4 +2566,16 @@ if (argv._.includes('rmom')) {
 }
 if (argv._.includes('rh2')) {
   relateHamell2();
+}
+if (argv._.includes('1704ep')) {
+  extractLocations();
+}
+if (argv._.includes('1704ls')) {
+  extractLaySureties();
+}
+if (argv._.includes('ed')) {
+  exportDioceses();
+}
+if (argv._.includes('ingesticp')) {
+  ingesticp();
 }

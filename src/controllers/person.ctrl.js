@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Person {
-  constructor({_id=null,label=null,honorificPrefix=[],firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,honorificPrefix=[],firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,personType=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     if (typeof _id!=="undefined" && _id!==null) {
       this._id = _id;
     }
@@ -26,6 +26,7 @@ class Person {
     this.fnameSoundex = fnameSoundex;
     this.lnameSoundex = lnameSoundex;
     this.description = description;
+    this.personType = personType;
     this.status = status;
     this.alternateAppelations = this.normalizeAppelations(alternateAppelations);
     this.createdBy = createdBy;
@@ -290,6 +291,7 @@ class Person {
 const getPeople = async (req, resp) => {
   let parameters = req.query;
   let label = "";
+  let personType = "";
   let firstName = "";
   let lastName = "";
   let fnameSoundex = "";
@@ -361,6 +363,15 @@ const getPeople = async (req, resp) => {
   }
   if (typeof parameters.orderField!=="undefined") {
     orderField = parameters.orderField;
+  }
+  if (typeof parameters.personType!=="undefined") {
+    personType = parameters.personType;
+    if (personType!=="") {
+      if (queryParams !=="") {
+        queryParams += " AND ";
+      }
+      queryParams += "exists(n.personType) AND toLower(n.personType) =~ toLower('.*"+personType+".*') ";
+    }
   }
   if (orderField!=="") {
     queryOrder = "ORDER BY n."+orderField;
