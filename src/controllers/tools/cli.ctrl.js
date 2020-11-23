@@ -2402,9 +2402,6 @@ const ingesticp = async() => {
   for (let rowKey in csv) {
     let row = csv[rowKey];
     let int = row[keys[0]].trim();
-    if (Number(int)<1110) {
-      continue;
-    }
     let archivalReferenceId = row['Archival Reference'].trim();
     let lastName = row['Last Name'].trim();
     let firstName = row['First name'].trim();
