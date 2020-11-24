@@ -579,28 +579,33 @@ const prepareItemOutput = async({defaultItem=null,firstLevel=[],subgraphs=[],cla
   let linksIds = [];
   for (let i=0; i<recordsNodes.length; i++) {
     let record = recordsNodes[i];
-    let item = helpers.outputRecord(record);
-    item.type = record.labels[0];
-    let itemType = item.type;
-    if (typeof item.systemType!=="undefined" && item.systemType===classpieceTermId) {
-      itemType = "Classpiece";
-    }
-    if (item._id!==defaultItem.id && nodeIds.indexOf(item._id)===-1) {
-      nodeIds.push(item._id);
-      let colors = nodeColors(itemType);
-      let node = {
-        id: item._id,
-        label: item.label,
-        itemId: item._id,
-        type: itemType,
-        color: colors.color,
-        strokeColor: colors.strokeColor,
-        size: 30
+    if (record!==null) {
+      let item = helpers.outputRecord(record);
+      item.type = record.labels[0];
+      let itemType = item.type;
+      if (typeof item.systemType!=="undefined" && item.systemType===classpieceTermId) {
+        itemType = "Classpiece";
       }
-      nodes.push(node);
+      if (item._id!==defaultItem.id && nodeIds.indexOf(item._id)===-1) {
+        nodeIds.push(item._id);
+        let colors = nodeColors(itemType);
+        let node = {
+          id: item._id,
+          label: item.label,
+          itemId: item._id,
+          type: itemType,
+          color: colors.color,
+          strokeColor: colors.strokeColor,
+          size: 30
+        }
+        nodes.push(node);
+      }
     }
   }
   for (let j=0;j<recordsLinks.length;j++) {
+    if (recordsLinks[j]===null) {
+      continue;
+    }
     let rel = helpers.outputRelation(recordsLinks[j]);
     let start = rel.start, end = rel.end;
     let pair = `${start}-${end}`;

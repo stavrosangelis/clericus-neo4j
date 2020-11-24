@@ -16,6 +16,7 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 * @apiParam {array} [resources] An array of resources ids
 * @apiParam {array} [temporal] An array of temporal ids
 * @apiParam {array} [spatial] An array of spatial ids
+* @apiParam {array} [resourcesTypes] An array of resource types
 
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
@@ -462,6 +463,7 @@ const getResourcesPrepareQueryParams = async(req)=>{
   let resources = [];
   let temporal = [];
   let spatial = [];
+  let resourcesTypes = [];
   let page = 0;
   let orderField = "label";
   let queryPage = 0;
@@ -535,6 +537,22 @@ const getResourcesPrepareQueryParams = async(req)=>{
       }
       queryParams += "toLower(n.description) =~ toLower('.*"+description+".*') ";
     }
+  }
+
+  if (typeof parameters.resourcesTypes!=="undefined" && parameters.resourcesTypes.length>0) {
+    resourcesTypes = parameters.resourcesTypes;
+    if (queryParams !=="") {
+      queryParams += " AND ";
+    }
+    let resourcesTypesQuery = "";
+    for (let key in resourcesTypes) {
+      let rType = resourcesTypes[key];
+      if (resourcesTypesQuery !=="") {
+        resourcesTypesQuery += " OR ";
+      }
+      resourcesTypesQuery += ` n.systemType="${rType}"`;
+    }
+    queryParams += `(${resourcesTypesQuery})`;
   }
 
   if (typeof parameters.orderField!=="undefined") {

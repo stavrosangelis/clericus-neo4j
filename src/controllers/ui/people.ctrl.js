@@ -13,6 +13,7 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 * @apiParam {string} [fnameSoundex] A string to match against the peoples' first name soundex.
 * @apiParam {string} [lnameSoundex] A string to match against the peoples' last name soundex.
 * @apiParam {string} [description] A string to match against the peoples' description.
+* @apiParam {string} [personType] The person type.
 * @apiParam {string} [orderField=firstName] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
@@ -311,6 +312,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
   let fnameSoundex = "";
   let lnameSoundex = "";
   let description = "";
+  let personType = "";
   let page = 0;
   let orderField = "lastName";
   let queryPage = 0;
@@ -374,6 +376,13 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams += " AND ";
     }
     queryParams += "toLower(n.description) =~ toLower('.*"+description+".*') ";
+  }
+  if (typeof parameters.personType!=="undefined") {
+    personType = helpers.addslashes(parameters.personType).trim();
+    if (queryParams !=="") {
+      queryParams += " AND ";
+    }
+    queryParams += "toLower(n.personType) =~ toLower('.*"+personType+".*') ";
   }
 
   if (typeof parameters.orderField!=="undefined") {
