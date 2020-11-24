@@ -1589,8 +1589,8 @@ const ingesticp = async() => {
   for (let key in vcsv) {
     let row = vcsv[key];
     // check if matriculation class is in the db or add it
-    let mc = await matriculationClassDB(row['Name updated'].trim(), userId);
-    matriculationClasses.push({name:row['﻿Name'].trim(), nameUpdated:row['Name updated'].trim(), _id:mc._id});
+    let mc = await matriculationClassDB(row[vkeys['0']].trim(), userId);
+    matriculationClasses.push({name:row[vkeys['0']].trim(), nameUpdated:row[vkeys['1']].trim(), _id:mc._id});
   }
 
   const normaliseDate = (date) => {
@@ -1643,7 +1643,7 @@ const ingesticp = async() => {
     return output;
   }
 
-  const ingestPerson = async(firstName="",middleName="",lastName="",dbID="") => {
+  const ingestPerson = async(firstName="",middleName="",lastName="",dbID="", rowNum, total) => {
     let person = {};
     // insert person
     if (dbID==="") {
@@ -1668,7 +1668,8 @@ const ingesticp = async() => {
       person = new Person(personData);
       await person.load();
     }
-    console.log(person._id)
+    let percentage = (rowNum/total)*1000;
+    console.log(person._id, dbID, person.label, `${percentage}%`);
     return person;
   }
 
@@ -2150,7 +2151,7 @@ const ingesticp = async() => {
         {_id: newEvent._id, type: "Event"},
         {_id: person._id, type: "Person"}
       ],
-      taxonomyTermLabel: `Death`
+      taxonomyTermLabel: `wasStatusOf`
     };
     await updateReference(personReference);
     if (date!=="") {
@@ -2208,7 +2209,7 @@ const ingesticp = async() => {
         {_id: newEvent._id, type: "Event"},
         {_id: person._id, type: "Person"}
       ],
-      taxonomyTermLabel: `wasAwarded`
+      taxonomyTermLabel: `wasHeldBy`
     };
     await updateReference(personReference);
     if (date!=="") {
@@ -2399,48 +2400,49 @@ const ingesticp = async() => {
     });
   });
   let keys = Object.keys(csv['0']);
+  let totalLength = csv.length;
   for (let rowKey in csv) {
     let row = csv[rowKey];
     let int = row[keys[0]].trim();
-    let archivalReferenceId = row['Archival Reference'].trim();
-    let lastName = row['Last Name'].trim();
-    let firstName = row['First name'].trim();
+    let archivalReferenceId = row[keys['1']].trim();
+    let lastName = row[keys['2']].trim();
+    let firstName = row[keys['3']].trim();
     let middleName = "";
     if (firstName.includes(" ")) {
       let firstNameArr = firstName.split(" ");
       firstName = firstNameArr[0].trim();
       middleName = firstNameArr[1].trim();
     }
-    let dateOfBirth = normaliseDate(row['Date of Birth'].trim());
+    let dateOfBirth = normaliseDate(row[keys['4']].trim());
 
     // father
-    let fatherFirstName = row["Father's Forename"].trim();
+    let fatherFirstName = row[keys['5']].trim();
     let fatherLastName = lastName;
 
     //mother
-    let motherFirstName = row["Mother's Forename"].trim();
+    let motherFirstName = row[keys['6']].trim();
     let motherLastName = lastName;
-    let motherMaidenName = row["Mother's Surname"].trim();
+    let motherMaidenName = row[keys['7']].trim();
 
-    let placeOfOrigin = row['Place of Origin'].trim();
-    let diocese = row['Diocese'].trim();
-    let baptisedDate = normaliseDate(row['Baptized'].trim());
-    let matriculationDate = normaliseDate(row['Date of Entry'].trim());
-    let matriculationClass = row['Passe for'].trim();
-    let confirmationDate = row['Confirmed'].trim();
+    let placeOfOrigin = row[keys['8']].trim();
+    let diocese = row[keys['9']].trim();
+    let baptisedDate = normaliseDate(row[keys['10']].trim());
+    let matriculationDate = normaliseDate(row[keys['14']].trim());
+    let matriculationClass = row[keys['21']].trim();
+    let confirmationDate = row[keys['19']].trim();
     if (confirmationDate!=="yes") {
-      confirmationDate = normaliseDate(row['Confirmed'].trim());
+      confirmationDate = normaliseDate(row[keys['19']].trim());
     }
-    let dateOfDeparture = row['Date of Departure'].trim();
-    let dateOfDepartureDescription = row['Add to column S description'].trim();
+    let dateOfDeparture = row[keys['18']].trim();
+    let dateOfDepartureDescription = row[keys['45']].trim();
 
-    let extraEventColumn = row['Add as distinct event to entry'].trim();
-    let extraEventColumnDescription = row['Add to column AU description in db'].trim();
+    let extraEventColumn = row[keys['46']].trim();
+    let extraEventColumnDescription = row[keys['47']].trim();
 
-    let dbID = row['﻿DB ID']?.trim() || "";
+    let dbID = row[keys['48']]?.trim() || "";
 
     // 1. ingest person
-    let person = await ingestPerson(firstName, middleName, lastName, dbID);
+    let person = await ingestPerson(firstName, middleName, lastName, dbID, Number(rowKey), totalLength);
 
     // 2. reference to archival number
     // add the reources to the db if not exist
