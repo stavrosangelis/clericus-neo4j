@@ -2,7 +2,7 @@ const driver = require("../config/db-driver");
 const helpers = require("../helpers");
 
 class Person {
-  constructor({_id=null,label=null,honorificPrefix=[],firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,personType=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({_id=null,label=null,honorificPrefix=[],firstName=null,middleName=null,lastName=null,fnameSoundex=null,lnameSoundex=null,alternateAppelations=[],description=null,personType="Clergy",status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
     if (typeof _id!=="undefined" && _id!==null) {
       this._id = _id;
     }
