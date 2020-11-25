@@ -1545,6 +1545,9 @@ const ingesticp = async() => {
     iLocations.push({name:row['﻿Location name'].trim(),nameUpdated:row['Name updated'].trim(),type:row['Organisation type'].trim()})
   }
 
+  const mcTaxonomy = new Taxonomy({systemType:"matriculationClass"});
+  await mcTaxonomy.load();
+
   const matriculationClassDB = async(mc, userId) => {
     let newMC = null;
     let searchQuery = `MATCH (n:TaxonomyTerm {label:"${mc}"}) RETURN n`;
@@ -1570,6 +1573,14 @@ const ingesticp = async() => {
       let newMCTerm = new TaxonomyTerm(newMCData);
       let newMCSave = await newMCTerm.save(userId);
       newMC = newMCSave.data;
+      let newRef = {
+        items: [
+          {_id:newMC._id, type: "TaxonomyTerm", role: ""},
+          {_id:mcTaxonomy._id, type: "Taxonomy", role: ""},
+        ],
+        taxonomyTermLabel: "isChildOf"
+      };
+      let addRef = await updateReference(newRef);
     }
     return newMC;
   }
@@ -1589,10 +1600,9 @@ const ingesticp = async() => {
   for (let key in vcsv) {
     let row = vcsv[key];
     // check if matriculation class is in the db or add it
-    let mc = await matriculationClassDB(row[vkeys['0']].trim(), userId);
+    let mc = await matriculationClassDB(row[vkeys['1']].trim(), userId);
     matriculationClasses.push({name:row[vkeys['0']].trim(), nameUpdated:row[vkeys['1']].trim(), _id:mc._id});
   }
-
   const normaliseDate = (date) => {
     date = date.replace(/ /g,'');
     let startDate = "";
@@ -1668,8 +1678,9 @@ const ingesticp = async() => {
       person = new Person(personData);
       await person.load();
     }
-    let percentage = (rowNum/total)*1000;
-    console.log(person._id, dbID, person.label, `${percentage}%`);
+    let percentage = (rowNum/total)*100;
+    let perc = percentage.toFixed(2);
+    console.log(person._id, dbID, person.label, `${perc}%`);
     return person;
   }
 
@@ -2030,7 +2041,7 @@ const ingesticp = async() => {
     if (newMatriculationClass!=="") {
       label = `Matriculation into ${newMatriculationClass}`;
     }
-    let matriculationEventQuery = `match (n:Event)
+    let matriculationEventQuery = `match (n:Event {label:"${label}"})
       match (t:Temporal)
       match (s:Spatial)
       WHERE exists((n)-[:hasTime]->(t)) AND id(t)=${newDate._id}
@@ -2058,7 +2069,7 @@ const ingesticp = async() => {
       ],
       taxonomyTermLabel: `hasParticipant`
     };
-    if (newMatriculationClass!=="") {
+    if (newMatriculationClassId!=="") {
       matriculationReference.items[1].role = null;
       matriculationReference.items[0].role = newMatriculationClassId;
     }

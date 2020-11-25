@@ -85,14 +85,11 @@ const createIndexes = async () => {
 
 const createUniqueConstrains = async () => {
   let session = driver.session()
-  let query = "CREATE CONSTRAINT ON (n:Entity) ASSERT n.label IS UNIQUE"
-  " CREATE CONSTRAINT ON (n:Entity) ASSERT n.labelId IS UNIQUE"
-  " CREATE CONSTRAINT ON (n:TaxonomyTerm) ASSERT n.label IS UNIQUE"
-  " CREATE CONSTRAINT ON (n:TaxonomyTerm) ASSERT n.labelId IS UNIQUE"
-  " CREATE CONSTRAINT ON (n:TaxonomyTerm) ASSERT n.inverseLabel IS UNIQUE"
-  " CREATE CONSTRAINT ON (n:TaxonomyTerm) ASSERT n.inverseLabelId IS UNIQUE"
-  " CREATE CONSTRAINT ON (n:User) ASSERT n.email IS UNIQUE"
-  " CREATE CONSTRAINT ON (n:Usergroup) ASSERT n.label IS UNIQUE";
+  let query = "CREATE CONSTRAINT ON (n:Entity) ASSERT n.labelId IS UNIQUE"
+  +" CREATE CONSTRAINT ON (n:TaxonomyTerm) ASSERT n.labelId IS UNIQUE"
+  +" CREATE CONSTRAINT ON (n:TaxonomyTerm) ASSERT n.inverseLabelId IS UNIQUE"
+  +" CREATE CONSTRAINT ON (n:User) ASSERT n.email IS UNIQUE"
+  +" CREATE CONSTRAINT ON (n:Usergroup) ASSERT n.label IS UNIQUE";
   const resultPromise = await new Promise((resolve, reject)=> {
     let result = session.run(
       query,

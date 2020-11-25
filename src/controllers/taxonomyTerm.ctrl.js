@@ -188,6 +188,46 @@ class TaxonomyTerm {
     }
   }
 
+  async uniqueId(value, type="labelId") {
+    let session = driver.session();
+    const normalizeLabel = (label) => {
+    	if (!label.includes("_")) {
+    		label = `${label}_2`;
+       	}
+        else {
+        	let parts = label.split("_");
+        	let numPart = parts[1];
+            let num = Number(numPart)+1;
+            label = `${parts[0]}_${num}`;
+
+        }
+        return label;
+    }
+    let label = value;
+    let query = `MATCH (n:TaxonomyTerm) WHERE n.${type}="${value}" RETURN n`;
+    console.log(query)
+    let node = await session.writeTransaction(tx=>tx.run(query,{}))
+    .then(result=> {
+      let records = result.records;
+      if (records.length>0) {
+        let record = records[0];
+        let key = record.keys[0];
+        let output = record.toObject()[key];
+        output = helpers.outputRecord(output);
+        return output;
+      }
+      return null;
+    }).catch((error) => {
+      console.log(error)
+    });
+    if (node!==null) {
+      let newValue = normalizeLabel(value);
+      label = await this.uniqueId(newValue, type);
+    }
+    session.close();
+    return label;
+  }
+
   async save(userId) {
     let validateTaxonomyTerm = this.validate();
     if (!validateTaxonomyTerm.status) {
@@ -214,6 +254,9 @@ class TaxonomyTerm {
       if (typeof this._id==="undefined" || this._id===null) {
         this.labelId = helpers.normalizeLabelId(this.label);
         this.inverseLabelId = helpers.normalizeLabelId(this.inverseLabel);
+        // check if labelId and inverseLabelId is unique
+        this.labelId = await this.uniqueId(this.labelId, "labelId");
+        this.inverseLabelId = await this.uniqueId(this.inverseLabelId, "inverseLabelId");
       }
       else {
         await this.load();
@@ -249,6 +292,8 @@ class TaxonomyTerm {
           output = {error: [], status: true, data: resultRecord};
         }
         return output;
+      }).catch((error) => {
+        console.log(error)
       });
 
       // remove hasChild ref
