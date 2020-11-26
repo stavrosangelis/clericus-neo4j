@@ -382,7 +382,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
     if (queryParams !=="") {
       queryParams += " AND ";
     }
-    queryParams += "toLower(n.personType) =~ toLower('.*"+personType+".*') ";
+    queryParams += ` toLower(n.personType)= toLower("${personType}") `;
   }
 
   if (typeof parameters.orderField!=="undefined") {

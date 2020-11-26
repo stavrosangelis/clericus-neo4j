@@ -205,7 +205,6 @@ class TaxonomyTerm {
     }
     let label = value;
     let query = `MATCH (n:TaxonomyTerm) WHERE n.${type}="${value}" RETURN n`;
-    console.log(query)
     let node = await session.writeTransaction(tx=>tx.run(query,{}))
     .then(result=> {
       let records = result.records;

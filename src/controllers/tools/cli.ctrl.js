@@ -40,6 +40,7 @@ const argv = yargs
     .command('1704ls', 'Export Lay Sureties from 1704 excel')
     .command('ed', 'Export dioceses')
     .command('ingesticp', 'Ingest ICP data')
+    .command('icpLocations', 'Fix ICP locations data')
     .example('$0 parse -i data.csv', 'parse the contents of the csv file')
     .option('csv', {
         alias: 'c',
@@ -1545,6 +1546,25 @@ const ingesticp = async() => {
     iLocations.push({name:row['﻿Location name'].trim(),nameUpdated:row['Name updated'].trim(),type:row['Organisation type'].trim()})
   }
 
+  let eLocations = [];
+  let ePath = `${archivePath}documents/icp/locations.csv`;
+  var eCsv = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(ePath)
+    .pipe(csvParser())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    });
+  });
+  let ekeys = Object.keys(eCsv['0']);
+  for (let key in eCsv) {
+    let row = eCsv[key];
+    if (row[ekeys[0]]!=="") {
+      eLocations.push({name:row[ekeys[0]].trim(),nameUpdated:row[ekeys[1]].trim()})
+    }
+  }
+
   const mcTaxonomy = new Taxonomy({systemType:"matriculationClass"});
   await mcTaxonomy.load();
 
@@ -2220,7 +2240,7 @@ const ingesticp = async() => {
         {_id: newEvent._id, type: "Event"},
         {_id: person._id, type: "Person"}
       ],
-      taxonomyTermLabel: `wasHeldBy`
+      taxonomyTermLabel: `hasRecipient`
     };
     await updateReference(personReference);
     if (date!=="") {
@@ -2351,9 +2371,6 @@ const ingesticp = async() => {
     await updateReference(reference);
   }
 
-  const extraEventTaxonomyTerm = new TaxonomyTerm({labelId:"wasAwarded"});
-  await extraEventTaxonomyTerm.load();
-
   const addExtraEvents = async(extraEventColumn, extraEventColumnDescription, person, userId) => {
     let events = extraEventColumn.split(";");
     for (let eKey in events) {
@@ -2370,7 +2387,11 @@ const ingesticp = async() => {
           newObject.event = part.replace("e =","").trim();
         }
         if (part.includes("s =")) {
-          newObject.spatial = part.replace("s =","").trim();
+          let newSpatial = part.replace("s =","").trim();
+          let newSpatial2 = eLocations.find(l=>l.name===newSpatial);
+          if (typeof newSpatial2!=="undefined") {
+            newObject.spatial = newSpatial2.nameUpdated;
+          }
         }
         if (part.includes("t =")) {
           newObject.temporal = part.replace("t =","").trim();
@@ -2543,6 +2564,93 @@ const ingesticp = async() => {
   process.exit();
 }
 
+const icpLocations = async() => {
+  let path = `${archivePath}documents/icp/ICP-Database.csv`;
+  var csv = await new Promise((resolve,reject)=>{
+    let results = [];
+    fs.createReadStream(path)
+    .pipe(csvParser())
+    .on('data', (data) => results.push(data))
+    .on('end', () => {
+      resolve(results);
+    });
+  });
+  let keys = Object.keys(csv['0']);
+  let totalLength = csv.length;
+  let spatial = [];
+  let names = [];
+  const session = driver.session();
+  for (let rowKey in csv) {
+    let row = csv[rowKey];
+    let extraEventColumn = row[keys['46']].trim();
+    let events = extraEventColumn.split(";");
+    for (let eKey in events) {
+      let e = events[eKey];
+      let parts = e.split(",");
+      let obj = {
+        event: "",
+        spatial: "",
+        temporal: ""
+      }
+      for (let key in parts) {
+        let part = parts[key].trim();
+        if (part.includes("e =")) {
+          obj.event = part.replace("e =","").trim();
+        }
+        if (part.includes("s =")) {
+          obj.spatial = part.replace("s =","").trim();
+        }
+        if (part.includes("t =")) {
+          obj.temporal = part.replace("t =","").trim();
+        }
+      }
+      if (names.indexOf(obj.spatial)===-1) {
+        const icpSpatialQuery = `MATCH (n:Spatial {label:"${obj.spatial}"}) RETURN n`
+        let icpSpatialNode = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+        .then(result=> {
+          let records = result.records;
+          if (records.length>0) {
+            let record = records[0].toObject();
+            let outputRecord = helpers.outputRecord(record.n);
+            return outputRecord;
+          }
+          return null;
+        })
+        .catch((error) => {
+          console.log(error)
+        });
+        let nameUpdated = icpSpatialNode?.label || "";
+        let dbMatch = "";
+        if (icpSpatialNode!==null) {
+          dbMatch = "yes";
+        }
+        spatial.push({name:obj.spatial, nameUpdated:nameUpdated, dbMatch:dbMatch});
+        names.push(obj.spatial);
+      }
+
+    }
+  }
+  session.close();
+  spatial.sort((a,b)=> (a.name > b.name ? 1 : -1));
+  let csvText = "Name,Name Updated,DB Match\n";
+  for (let k in spatial) {
+    let row = spatial[k];
+    csvText+=`${row.name},${row.nameUpdated},${row.dbMatch}\n`;
+  }
+  let csvPath = `${archivePath}documents/icp/locations.csv`;
+  let writeFile = await new Promise ((resolve,reject)=> {
+    fs.writeFile(csvPath, csvText, 'utf8', function(err) {
+      if (err) {
+        reject(err);
+      } else {
+        csvStatus = true;
+        resolve(true);
+      }
+    });
+  });
+  process.exit();
+}
+
 const getDaysInMonth = (m,y) => {
   return new Date(y, m+1, 0).getDate();
 }
@@ -2588,4 +2696,7 @@ if (argv._.includes('ed')) {
 }
 if (argv._.includes('ingesticp')) {
   ingesticp();
+}
+if (argv._.includes('icpLocations')) {
+  icpLocations();
 }

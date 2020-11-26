@@ -356,7 +356,7 @@ const getItemNetwork = async (req, resp) => {
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
   let defaultItemType = node.recordType;
-  if (node.systemType!==null && node.systemType===classpieceTerm._id) {
+  if (node?.systemType===classpieceTerm._id) {
     defaultItemType = "Classpiece";
   }
   let colors = nodeColors(defaultItemType);
@@ -372,7 +372,8 @@ const getItemNetwork = async (req, resp) => {
 
   let prepareItemOutputParams = {
     defaultItem: defaultItem,
-    firstLevel: firstLevelNodes
+    firstLevel: firstLevelNodes,
+    classpieceTermId: classpieceTerm._id
   };
   let data = await prepareItemOutput(prepareItemOutputParams);
   /*let t2 = performance.now();
@@ -583,7 +584,7 @@ const prepareItemOutput = async({defaultItem=null,firstLevel=[],subgraphs=[],cla
       let item = helpers.outputRecord(record);
       item.type = record.labels[0];
       let itemType = item.type;
-      if (typeof item.systemType!=="undefined" && item.systemType===classpieceTermId) {
+      if (itemType==="Resource" && typeof item.systemType!=="undefined" && item.systemType===classpieceTermId) {
         itemType = "Classpiece";
       }
       if (item._id!==defaultItem.id && nodeIds.indexOf(item._id)===-1) {
