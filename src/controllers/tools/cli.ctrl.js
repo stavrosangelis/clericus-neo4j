@@ -2146,7 +2146,8 @@ const ingesticp = async() => {
       await updateReference(temporalReference);
     }
     if (location!=="") {
-      const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
+      let escapeLocation = helpers.addslashes(location);
+      const spatialQuery = `MATCH (n:Spatial) WHERE trim(toLower(n.label))=toLower("${escapeLocation}") RETURN n`
       let spatial = await session.writeTransaction(tx=>tx.run(spatialQuery,{}))
       .then(result=> {
         let records = result.records;
@@ -2163,14 +2164,16 @@ const ingesticp = async() => {
       if (spatial===null) {
         console.log(`No spatial for location: "${location}" and person: "${person.label}"`);
       }
-      let spatialReference = {
-        items: [
-          {_id: ordinationEvent._id, type: "Event"},
-          {_id: spatial._id, type: "Spatial"}
-        ],
-        taxonomyTermLabel: `hasLocation`
-      };
-      await updateReference(spatialReference);
+      else {
+        let spatialReference = {
+          items: [
+            {_id: ordinationEvent._id, type: "Event"},
+            {_id: spatial._id, type: "Spatial"}
+          ],
+          taxonomyTermLabel: `hasLocation`
+        };
+        await updateReference(spatialReference);
+      }
     }
     return true;
   }
@@ -2200,7 +2203,8 @@ const ingesticp = async() => {
       await updateReference(temporalReference);
     }
     if (location!=="") {
-      const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
+      let escapeLocation = helpers.addslashes(location);
+      const spatialQuery = `MATCH (n:Spatial) WHERE trim(toLower(n.label))=toLower("${escapeLocation}") RETURN n`
       let spatial = await session.writeTransaction(tx=>tx.run(spatialQuery,{}))
       .then(result=> {
         let records = result.records;
@@ -2258,7 +2262,8 @@ const ingesticp = async() => {
       await updateReference(temporalReference);
     }
     if (location!=="") {
-      const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
+      let escapeLocation = helpers.addslashes(location);
+      const spatialQuery = `MATCH (n:Spatial) WHERE trim(toLower(n.label))=toLower("${escapeLocation}") RETURN n`
       let spatial = await session.writeTransaction(tx=>tx.run(spatialQuery,{}))
       .then(result=> {
         let records = result.records;
