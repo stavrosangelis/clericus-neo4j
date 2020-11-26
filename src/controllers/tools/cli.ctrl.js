@@ -2147,7 +2147,7 @@ const ingesticp = async() => {
     }
     if (location!=="") {
       const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
-      let spatial = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+      let spatial = await session.writeTransaction(tx=>tx.run(spatialQuery,{}))
       .then(result=> {
         let records = result.records;
         if (records.length>0) {
@@ -2201,7 +2201,7 @@ const ingesticp = async() => {
     }
     if (location!=="") {
       const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
-      let spatial = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+      let spatial = await session.writeTransaction(tx=>tx.run(spatialQuery,{}))
       .then(result=> {
         let records = result.records;
         if (records.length>0) {
@@ -2259,7 +2259,7 @@ const ingesticp = async() => {
     }
     if (location!=="") {
       const spatialQuery = `MATCH (n:Spatial {label:"${location}"}) RETURN n`
-      let spatial = await session.writeTransaction(tx=>tx.run(icpSpatialQuery,{}))
+      let spatial = await session.writeTransaction(tx=>tx.run(spatialQuery,{}))
       .then(result=> {
         let records = result.records;
         if (records.length>0) {
