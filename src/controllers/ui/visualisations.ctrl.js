@@ -98,16 +98,16 @@ const produceGraphNetwork = async () => {
   let t0 = performance.now()
   let classpieceTerm = new TaxonomyTerm({labelId: "Classpiece"});
   await classpieceTerm.load();
-  let query = `OPTIONAL MATCH (n1:Event {status='public'})
+  let query = `OPTIONAL MATCH (n1:Event {status:'public'})
   WITH collect(distinct n1) as c1
-  OPTIONAL MATCH (n2:Organisation {status='public'})
+  OPTIONAL MATCH (n2:Organisation {status:'public'})
   WITH collect(distinct n2) + c1 as c2
-  OPTIONAL MATCH (n3:Person {status='public'})
+  OPTIONAL MATCH (n3:Person {status:'public'})
   WITH collect(distinct n3) + c2 as c3
-  OPTIONAL MATCH (n4:Resource {status='public'})
+  OPTIONAL MATCH (n4:Resource {status:'public'})
   WITH collect(distinct n4) + c3 as c4
   UNWIND c4 as n
-  OPTIONAL MATCH (n)-[r]-(t {status='public'}) RETURN n, r, t`;
+  OPTIONAL MATCH (n)-[r]-(t {status:'public'}) RETURN n, r, t`;
   let resultsPromise = await loadNodes(query);
   let results = prepareItemsOutput(resultsPromise.records);
   let nodes = results.nodes;

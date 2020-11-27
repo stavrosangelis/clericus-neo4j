@@ -2178,8 +2178,11 @@ const ingesticp = async() => {
     return true;
   }
 
+  const deathTaxonomyTerm = new TaxonomyTerm({labelId:"Death"});
+  await deathTaxonomyTerm.load();
+
   const addDeathEvent = async(date, location, description, person, userId) => {
-    let newEvent = await addNewEvent("Deceased", ordinationTaxonomyTerm._id, userId, description);
+    let newEvent = await addNewEvent("Deceased", deathTaxonomyTerm._id, userId, description);
     let personReference = {
       items: [
         {_id: newEvent._id, type: "Event"},
