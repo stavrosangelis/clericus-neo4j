@@ -236,7 +236,8 @@ const getOrganisations = async (req, resp) => {
   if (typeof parameters.label!=="undefined") {
     label = parameters.label;
     if (label!=="") {
-      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
+      let escapeLabel = helpers.addslashes(label);
+      queryParams = `toLower(n.label) =~ toLower('.*${escapeLabel}.*'`;
     }
   }
   if (typeof parameters.orderField!=="undefined") {
