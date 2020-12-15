@@ -51,8 +51,13 @@ const getPeople = async (req, resp) => {
     return false;
   }
   else {
-    let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    let data = await getPeopleQuery(query, params.match, params.queryParams, params.limit);
+    let optionalMatchQuery = "";
+    if (params.optionalMatch!=="") {
+      optionalMatchQuery = params.optionalMatch;
+    }
+    let query = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
+    let queryCount = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN count(distinct n) as c`;
+    let data = await getPeopleQuery(query, queryCount, params.limit);
     if (data.error) {
       resp.json({
         status: false,
@@ -78,7 +83,7 @@ const getPeople = async (req, resp) => {
   }
 }
 
-const getPeopleQuery = async (query, match, queryParams, limit) => {
+const getPeopleQuery = async (query, queryCount, limit) => {
   let session = driver.session();
   let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
   .then(result=> {
@@ -140,8 +145,9 @@ const getPeopleQuery = async (query, match, queryParams, limit) => {
     node.affiliations = affiliations;
     return node;
   });
+  let optionalMatchQuery = "";
   let count = await session.writeTransaction(tx=>
-    tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
+    tx.run(queryCount)
   )
   .then(result=> {
     session.close();
@@ -255,7 +261,7 @@ const getPersonActiveFilters = async(req, resp) => {
     helpers.prepareOutput(record);
     peopleIds.push(record.toObject()['_id']);
   }
-  let query = `MATCH (p:Person {status:'public'})-->(n {status:'public'}) WHERE id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.eventType as eventType`;
+  let query = `MATCH (p:Person {status:'public'})-->(n {status:'public'}) WHERE id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, labels(n) as labels, n.eventType as eventType, n.systemType as systemType`;
   let nodesPromise = await session.writeTransaction(tx=>
     tx.run(query,{})
   )
@@ -273,6 +279,7 @@ const getPersonActiveFilters = async(req, resp) => {
   });
   let events = [];
   let organisations = [];
+  let sources = [];
   let eventsFind = nodes.filter(n=>n.type==="Event");
   if (eventsFind!=="undefined") {
     events = [];
@@ -292,9 +299,22 @@ const getPersonActiveFilters = async(req, resp) => {
     }
     organisations = organisationsResult;
   }
+  let resourcesFind = nodes.filter(n=>n.type==="Resource");
+  let documentSystemType = new TaxonomyTerm({"labelId":"Document"});
+  await documentSystemType.load();
+  if (resourcesFind!=="undefined") {
+    sources = [];
+    for (let i=0;i<resourcesFind.length; i++) {
+      let r = resourcesFind[i];
+      if (r.systemType===documentSystemType._id)  {
+        sources.push(r._id);
+      }
+    }
+  }
   let output = {
     events: events,
     organisations: organisations,
+    sources: sources
   }
   resp.json({
     status: true,
@@ -321,6 +341,7 @@ const getPeoplePrepareQueryParams = async(req)=>{
   let returnResults = true;
 
   let match = "(n:Person)";
+  let optionalMatch = "";
 
   let query = "";
   let queryParams = " n.status='public' ";
@@ -383,6 +404,10 @@ const getPeoplePrepareQueryParams = async(req)=>{
       queryParams += " AND ";
     }
     queryParams += ` toLower(n.personType)= toLower("${personType}") `;
+  }
+  if (parameters.sources?.length>0) {
+    optionalMatch = `OPTIONAL MATCH (s:Resource) WHERE id(s) IN [${parameters.sources}]`
+    queryParams += ` AND exists((n)-[:isReferencedIn]->(s))`;
   }
 
   if (typeof parameters.orderField!=="undefined") {
@@ -557,9 +582,9 @@ const getPeoplePrepareQueryParams = async(req)=>{
   if (queryParams!=="") {
     queryParams = "WHERE "+queryParams;
   }
-
   return {
     match: match,
+    optionalMatch: optionalMatch,
     queryParams: queryParams,
     skip: skip,
     limit: limit,
@@ -621,8 +646,30 @@ const advancedQueryBuilder = (advancedSearch) => {
   return query;
 }
 
+const getPeopleSources = async(req,resp) => {
+  let documentSystemType = new TaxonomyTerm({"labelId":"Document"});
+  await documentSystemType.load();
+  let query = `MATCH (r:Resource {systemType:"${documentSystemType._id}",status:"public"}) RETURN r`;
+  let session = driver.session();
+  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
+  .then(result=> {
+    return result.records;
+  }).catch((error) => {
+    console.log(error)
+  });
+  let sources = helpers.normalizeRecordsOutput(nodesPromise, "n");
+  session.close();
+  return resp.json({
+    status: true,
+    data: sources,
+    error: [],
+    msg: "Query results",
+  });
+}
+
 module.exports = {
   getPeople: getPeople,
   getPerson: getPerson,
   getPersonActiveFilters: getPersonActiveFilters,
+  getPeopleSources: getPeopleSources,
 };

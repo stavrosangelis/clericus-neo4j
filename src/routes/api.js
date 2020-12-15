@@ -90,6 +90,7 @@ server.post('/ui-organisations-active-filters', organisationsUiController.getOrg
 
 // ******* ui people  ******** //
 server.post('/ui-people', peopleController.getPeople);
+server.get('/ui-people-sources', peopleController.getPeopleSources);
 server.get('/ui-person', peopleController.getPerson);
 server.post('/ui-person-active-filters', peopleController.getPersonActiveFilters);
 
