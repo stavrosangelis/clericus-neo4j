@@ -41,6 +41,7 @@ const argv = yargs
     .command('ed', 'Export dioceses')
     .command('ingesticp', 'Ingest ICP data')
     .command('icpLocations', 'Fix ICP locations data')
+    .command('referenceMainICP', 'Add a relationship to all items related with one or more ICP references to the main ICP reference')
     .example('$0 parse -i data.csv', 'parse the contents of the csv file')
     .option('csv', {
         alias: 'c',
@@ -2659,6 +2660,134 @@ const icpLocations = async() => {
   process.exit();
 }
 
+const referenceMainICP = async() => {
+  const session = driver.session();
+
+  // reference 1
+  let reference1Title = helpers.addslashes(`MS A2.c1 Registre des entrées et sorties des élèves, 1835-1849 [1835-1851]`);
+  let r1Query = `MATCH (n) WHERE n.label="${reference1Title}" RETURN n`;
+  let reference1 = await session.writeTransaction(tx=>tx.run(r1Query,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+    return null;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  // reference 2
+  let reference2Title = helpers.addslashes(`MS A2.c4 Registre des élèves entrés au collège entre 1858 et 1938 (1858-1939) [1858-1939].`);
+  let r2Query = `MATCH (n) WHERE n.label="${reference2Title}" RETURN n`;
+  let reference2 = await session.writeTransaction(tx=>tx.run(r2Query,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+    return null;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  // reference 3
+  let reference3Title = helpers.addslashes(`MS A2.d1 Recettes et dépenses de 1807 à 1814 et registre d'entrée et de sortie des élèves de 1832 à 1838 [1832-1839].`);
+  let r3Query = `MATCH (n) WHERE n.label="${reference3Title}" RETURN n`;
+  let reference3 = await session.writeTransaction(tx=>tx.run(r3Query,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+    return null;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  // reference 4
+  let reference4Title = helpers.addslashes(`MS A2.d15 Collège: livre de comptes, commission de 1849, bourses, registre des étudiants de 1850 à 1858 (1849-1873), emploi du temps et notes (1932-1937) [1850-1858].`);
+  let r4Query = `MATCH (n) WHERE n.label="${reference4Title}" RETURN n`;
+  let reference4 = await session.writeTransaction(tx=>tx.run(r4Query,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+    return null;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  // main reference
+  let mainReferenceTitle = helpers.addslashes(`Liam Chambers and Sarah Frank, 'Database of students at the Irish College, Paris, 1832-1939'`);
+  let mrQuery = `MATCH (n) WHERE n.label="${mainReferenceTitle}" RETURN n`;
+  let mainReference = await session.writeTransaction(tx=>tx.run(mrQuery,{}))
+  .then(result=> {
+    let records = result.records;
+    if (records.length>0) {
+      let record = records[0].toObject();
+      let outputRecord = helpers.outputRecord(record.n);
+      return outputRecord;
+    }
+    return null;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  // link references to main reference
+  let refIds = [reference1._id,reference2._id,reference3._id,reference4._id]
+  let lrQuery = `MATCH (n)-[r:hasReference]->(t) WHERE id(n) IN [${refIds}] return id(t) AS _id`;
+  let people = await session.writeTransaction(tx=>tx.run(lrQuery,{}))
+  .then(result=> {
+    let output = [];
+    let records = result.records;
+    if (records.length>0) {
+      for (let key in records) {
+        let record = records[key].toObject();
+        helpers.prepareOutput(record)
+        let newId = Number(record._id);
+        if (output.indexOf(output)===-1) {
+          output.push(newId);
+        }        
+      }
+    }
+    return output;
+  })
+  .catch((error) => {
+    console.log(error)
+  });
+
+  for (let key in people) {
+    let _id = people[key];
+    let newRef = {
+      items: [
+        {_id:_id, type: "Person", role: ""},
+        {_id:mainReference._id, type: "Resource", role: ""},
+      ],
+      taxonomyTermLabel: "isReferencedIn"
+    };
+    let addRef = await updateReference(newRef);
+  }
+
+  console.log(`Process complete`);
+  session.close();
+  process.exit();
+}
+
 const getDaysInMonth = (m,y) => {
   return new Date(y, m+1, 0).getDate();
 }
@@ -2707,4 +2836,7 @@ if (argv._.includes('ingesticp')) {
 }
 if (argv._.includes('icpLocations')) {
   icpLocations();
+}
+if (argv._.includes('referenceMainICP')) {
+  referenceMainICP();
 }
