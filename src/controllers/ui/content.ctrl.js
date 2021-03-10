@@ -1,19 +1,28 @@
-const driver = require("../../config/db-driver");
-const helpers = require("../../helpers");
-const sanitizeHtml = require('sanitize-html');
-const Canvas = require('canvas');
-const fs = require('fs');
-const mimeType = require('mime-types')
-const formidable = require('formidable');
-const path = require('path');
+const driver = require('../../config/db-driver');
+const helpers = require('../../helpers');
 const UploadedFile = require('../uploadedFile.ctrl').UploadedFile;
 const ArticleCategory = require('../articleCategory.ctrl').ArticleCategory;
 const User = require('../user.ctrl').User;
 
 class Article {
-  constructor({_id=null,label=null,permalink=null,category=0,content=null,teaser=null,status='public',featuredImage=null,featuredImageDetails=null,author=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({
+    _id = null,
+    label = null,
+    permalink = null,
+    category = 0,
+    content = null,
+    teaser = null,
+    status = 'public',
+    featuredImage = null,
+    featuredImageDetails = null,
+    author = null,
+    createdBy = null,
+    createdAt = null,
+    updatedBy = null,
+    updatedAt = null,
+  }) {
     this._id = null;
-    if (_id!==null) {
+    if (_id !== null) {
       this._id = _id;
     }
     this.label = label;
@@ -32,53 +41,56 @@ class Article {
   }
 
   async load() {
-    if (this._id===null && this.permalink===null) {
+    if (this._id === null && this.permalink === null) {
       return false;
     }
-    let query = "";
-    if (this._id!==null) {
+    let query = '';
+    if (this._id !== null) {
       query = `MATCH (n:Article) WHERE id(n)=${this._id} AND n.status="public" return n`;
     }
-    if (this.permalink!==null) {
+    if (this.permalink !== null) {
       query = `MATCH (n:Article) WHERE n.permalink="${this.permalink}" AND n.status="public" return n`;
     }
-    let session = driver.session()
-    let node = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0];
-        let key = record.keys[0];
-        let output = record.toObject()[key];
-        output = helpers.outputRecord(output);
-        return output;
-      }
-    })
+    let session = driver.session();
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let output = record.toObject()[key];
+          output = helpers.outputRecord(output);
+          return output;
+        }
+      });
     // assign results to class values
     for (let key in node) {
       this[key] = node[key];
     }
     // populate featured image
-    if (typeof this.featuredImage!=="undefined" && this.featuredImage!==null && this.featuredImage!=="") {
-      let featuredImageDetails = new UploadedFile({_id:this.featuredImage});
+    if (
+      typeof this.featuredImage !== 'undefined' &&
+      this.featuredImage !== null &&
+      this.featuredImage !== ''
+    ) {
+      let featuredImageDetails = new UploadedFile({ _id: this.featuredImage });
       await featuredImageDetails.load();
       this.featuredImageDetails = featuredImageDetails;
     }
-    let author = new User({_id: this.updatedBy});
+    let author = new User({ _id: this.updatedBy });
     await author.load();
-    let authorLabel = "";
-    if (author.firstName!=="") {
+    let authorLabel = '';
+    if (author.firstName !== '') {
       authorLabel = author.firstName;
     }
-    if (author.firstName!=="" && author.lastName!=="") {
+    if (author.firstName !== '' && author.lastName !== '') {
       authorLabel += ` ${author.lastName}`;
     }
     this.author = authorLabel;
   }
-};
+}
 
 /**
 * @api {get} /content-articles Get articles
@@ -89,143 +101,155 @@ class Article {
 */
 const getArticles = async (req, resp) => {
   let parameters = req.query;
-  let label = "";
-  let categoryId = "";
-  let categoryName = "";
+  let label = '';
+  let categoryId = '';
+  let categoryName = '';
   let page = 0;
-  let orderField = "label";
+  let orderField = 'label';
   let queryPage = 0;
-  let queryOrder = "";
+  let queryOrder = '';
   let limit = 25;
 
-  let query = "";
-  let queryParams = "";
-  if (typeof parameters.label!=="undefined") {
+  let query = '';
+  let queryParams = '';
+  if (typeof parameters.label !== 'undefined') {
     label = parameters.label;
-    if (label!=="") {
-      queryParams +="toLower(n.label) =~ toLower('.*"+label+".*') ";
+    if (label !== '') {
+      queryParams += "toLower(n.label) =~ toLower('.*" + label + ".*') ";
     }
   }
-  if (typeof parameters.categoryId!=="undefined") {
+  if (typeof parameters.categoryId !== 'undefined') {
     categoryId = parameters.categoryId;
-    if (categoryId!=="") {
-      queryParams +=`n.category=${categoryId} ` ;
+    if (categoryId !== '') {
+      queryParams += `n.category=${categoryId} `;
     }
   }
-  if (typeof parameters.categoryName!=="undefined") {
+  if (typeof parameters.categoryName !== 'undefined') {
     categoryName = parameters.categoryName;
-    if (categoryName!=="") {
-      let category = new ArticleCategory({label:categoryName});
+    if (categoryName !== '') {
+      let category = new ArticleCategory({ label: categoryName });
       await category.load();
       categoryId = category._id;
-      queryParams +=`n.category="${categoryId}" ` ;
+      queryParams += `n.category="${categoryId}" `;
     }
   }
-  if (typeof parameters.orderField!=="undefined") {
+  if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
   }
-  if (orderField!=="") {
-    queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
-      queryOrder += " DESC";
+  if (orderField !== '') {
+    queryOrder = 'ORDER BY n.' + orderField;
+    if (
+      typeof parameters.orderDesc !== 'undefined' &&
+      parameters.orderDesc === 'true'
+    ) {
+      queryOrder += ' DESC';
     }
   }
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
+    queryPage = parseInt(parameters.page, 10) - 1;
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
-  let skip = limit*queryPage;
-  if (queryParams!=="") {
-    queryParams = "WHERE n.status='public' AND "+queryParams;
+  let skip = limit * queryPage;
+  if (queryParams !== '') {
+    queryParams = "WHERE n.status='public' AND " + queryParams;
   }
 
-  query = "MATCH (n:Article) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+  query =
+    'MATCH (n:Article) ' +
+    queryParams +
+    ' RETURN n ' +
+    queryOrder +
+    ' SKIP ' +
+    skip +
+    ' LIMIT ' +
+    limit;
   let data = await getArticlesQuery(query, queryParams, limit);
   if (data.error) {
-    resp.json({
+    return resp.json({
       status: false,
       data: [],
       error: data.error,
       msg: data.error.message,
-    })
-  }
-  else {
+    });
+  } else {
     let responseData = {
       currentPage: currentPage,
       data: data.nodes,
       totalItems: data.count,
       totalPages: data.totalPages,
-    }
-    resp.json({
+    };
+    return resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
-    })
+      msg: 'Query results',
+    });
   }
-}
+};
 
 const getArticlesQuery = async (query, queryParams, limit) => {
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  }).catch((error) => {
-    console.log(error)
-  });
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
 
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
 
-  for (let i=0;i<nodes.length; i++) {
+  for (let i = 0; i < nodes.length; i++) {
     let node = nodes[i];
-    if (typeof node.featuredImage!=="undefined" && node.featuredImage!=="") {
-      let featuredImageDetails = new UploadedFile({_id:node.featuredImage});
+    if (
+      typeof node.featuredImage !== 'undefined' &&
+      node.featuredImage !== ''
+    ) {
+      let featuredImageDetails = new UploadedFile({ _id: node.featuredImage });
       await featuredImageDetails.load();
       node.featuredImageDetails = featuredImageDetails;
-    }
-    else node.featuredImageDetails = null;
+    } else node.featuredImageDetails = null;
 
-    let author = new User({_id: node.updatedBy});
+    let author = new User({ _id: node.updatedBy });
     await author.load();
-    let authorLabel = "";
-    if (author.firstName!=="") {
+    let authorLabel = '';
+    if (author.firstName !== '') {
       authorLabel = author.firstName;
     }
-    if (author.firstName!=="" && author.lastName!=="") {
+    if (author.firstName !== '' && author.lastName !== '') {
       authorLabel += ` ${author.lastName}`;
     }
     node.author = authorLabel;
   }
 
-
-  let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Article) "+queryParams+" RETURN count(*)")
-  )
-  .then(result=> {
-    session.close();
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['count(*)'];
-    return parseInt(output,10);
-  });
-  let totalPages = Math.ceil(count/limit)
+  let count = await session
+    .writeTransaction((tx) =>
+      tx.run('MATCH (n:Article) ' + queryParams + ' RETURN count(*)')
+    )
+    .then((result) => {
+      session.close();
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['count(*)'];
+      return parseInt(output, 10);
+    });
+  let totalPages = Math.ceil(count / limit);
   let result = {
     nodes: nodes,
     count: count,
-    totalPages: totalPages
-  }
+    totalPages: totalPages,
+  };
   return result;
-}
+};
 
 /**
 * @api {get} /content-article Get article
@@ -236,31 +260,37 @@ const getArticlesQuery = async (query, queryParams, limit) => {
 * @apiParam {string} [permalink] The permalink of the requested article.
 
 */
-const getArticle = async(req, resp) => {
+const getArticle = async (req, resp) => {
   let parameters = req.query;
-  if ((typeof parameters._id==="undefined" || parameters._id==="") && (typeof parameters.permalink==="undefined" || parameters.permalink==="")) {
+  if (
+    (typeof parameters._id === 'undefined' || parameters._id === '') &&
+    (typeof parameters.permalink === 'undefined' || parameters.permalink === '')
+  ) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
-  let _id=null;
-  let permalink=null;
+  let _id = null;
+  let permalink = null;
   let query = null;
-  if (typeof parameters._id!=="undefined" && parameters._id!=="") {
+  if (typeof parameters._id !== 'undefined' && parameters._id !== '') {
     _id = parameters._id;
-    query = {_id: _id};
+    query = { _id: _id };
   }
-  if (typeof parameters.permalink!=="undefined" && parameters.permalink!=="") {
+  if (
+    typeof parameters.permalink !== 'undefined' &&
+    parameters.permalink !== ''
+  ) {
     permalink = parameters.permalink;
-    query = {permalink: permalink};
+    query = { permalink: permalink };
   }
   let content = new Article(query);
   await content.load();
-  if (content._id!==null) {
+  if (content._id !== null) {
     let categories = await getArticleCategoryTree(content.category);
     categories.reverse();
     content.categories = categories;
@@ -268,28 +298,27 @@ const getArticle = async(req, resp) => {
       status: true,
       data: content,
       error: [],
-      msg: "Query results",
+      msg: 'Query results',
     });
-  }
-  else {
+  } else {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "This article is not available",
+      msg: 'This article is not available',
     });
   }
-}
+};
 
 async function getArticleCategoryTree(_id) {
-  if (_id===0) {
+  if (_id === 0) {
     return [];
   }
   let tree = [];
-  let category = new ArticleCategory({_id:_id});
+  let category = new ArticleCategory({ _id: _id });
   await category.load();
   tree.push(category);
-  if (category.parentId>0) {
+  if (category.parentId > 0) {
     let parent = await getArticleCategoryTree(category.parentId);
     tree = [...tree, ...parent];
   }
@@ -299,16 +328,15 @@ async function getArticleCategoryTree(_id) {
 async function getArticleCategoryChildrenTree(_id) {
   let children = [];
   let query = `MATCH (n:ArticleCategory) WHERE n.parentId="${_id}" return n`;
-  let session = driver.session()
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    session.close();
-    return result.records;
-  })
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise, "n");
-  for (let i=0;i<nodes.length; i++) {
+  let session = driver.session();
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      session.close();
+      return result.records;
+    });
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  for (let i = 0; i < nodes.length; i++) {
     let node = nodes[i];
     let nodeChildren = await getArticleCategoryChildrenTree(node._id);
     node.children_categories = nodeChildren;
@@ -317,74 +345,87 @@ async function getArticleCategoryChildrenTree(_id) {
   return children;
 }
 
-const getArticleCategory = async(req, resp)  => {
+const getArticleCategory = async (req, resp) => {
   let parameters = req.query;
-  let label = "";
-  let categoryId = "";
-  let permalink = "";
+  let label = '';
+  let categoryId = '';
+  let permalink = '';
   let page = 0;
-  let orderField = "label";
+  let orderField = 'label';
   let queryPage = 0;
-  let queryOrder = "";
+  let queryOrder = '';
   let limit = 25;
 
-  let query = "";
-  let queryParams = "";
-  if (typeof parameters.label!=="undefined") {
+  let query = '';
+  let queryParams = '';
+  if (typeof parameters.label !== 'undefined') {
     label = parameters.label;
-    if (label!=="") {
-      queryParams +="toLower(n.label) =~ toLower('.*"+label+".*') ";
+    if (label !== '') {
+      queryParams += "toLower(n.label) =~ toLower('.*" + label + ".*') ";
     }
   }
-  if (typeof parameters.categoryId!=="undefined") {
+  if (typeof parameters.categoryId !== 'undefined') {
     categoryId = parameters.categoryId;
-    if (categoryId!=="") {
-      queryParams +=`n.category=${categoryId} ` ;
+    if (categoryId !== '') {
+      queryParams += `n.category=${categoryId} `;
     }
   }
-  if (typeof parameters.permalink!=="undefined") {
+  if (typeof parameters.permalink !== 'undefined') {
     permalink = parameters.permalink;
   }
   // 1. load category details
-  let categoryQuery = {_id: categoryId};
-  if (permalink!=="") {
-    categoryQuery = {permalink: permalink};
+  let categoryQuery = { _id: categoryId };
+  if (permalink !== '') {
+    categoryQuery = { permalink: permalink };
   }
   let category = new ArticleCategory(categoryQuery);
   await category.load();
   let categories = await getArticleCategoryTree(category._id);
   categories.reverse();
   category.categories = categories;
-  category.children_categories = await getArticleCategoryChildrenTree(category._id);
+  category.children_categories = await getArticleCategoryChildrenTree(
+    category._id
+  );
   categoryId = category._id;
-  queryParams +=`n.category="${categoryId}" ` ;
+  queryParams += `n.category="${categoryId}" `;
 
-  if (typeof parameters.orderField!=="undefined") {
+  if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
   }
-  if (orderField!=="") {
-    queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
-      queryOrder += " DESC";
+  if (orderField !== '') {
+    queryOrder = 'ORDER BY n.' + orderField;
+    if (
+      typeof parameters.orderDesc !== 'undefined' &&
+      parameters.orderDesc === 'true'
+    ) {
+      queryOrder += ' DESC';
     }
   }
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
+    queryPage = parseInt(parameters.page, 10) - 1;
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
-  let skip = limit*queryPage;
-  if (queryParams!=="") {
-    queryParams = "WHERE n.status='public' AND "+queryParams;
+  let skip = limit * queryPage;
+  if (queryParams !== '') {
+    queryParams = "WHERE n.status='public' AND " + queryParams;
   }
 
-  query = "MATCH (n:Article) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+  query =
+    'MATCH (n:Article) ' +
+    queryParams +
+    ' RETURN n ' +
+    queryOrder +
+    ' SKIP ' +
+    skip +
+    ' LIMIT ' +
+    limit;
   let data = await getArticlesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -392,92 +433,86 @@ const getArticleCategory = async(req, resp)  => {
       data: [],
       error: data.error,
       msg: data.error.message,
-    })
-  }
-  else if (category.status!=="public") {
+    });
+  } else if (category.status !== 'public') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "This content category is private.",
-    })
-  }
-  else {
+      msg: 'This content category is private.',
+    });
+  } else {
     let responseData = {
       currentPage: currentPage,
       data: {
         category: category,
-        articles: data.nodes
+        articles: data.nodes,
       },
       totalItems: data.count,
       totalPages: data.totalPages,
-    }
+    };
     resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
-    })
+      msg: 'Query results',
+    });
   }
-}
+};
 
-const getHighlights = async(req, resp) => {
+const getHighlights = async (req, resp) => {
   let parameters = req.query;
-  let page = 0;
   let limit = 25;
   let queryPage = 0;
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
-    if (queryPage===-1) queryPage = 0;
+  if (typeof parameters.page !== 'undefined') {
+    queryPage = parseInt(parameters.page, 10) - 1;
+    if (queryPage === -1) queryPage = 0;
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
-  let currentPage = page;
-  if (page===0) {
-    currentPage = 1;
-  }
-  let skip = limit*queryPage;
-  let query = `MATCH (n:Article) WHERE n.status='public' AND n.highlight=true RETURN n ORDER BY n.highlightOrder SKIP ${skip} LIMIT ${limit}`
+  let skip = limit * queryPage;
+  let query = `MATCH (n:Article) WHERE n.status='public' AND n.highlight=true RETURN n ORDER BY n.highlightOrder SKIP ${skip} LIMIT ${limit}`;
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    session.close();
-    return result.records;
-  }).catch((error) => {
-    console.log(error)
-  });
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      session.close();
+      return result.records;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
-  for (let i=0;i<nodes.length; i++) {
+  for (let i = 0; i < nodes.length; i++) {
     let node = nodes[i];
-    if (typeof node.featuredImage!=="undefined" && node.featuredImage!=="") {
-      let featuredImageDetails = new UploadedFile({_id:node.featuredImage});
+    if (
+      typeof node.featuredImage !== 'undefined' &&
+      node.featuredImage !== ''
+    ) {
+      let featuredImageDetails = new UploadedFile({ _id: node.featuredImage });
       await featuredImageDetails.load();
       node.featuredImageDetails = featuredImageDetails;
-    }
-    else node.featuredImageDetails = null;
+    } else node.featuredImageDetails = null;
 
-    let author = new User({_id: node.updatedBy});
+    let author = new User({ _id: node.updatedBy });
     await author.load();
-    let authorLabel = "";
-    if (author.firstName!=="") {
+    let authorLabel = '';
+    if (author.firstName !== '') {
       authorLabel = author.firstName;
     }
-    if (author.firstName!=="" && author.lastName!=="") {
+    if (author.firstName !== '' && author.lastName !== '') {
       authorLabel += ` ${author.lastName}`;
     }
     node.author = authorLabel;
   }
-  resp.json({
+  return resp.json({
     status: true,
     data: nodes,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 module.exports = {
   Article: Article,

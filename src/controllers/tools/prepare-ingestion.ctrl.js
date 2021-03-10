@@ -1,23 +1,19 @@
 const fs = require('fs');
 const path = require('path');
-const { parse } = require('querystring');
-const assert = require('assert');
 const helpers = require('../../helpers');
-const driver = require("../../config/db-driver");
-const Promise = require("bluebird");
+const driver = require('../../config/db-driver');
+const Promise = require('bluebird');
 
 const ExifImage = require('exif').ExifImage;
 const IptcImage = require('node-iptc');
 const sizeOfImage = require('image-size');
-const crypto = require("crypto");
+const crypto = require('crypto');
 
 const resourcesPath = process.env.RESOURCESPATH;
 const serverURL = process.env.SERVERURL;
 const archivePath = process.env.ARCHIVEPATH;
 
-const parseRequestData = helpers.parseRequestData;
-
-const referencesController = require('../references.ctrl')
+const referencesController = require('../references.ctrl');
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 const Resource = require('../resource.ctrl').Resource;
 const Person = require('../person.ctrl').Person;
@@ -94,58 +90,75 @@ const Organisation = require('../organisation.ctrl').Organisation;
   "db_classpiece": "0"
 }, "error": false, "msg": ""
 }*/
-const preIngestionReportClassPiece = async(req, resp) => {
+const preIngestionReportClassPiece = async (req, resp) => {
   let parameters = req.query;
   let file = parameters.file;
-  if (typeof file==="undefined" || file==="") {
+  if (typeof file === 'undefined' || file === '') {
     resp.json({
       status: false,
       data: '',
       error: true,
       msg: 'Please provide a valid file name to continue',
-    })
+    });
     return false;
   }
 
   let fileName = path.parse(file).name;
-  let classPieceSource = resourcesPath+"images/processed/fullsize/"+file;
-  let outputDir = resourcesPath+"output/"+fileName+"/";
-  let outputThumbnailsDir = resourcesPath+"output/"+fileName+"/thumbnails/";
-  let outputJsonDir = resourcesPath+"output/"+fileName+"/json/";
+  let classPieceSource = resourcesPath + 'images/processed/fullsize/' + file;
+  let outputJsonDir = resourcesPath + 'output/' + fileName + '/json/';
   // class piece
-  var classPiecePromise = await classPieceImageResource(classPieceSource,fileName);
-  var classPieceFaces = await facesImageResources(outputJsonDir+fileName+"-faces.json",fileName);
+  var classPiecePromise = await classPieceImageResource(
+    classPieceSource,
+    fileName
+  );
+  var classPieceFaces = await facesImageResources(
+    outputJsonDir + fileName + '-faces.json',
+    fileName
+  );
 
-  var checkIfClassPieceIsImported = await new Promise(async(resolve, reject) => {
-    let session = driver.session();
-    let count = await session.writeTransaction(tx=>
-      tx.run("MATCH (n:Resource) WHERE n.label='"+fileName+"' AND n.fileName='"+file+"' RETURN count(*) as c")
-    )
-    .then(result=> {
-      session.close()
-      let resultRecord = result.records[0];
-      let countObj = resultRecord.toObject();
-      helpers.prepareOutput(countObj);
-      let output = countObj['c'];
-      return output;
-    });
-    resolve(count);
-  })
-  .catch((error)=> {
+  var checkIfClassPieceIsImported = await new Promise((resolve) => {
+    const check = async () => {
+      let session = driver.session();
+      let count = await session
+        .writeTransaction((tx) =>
+          tx.run(
+            "MATCH (n:Resource) WHERE n.label='" +
+              fileName +
+              "' AND n.fileName='" +
+              file +
+              "' RETURN count(*) as c"
+          )
+        )
+        .then((result) => {
+          session.close();
+          let resultRecord = result.records[0];
+          let countObj = resultRecord.toObject();
+          helpers.prepareOutput(countObj);
+          let output = countObj['c'];
+          return output;
+        });
+      resolve(count);
+    };
+    check();
+  }).catch((error) => {
     console.log(error);
   });
 
-  let all = await Promise.all([classPiecePromise,classPieceFaces,checkIfClassPieceIsImported]).then(data=> {
+  let all = await Promise.all([
+    classPiecePromise,
+    classPieceFaces,
+    checkIfClassPieceIsImported,
+  ]).then((data) => {
     let classPieceJson = data[0];
     classPieceJson.label = fileName;
     classPieceJson.fileName = file;
     classPieceJson.thumbnail = {
-      path: resourcesPath+"images/processed/thumbnails/"+file,
-      src: serverURL+"images/processed/thumbnails/"+file
-    }
+      path: resourcesPath + 'images/processed/thumbnails/' + file,
+      src: serverURL + 'images/processed/thumbnails/' + file,
+    };
     let faces = data[1];
     let dbClasspiece = null;
-    if (data[2].length>0) {
+    if (data[2].length > 0) {
       dbClasspiece = data[2];
     }
     let response = {};
@@ -157,10 +170,10 @@ const preIngestionReportClassPiece = async(req, resp) => {
       data: response,
       error: false,
       msg: '',
-    })
+    });
   });
   return all;
-}
+};
 
 /**
 * @api {put} /prepare-classpiece-identify-duplicates Prepare classpiece identify duplicates
@@ -177,107 +190,104 @@ const preIngestionReportClassPiece = async(req, resp) => {
   "msg": ""
 }
 */
-const classPieceIdentifyDuplicates = async(req, resp) => {
-  let postData = req.body;
+const classPieceIdentifyDuplicates = async (req, resp) => {
+  const postData = req.body;
+  const session = driver.session();
   let faces = {};
-  if (typeof postData.faces!=="undefined") {
+  if (typeof postData.faces !== 'undefined') {
     faces = JSON.parse(postData.faces);
   }
-  let newFaces = [];
-  let newFacesPromises = [];
-  for(let i=0; i<faces.length; i++) {
-    let facePromise = new Promise(async(resolve, reject) => {
-      let face = faces[i];
-      // compare person
-      let queryParams = "";
-      let firstName = "";
-      let lastName = "";
-      if (typeof face.firstName!=="undefined") {
-        firstName = face.firstName.toLowerCase();
-        if (firstName!=="") {
-          queryParams = "toLower(n.firstName) =~ toLower('.*"+firstName+".*') ";
-        }
+  const newFaces = [];
+  for (let i = 0; i < faces.length; i++) {
+    const face = faces[i];
+    // compare person
+    let queryParams = '';
+    let firstName = '';
+    let lastName = '';
+    if (typeof face.firstName !== 'undefined') {
+      firstName = face.firstName.toLowerCase();
+      if (firstName !== '') {
+        queryParams =
+          "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
       }
-      if (typeof face.lastName!=="undefined") {
-        lastName = face.lastName.toLowerCase();
-        if (queryParams !=="") {
-          queryParams += " AND ";
-        }
-        queryParams = "toLower(n.firstName) =~ toLower('.*"+firstName+".*') ";
+    }
+    if (typeof face.lastName !== 'undefined') {
+      lastName = face.lastName.toLowerCase();
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
-      if (queryParams!=="") {
-        queryParams = "WHERE "+queryParams;
-      }
+      queryParams = "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
+    }
+    if (queryParams !== '') {
+      queryParams = 'WHERE ' + queryParams;
+    }
 
-      if (queryParams!=="") {
-        let session = driver.session()
-        let query = "MATCH (n:Person) "+queryParams+" RETURN n";
-        let nodesPromise = await session.writeTransaction(tx=>
-          tx.run(query,{})
-        )
-        .then(result=> {
-          session.close();
+    if (queryParams !== '') {
+      let query = 'MATCH (n:Person) ' + queryParams + ' RETURN n';
+      let nodesPromise = await session
+        .writeTransaction((tx) => tx.run(query, {}))
+        .then((result) => {
           return result.records;
         })
         .catch((error) => {
-          console.log(error)
+          console.log(error);
         });
-        let nodes = helpers.normalizeRecordsOutput(nodesPromise);
-        let returnMatches = [];
-        for (let j=0;j<nodes.length; j++) {
-          let matchedFace = nodes[j];
-          let score = 0;
-          if (matchedFace.firstName.toLowerCase() === firstName.toLowerCase()) {
-            score += 50;
-          }
-          else if (helpers.soundex(matchedFace.firstName) === helpers.soundex(firstName)) {
-            score += 25;
-          }
-          if (matchedFace.lastName.toLowerCase() === lastName.toLowerCase()) {
-            score += 50;
-          }
-          else if (helpers.soundex(matchedFace.lastName) === helpers.soundex(lastName)) {
-            score += 25;
-          }
-          if (score>50) {
-            let resources = await helpers.loadRelations(matchedFace._id, "Person", "Resource");
-            let organisations = await helpers.loadRelations(matchedFace._id, "Person", "Organisation");
-            matchedFace.resources = resources;
-            matchedFace.organisations = organisations;
-            let newFaceMatch = matchedFace;
-            newFaceMatch.score = score;
-            returnMatches.push(newFaceMatch);
-          }
+      let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+      let returnMatches = [];
+      for (let j = 0; j < nodes.length; j++) {
+        let matchedFace = nodes[j];
+        let score = 0;
+        if (matchedFace.firstName.toLowerCase() === firstName.toLowerCase()) {
+          score += 50;
+        } else if (
+          helpers.soundex(matchedFace.firstName) === helpers.soundex(firstName)
+        ) {
+          score += 25;
         }
-        if (returnMatches.length>0) {
-          returnMatches.sort(function (a,b) {
-            return b.score - a.score;
-          });
+        if (matchedFace.lastName.toLowerCase() === lastName.toLowerCase()) {
+          score += 50;
+        } else if (
+          helpers.soundex(matchedFace.lastName) === helpers.soundex(lastName)
+        ) {
+          score += 25;
         }
-        face.matches = returnMatches;
-        resolve(face);
+        if (score > 50) {
+          let resources = await helpers.loadRelations(
+            matchedFace._id,
+            'Person',
+            'Resource'
+          );
+          let organisations = await helpers.loadRelations(
+            matchedFace._id,
+            'Person',
+            'Organisation'
+          );
+          matchedFace.resources = resources;
+          matchedFace.organisations = organisations;
+          let newFaceMatch = matchedFace;
+          newFaceMatch.score = score;
+          returnMatches.push(newFaceMatch);
+        }
       }
-      else {
-        resolve(face);
+      if (returnMatches.length > 0) {
+        returnMatches.sort(function (a, b) {
+          return b.score - a.score;
+        });
       }
-    })
-    .catch((error)=> {
-      console.log(error);
-    });
-    newFacesPromises.push(facePromise);
+      face.matches = returnMatches;
+    }
+    newFaces.push(face);
   }
 
-  let duplicates = await Promise.all(newFacesPromises).then(data=> {
-    return data;
-  });
+  session.close();
 
-  resp.json({
+  return resp.json({
     status: true,
-    data: JSON.stringify(duplicates),
+    data: JSON.stringify(newFaces),
     error: false,
     msg: '',
-  })
-}
+  });
+};
 
 /**
 * @api {put} /ingest-classpiece Ingest classpiece
@@ -291,14 +301,14 @@ const classPieceIdentifyDuplicates = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"classpiece":{"error":[],"status":true,"data":{"fileName":"1977.jpg","metadata":"\"{\\\"image\\\":{\\\"default\\\":{\\\"height\\\":6464,\\\"width\\\":4715,\\\"extension\\\":\\\"jpg\\\",\\\"x\\\":0,\\\"y\\\":0,\\\"rotate\\\":0},\\\"exif\\\":{\\\"image\\\":{\\\"XResolution\\\":240,\\\"YResolution\\\":240,\\\"ResolutionUnit\\\":2,\\\"Software\\\":\\\"Adobe Photoshop Lightroom Classic 7.3.1 (Windows)\\\",\\\"ModifyDate\\\":\\\"2018:07:02 12:56:58\\\",\\\"ExifOffset\\\":172},\\\"thumbnail\\\":{},\\\"exif\\\":{\\\"ExifVersion\\\":{\\\"type\\\":\\\"Buffer\\\",\\\"data\\\":[48,50,51,48]},\\\"ColorSpace\\\":1},\\\"gps\\\":{},\\\"interoperability\\\":{},\\\"makernote\\\":{}},\\\"iptc\\\":{}}}\"","paths":["\"{\\\"path\\\":\\\"images/fullsize/125aafc838d8a62ab579148adf01fe41.jpg\\\",\\\"pathType\\\":\\\"source\\\"}\"","\"{\\\"path\\\":\\\"images/thumbnails/125aafc838d8a62ab579148adf01fe41.jpg\\\",\\\"pathType\\\":\\\"thumbnail\\\"}\""],"systemType":"{\"ref\":\"87\"}","label":"1977","resourceType":"image","status":"private","_id":"2536"}},"faces":[]},"error":false,"msg":[]}
 */
-const ingestClasspiece = async(req, resp) => {
+const ingestClasspiece = async (req, resp) => {
   let postData = req.body;
-  if (Object.keys(postData).length===0) {
+  if (Object.keys(postData).length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "The file must not be empty",
+      msg: 'The file must not be empty',
     });
     return false;
   }
@@ -306,24 +316,21 @@ const ingestClasspiece = async(req, resp) => {
   let userId = req.decoded.id;
   let data = JSON.parse(postData.data);
 
-  let file = data.file;
   let errors = [];
   let dbClassPiece = {};
   let dbFaces = [];
-  let faces = [];
   let classpiece = null;
 
   // 1. ingest class piece
-  if (typeof data.classpiece!=="undefined") {
+  if (typeof data.classpiece !== 'undefined') {
     classpiece = data.classpiece;
 
     dbClassPiece = await ingestClasspieceImage(classpiece, userId);
     classpiece._id = dbClassPiece.data._id;
   }
   // 2. ingest and link faces
-  if (typeof data.faces!=="undefined") {
+  if (typeof data.faces !== 'undefined') {
     let faces = data.faces;
-    let facesPromises = [];
     for (let face of faces) {
       await ingestPerson(face, classpiece, userId);
     }
@@ -338,84 +345,94 @@ const ingestClasspiece = async(req, resp) => {
     error: false,
     msg: errors,
   });
-}
+};
 
-var classPieceImageResource = async(imgPath) => {
+var classPieceImageResource = async (imgPath) => {
   var imgDimensionsPromise = imgDimensions(imgPath);
   var exifPromise = imageExif(imgPath);
   var iptcPromise = imageIptc(imgPath);
-  let output = await Promise.all([imgDimensionsPromise,exifPromise,iptcPromise]).then((data)=> {
-    let imageMetadata = {};
-    let defaultValues = data[0];
-    defaultValues.x = 0;
-    defaultValues.y = 0;
-    defaultValues.rotate = 0;
+  let output = await Promise.all([
+    imgDimensionsPromise,
+    exifPromise,
+    iptcPromise,
+  ])
+    .then((data) => {
+      let imageMetadata = {};
+      let defaultValues = data[0];
+      defaultValues.x = 0;
+      defaultValues.y = 0;
+      defaultValues.rotate = 0;
 
-    let exifValues = null;
-    let iptcValues = null;
-    if (typeof data[1]!=="undefined" && data[1]!==false) {
-      exifValues = data[1];
-    }
-    if (typeof data[2]!=="undefined" && data[2]!==false) {
-      iptcValues = data[2];
-    }
-    imageMetadata.default = defaultValues;
-    imageMetadata.exif = exifValues;
-    imageMetadata.iptc = iptcValues;
-    return imageMetadata;
-  })
-  .catch((error)=> {
-    console.log(error);
-  });
-  return output;
-}
-
-var facesImageResources = async(jsonPath,fileName) => {
-  let fileData = await fs.readFileSync(jsonPath, 'utf-8', function (error, data){
-    if (error) {
+      let exifValues = null;
+      let iptcValues = null;
+      if (typeof data[1] !== 'undefined' && data[1] !== false) {
+        exifValues = data[1];
+      }
+      if (typeof data[2] !== 'undefined' && data[2] !== false) {
+        iptcValues = data[2];
+      }
+      imageMetadata.default = defaultValues;
+      imageMetadata.exif = exifValues;
+      imageMetadata.iptc = iptcValues;
+      return imageMetadata;
+    })
+    .catch((error) => {
       console.log(error);
-    }
-    return data;
-  });
+    });
+  return output;
+};
 
-  let output = await new Promise((resolve, reject) => {
+var facesImageResources = async (jsonPath, fileName) => {
+  let fileData = await fs.readFileSync(
+    jsonPath,
+    'utf-8',
+    function (error, data) {
+      if (error) {
+        console.log(error);
+      }
+      return data;
+    }
+  );
+
+  let output = await new Promise((resolve) => {
     let dataJson = JSON.parse(fileData);
-    if (typeof dataJson==="string") {
+    if (typeof dataJson === 'string') {
       dataJson = JSON.parse(dataJson);
     }
-    var facesData = facesEach(dataJson,fileName);
-    facesData.then(data=> {
+    var facesData = facesEach(dataJson, fileName);
+    facesData.then((data) => {
       resolve(data);
     });
-  })
-  .catch((error)=> {
+  }).catch((error) => {
     console.log(error);
   });
   return output;
-}
+};
 
-var facesEach = async (dataJson,fileName) => {
+var facesEach = async (dataJson, fileName) => {
   var facesDataPromises = [];
-  for (let i=0; i<dataJson.length; i++) {
+  for (let i = 0; i < dataJson.length; i++) {
     let face = dataJson[i];
     var thumbnailSrc = '';
-    if (typeof face.thumbnail!=="undefined") {
+    if (typeof face.thumbnail !== 'undefined') {
       thumbnailSrc = face.thumbnail.src;
       var faceImageResourcePromise = faceImageResource(thumbnailSrc);
       facesDataPromises.push(faceImageResourcePromise);
     }
   }
 
-  let facesdata = await Promise.all(facesDataPromises).then(data=>{return data});
-  let faces = dataJson.map((item,j)=> {
+  let facesdata = await Promise.all(facesDataPromises).then((data) => {
+    return data;
+  });
+  let faces = dataJson.map((item, j) => {
     let imageData = facesdata[j];
     let newItem = {};
     let faceData = faceImageData(item, imageData.default);
-    newItem.fileName = j+".jpg";
+    newItem.fileName = j + '.jpg';
     newItem.thumbnail = {
-      path: resourcesPath+"output/"+fileName+"/thumbnails/"+j+".jpg",
-      src: serverURL+"output/"+fileName+"/thumbnails/"+j+".jpg"
-    }
+      path: resourcesPath + 'output/' + fileName + '/thumbnails/' + j + '.jpg',
+      src: serverURL + 'output/' + fileName + '/thumbnails/' + j + '.jpg',
+    };
     newItem.honorificPrefix = faceData.honorificPrefix;
     newItem.firstName = faceData.firstName;
     newItem.middleName = faceData.middleName;
@@ -427,77 +444,81 @@ var facesEach = async (dataJson,fileName) => {
     return newItem;
   });
   return faces;
-}
+};
 
-var faceImageResource = async(imgPath) => {
+var faceImageResource = async (imgPath) => {
   var imgDimensionsPromise = await imgDimensions(imgPath);
   var exifPromise = await imageExif(imgPath);
   var iptcPromise = await imageIptc(imgPath);
-  let output = await Promise.all([imgDimensionsPromise,exifPromise,iptcPromise]).then((data)=> {
-    let imageMetadata = {};
-    let defaultValues = data[0];
-    let exifValues = null;
-    let iptcValues = null;
-    if (typeof data[1]!=="undefined" && data[1]!==false) {
-      exifValues = data[1];
-    }
-    if (typeof data[2]!=="undefined" && data[2]!==false) {
-      iptcValues = data[2];
-    }
-    imageMetadata.default = data[0];
-    if (exifValues!==null) {
-      imageMetadata.exif = data[1];
-    }
-    if (iptcValues!==null) {
-      imageMetadata.iptc = data[2];
-    }
-    return imageMetadata;
-  })
-  .catch((error)=> {
-    console.log(error);
-  });
+  let output = await Promise.all([
+    imgDimensionsPromise,
+    exifPromise,
+    iptcPromise,
+  ])
+    .then((data) => {
+      let imageMetadata = {};
+      let exifValues = null;
+      let iptcValues = null;
+      if (typeof data[1] !== 'undefined' && data[1] !== false) {
+        exifValues = data[1];
+      }
+      if (typeof data[2] !== 'undefined' && data[2] !== false) {
+        iptcValues = data[2];
+      }
+      imageMetadata.default = data[0];
+      if (exifValues !== null) {
+        imageMetadata.exif = data[1];
+      }
+      if (iptcValues !== null) {
+        imageMetadata.iptc = data[2];
+      }
+      return imageMetadata;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
   return output;
-}
+};
 
 var faceImageData = (face, imageDefaultData) => {
   let faceObj = {};
   let defaultValues = {};
-  if (typeof face.faceRectangle!=="undefined") {
+  if (typeof face.faceRectangle !== 'undefined') {
     let x = face.faceRectangle.left;
     let y = face.faceRectangle.top;
-    defaultValues = {x: x,y: y};
+    defaultValues = { x: x, y: y };
   }
-  let defaultData = Object.assign(imageDefaultData,defaultValues);
-  //let rotate = null;
-  let honorificPrefix = "";
-  let firstName = "";
-  let middleName = "";
-  let lastName = "";
-  let diocese = "";
-  let dioceseType = "";
-  let type = "";
-  if (typeof face.honorificPrefix!=="undefined") {
+  let defaultData = Object.assign(imageDefaultData, defaultValues);
+  // let rotate = null;
+  let honorificPrefix = '';
+  let firstName = '';
+  let middleName = '';
+  let lastName = '';
+  let diocese = '';
+  let dioceseType = '';
+  let type = '';
+  if (typeof face.honorificPrefix !== 'undefined') {
     honorificPrefix = face.honorificPrefix;
   }
-  if (typeof face.firstName!=="undefined") {
+  if (typeof face.firstName !== 'undefined') {
     firstName = face.firstName;
   }
-  if (typeof face.middleName!=="undefined") {
+  if (typeof face.middleName !== 'undefined') {
     middleName = face.middleName;
   }
-  if (typeof face.lastName!=="undefined") {
+  if (typeof face.lastName !== 'undefined') {
     lastName = face.lastName;
   }
-  if (typeof face.diocese!=="undefined") {
+  if (typeof face.diocese !== 'undefined') {
     diocese = face.diocese;
   }
-  if (typeof face.dioceseType!=="undefined") {
+  if (typeof face.dioceseType !== 'undefined') {
     dioceseType = face.dioceseType;
   }
-  if (typeof face.type!=="undefined") {
+  if (typeof face.type !== 'undefined') {
     type = face.type;
   }
-  if (typeof face.rotate!=="undefined") {
+  if (typeof face.rotate !== 'undefined') {
     defaultData.rotate = face.rotate;
   }
   faceObj.honorificPrefix = honorificPrefix;
@@ -509,68 +530,67 @@ var faceImageData = (face, imageDefaultData) => {
   faceObj.type = type;
   faceObj.default = defaultData;
   return faceObj;
-}
+};
 
 var imageIptc = (imgPath) => {
-  return new Promise((resolve, reject) => {
-    const image = fs.readFile(imgPath, function(error, data) {
+  return new Promise((resolve) => {
+    fs.readFile(imgPath, function (error, data) {
       if (error) {
-        console.log(error)
+        console.log(error);
       }
       var iptcData = IptcImage(data);
       resolve(iptcData);
     });
-  })
-  .catch((error)=> {
+  }).catch((error) => {
     console.log(error);
   });
-}
+};
 
 var imageExif = (imgPath) => {
-  return new Promise((resolve, reject) => {
-    const exifImage = ExifImage({ image : imgPath }, function (error, exifData) {
+  return new Promise((resolve) => {
+    ExifImage({ image: imgPath }, function (error, exifData) {
       if (error) {
-        //console.log(error.message);
+        // console.log(error.message);
       }
       resolve(exifData);
     });
-  })
-  .catch((error)=> {
+  }).catch((error) => {
     console.log(error);
   });
-}
+};
 
 var imgDimensions = (imgPath) => {
-  return new Promise((resolve, reject) => {
-    const imageSize = sizeOfImage(imgPath, (err,dimensions) => {
+  return new Promise((resolve) => {
+    sizeOfImage(imgPath, (err, dimensions) => {
       dimensions.extension = dimensions.type;
       delete dimensions.type;
       resolve(dimensions);
     });
-  })
-  .catch((error)=> {
+  }).catch((error) => {
     console.log(error);
   });
-}
+};
 
 const ingestClasspieceImage = async (classpiece, userId) => {
-  let classpieceRef = new TaxonomyTerm({"labelId": "Classpiece"});
+  let classpieceRef = new TaxonomyTerm({ labelId: 'Classpiece' });
   await classpieceRef.load();
 
-  let classpieceImage = await new Promise((resolve, reject) => {
+  let classpieceImage = await new Promise((resolve) => {
     // copy fullsize and thumbnail to archive directory
     let fileExtension = classpiece.default.extension;
 
-    let hashedName = hashFileName(classpiece.label)+"."+fileExtension;
+    let hashedName = hashFileName(classpiece.label) + '.' + fileExtension;
 
-    let fullsizeSrc = resourcesPath+"images/processed/compressed/"+classpiece.fileName;
-    let fullsizeTarget = archivePath+"images/fullsize/"+hashedName;
-    let fullsizePath = "images/fullsize/"+hashedName;
+    let fullsizeSrc =
+      resourcesPath + 'images/processed/compressed/' + classpiece.fileName;
+    let fullsizeTarget = archivePath + 'images/fullsize/' + hashedName;
+    let fullsizePath = 'images/fullsize/' + hashedName;
     copyFile(fullsizeSrc, fullsizeTarget);
 
-    let thumbnailSrc = resourcesPath+"images/processed/thumbnails/"+classpiece.fileName;
-    let thumbnailsTarget = archivePath+"images/thumbnails/"+hashedName;
-    let thumbnailsPath = "images/thumbnails/"+hashedName;
+    let thumbnailSrc =
+      resourcesPath + 'images/processed/thumbnails/' + classpiece.fileName;
+    let thumbnailsTarget = archivePath + 'images/thumbnails/' + hashedName;
+    let thumbnailsPath = 'images/thumbnails/' + hashedName;
     copyFile(thumbnailSrc, thumbnailsTarget);
 
     let classPieceData = {
@@ -580,156 +600,166 @@ const ingestClasspieceImage = async (classpiece, userId) => {
         image: {
           default: classpiece.default,
           exif: classpiece.exif,
-          iptc: classpiece.iptc
-        }
+          iptc: classpiece.iptc,
+        },
       },
       systemType: classpieceRef._id,
       resourceType: 'image',
       paths: [
-        {path: fullsizePath, pathType: 'source'},
-        {path: thumbnailsPath, pathType: 'thumbnail'},
-      ]
-    }
+        { path: fullsizePath, pathType: 'source' },
+        { path: thumbnailsPath, pathType: 'thumbnail' },
+      ],
+    };
     classPieceData.metadata = JSON.stringify(classPieceData.metadata);
-    classPieceData.paths = classPieceData.paths.map(path=>JSON.stringify(path));
+    classPieceData.paths = classPieceData.paths.map((path) =>
+      JSON.stringify(path)
+    );
 
     let newClasspiece = new Resource(classPieceData);
     let output = newClasspiece.save(userId);
     resolve(output);
-  })
-  .catch((error)=> {
+  }).catch((error) => {
     console.log(error);
   });
   return classpieceImage;
-}
+};
 
-const ingestPerson = async(person, classpiece, userId) => {
-  let newPerson = await new Promise(async(resolve,reject) => {
-    // 1. insert/update person
-    if (person.firstName==="") {
-      person.firstName = "Unknown";
-    }
-    if (person.lastName==="") {
-      person.lastName = "Unknown";
-    }
-    let honorificPrefix = null;
-    let firstName = null;
-    let middleName = null;
-    let lastName = null;
-    if (typeof person.honorificPrefix!=="undefined") {
-      honorificPrefix = person.honorificPrefix;
-    }
-    if (typeof person.firstName!=="undefined") {
-      firstName = person.firstName;
-    }
-    if (typeof person.middleName!=="undefined") {
-      middleName = person.middleName;
-    }
-    if (typeof person.lastName!=="undefined") {
-      lastName = person.lastName;
-    }
-    let personData = {
-      honorificPrefix: honorificPrefix,
-      firstName: firstName,
-      middleName: middleName,
-      lastName: lastName,
-    };
-    if (typeof person._id!=="undefined") {
-      personData._id = person._id;
-    }
-    let newPerson = new Person(personData);
-    let ingestPersonPromise = await newPerson.save(userId);
+const ingestPerson = async (person, classpiece, userId) => {
+  if (person.firstName === '') {
+    person.firstName = 'Unknown';
+  }
+  if (person.lastName === '') {
+    person.lastName = 'Unknown';
+  }
+  let honorificPrefix = null;
+  let firstName = null;
+  let middleName = null;
+  let lastName = null;
+  if (typeof person.honorificPrefix !== 'undefined') {
+    honorificPrefix = person.honorificPrefix;
+  }
+  if (typeof person.firstName !== 'undefined') {
+    firstName = person.firstName;
+  }
+  if (typeof person.middleName !== 'undefined') {
+    middleName = person.middleName;
+  }
+  if (typeof person.lastName !== 'undefined') {
+    lastName = person.lastName;
+  }
+  let personData = {
+    honorificPrefix: honorificPrefix,
+    firstName: firstName,
+    middleName: middleName,
+    lastName: lastName,
+  };
+  if (typeof person._id !== 'undefined') {
+    personData._id = person._id;
+  }
+  let newPerson = new Person(personData);
+  let ingestPersonPromise = await newPerson.save(userId);
 
-    if (ingestPersonPromise.status) {
-      // assign id to person object
-      person._id = ingestPersonPromise.data._id;
-      person.label = ingestPersonPromise.data.label;
-      // 2. insert/update thumbnail
-      let ingestPersonThumbnailPromise = await ingestPersonThumbnail(person, classpiece, userId);
+  if (ingestPersonPromise.status) {
+    // assign id to person object
+    person._id = ingestPersonPromise.data._id;
+    person.label = ingestPersonPromise.data.label;
+    // 2. insert/update thumbnail
+    let ingestPersonThumbnailPromise = await ingestPersonThumbnail(
+      person,
+      classpiece,
+      userId
+    );
 
-      // 3. insert diocese
-      let ingestDiocesePromise = await ingestDiocese(person, userId);
+    // 3. insert diocese
+    let ingestDiocesePromise = await ingestDiocese(person, userId);
 
-      // 4. link person to classpiece
-      if (classpiece!==null) {
-        // 4.1 get person role term id
-        let role = "student";
-        if (typeof person.type!=="undefined") {
-          role = person.type;
-        }
-        let classpieceRelRole = new TaxonomyTerm({labelId: role});
-        await classpieceRelRole.load();
-
-        // 4.2 link classpiece to person
-        let classpieceTaxonomyTerm = new TaxonomyTerm({labelId: "depicts"});
-        await classpieceTaxonomyTerm.load();
-
-
-        let classpieceReference = {
-          items: [
-            {_id: classpiece._id, type: "Resource", role: null},
-            {_id: ingestPersonPromise.data._id, type: "Person", role: classpieceRelRole._id}
-          ],
-          taxonomyTermId: classpieceTaxonomyTerm._id,
-        }
-
-        let insertClasspieceReference = await referencesController.updateReference(classpieceReference);
-
-        // 4.2. link classpiece to thumbnail
-        let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasPart"});
-        await classpieceThumbnailTaxonomyTerm.load();
-
-        let classpieceThumbnailReference = {
-          items: [
-            {_id: classpiece._id, type: "Resource"},
-            {_id: ingestPersonThumbnailPromise.data._id, type: "Resource"}
-          ],
-          taxonomyTermId: classpieceThumbnailTaxonomyTerm._id,
-        }
-
-        let insertClasspieceThumbnailReference = await referencesController.updateReference(classpieceThumbnailReference);
+    // 4. link person to classpiece
+    if (classpiece !== null) {
+      // 4.1 get person role term id
+      let role = 'student';
+      if (typeof person.type !== 'undefined') {
+        role = person.type;
       }
+      let classpieceRelRole = new TaxonomyTerm({ labelId: role });
+      await classpieceRelRole.load();
 
-      // 5. link person to thumbnail
-      let thumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasRepresentationObject"});
-      await thumbnailTaxonomyTerm.load();
+      // 4.2 link classpiece to person
+      let classpieceTaxonomyTerm = new TaxonomyTerm({ labelId: 'depicts' });
+      await classpieceTaxonomyTerm.load();
 
-      let thumbnailReference = {
+      let classpieceReference = {
         items: [
-          {_id: ingestPersonPromise.data._id, type: "Person"},
-          {_id: ingestPersonThumbnailPromise.data._id, type: "Resource"},
+          { _id: classpiece._id, type: 'Resource', role: null },
+          {
+            _id: ingestPersonPromise.data._id,
+            type: 'Person',
+            role: classpieceRelRole._id,
+          },
         ],
-        taxonomyTermId: thumbnailTaxonomyTerm._id,
-      }
-      let insertThumbnailReference = await referencesController.updateReference(thumbnailReference);
+        taxonomyTermId: classpieceTaxonomyTerm._id,
+      };
 
-      // 6. link person to diocese
-      if (typeof ingestDiocesePromise!=="undefined") {
-        let organisationTaxonomyTerm = new TaxonomyTerm({labelId: "hasAffiliation"});
-        await organisationTaxonomyTerm.load();
+      await referencesController.updateReference(classpieceReference);
 
-        let organisationReference = {
-          items: [
-            {_id: ingestPersonPromise.data._id, type: "Person"},
-            {_id: ingestDiocesePromise._id, type: "Organisation"},
-          ],
-          taxonomyTermId: organisationTaxonomyTerm._id,
-        }
-        let insertOrganisationReference = await referencesController.updateReference(organisationReference);
-      }
+      // 4.2. link classpiece to thumbnail
+      let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({
+        labelId: 'hasPart',
+      });
+      await classpieceThumbnailTaxonomyTerm.load();
+
+      let classpieceThumbnailReference = {
+        items: [
+          { _id: classpiece._id, type: 'Resource' },
+          { _id: ingestPersonThumbnailPromise.data._id, type: 'Resource' },
+        ],
+        taxonomyTermId: classpieceThumbnailTaxonomyTerm._id,
+      };
+
+      await referencesController.updateReference(classpieceThumbnailReference);
     }
-    resolve(person);
-  });
-  return newPerson;
-}
 
-const ingestPersonThumbnail = async(person, classpiece, userId) => {
-  if (classpiece===null) {
+    // 5. link person to thumbnail
+    let thumbnailTaxonomyTerm = new TaxonomyTerm({
+      labelId: 'hasRepresentationObject',
+    });
+    await thumbnailTaxonomyTerm.load();
+
+    let thumbnailReference = {
+      items: [
+        { _id: ingestPersonPromise.data._id, type: 'Person' },
+        { _id: ingestPersonThumbnailPromise.data._id, type: 'Resource' },
+      ],
+      taxonomyTermId: thumbnailTaxonomyTerm._id,
+    };
+    await referencesController.updateReference(thumbnailReference);
+
+    // 6. link person to diocese
+    if (typeof ingestDiocesePromise !== 'undefined') {
+      let organisationTaxonomyTerm = new TaxonomyTerm({
+        labelId: 'hasAffiliation',
+      });
+      await organisationTaxonomyTerm.load();
+
+      let organisationReference = {
+        items: [
+          { _id: ingestPersonPromise.data._id, type: 'Person' },
+          { _id: ingestDiocesePromise._id, type: 'Organisation' },
+        ],
+        taxonomyTermId: organisationTaxonomyTerm._id,
+      };
+      await referencesController.updateReference(organisationReference);
+    }
+  }
+  return person;
+};
+
+const ingestPersonThumbnail = async (person, classpiece, userId) => {
+  if (classpiece === null) {
     return false;
   }
   let exifData = {};
   let iptcData = {};
-  if (typeof person.thumbnail.path!=="undefined") {
+  if (typeof person.thumbnail.path !== 'undefined') {
     let imgPath = person.thumbnail.path;
     let exifPromise = imageExif(imgPath);
     let iptcPromise = imageIptc(imgPath);
@@ -739,21 +769,26 @@ const ingestPersonThumbnail = async(person, classpiece, userId) => {
   }
 
   // get value of thumbnail resource system type
-  let thumbnailRef = new TaxonomyTerm({"labelId": "Thumbnail"});
+  let thumbnailRef = new TaxonomyTerm({ labelId: 'Thumbnail' });
   await thumbnailRef.load();
 
-  let personThumbnail = await new Promise((resolve, reject) => {
+  let personThumbnail = await new Promise((resolve) => {
     // copy fullsize and thumbnail to archive
     let fileExtension = person.default.extension;
-    let hashedName = hashFileName(person.label)+"."+fileExtension;
+    let hashedName = hashFileName(person.label) + '.' + fileExtension;
 
-    let fullsizeSrc = resourcesPath+"output/"+classpiece.label+"/thumbnails/"+person.fileName;
-    let fullsizeTarget = archivePath+"images/fullsize/"+hashedName;
-    let fullsizePath = "images/fullsize/"+hashedName;
+    let fullsizeSrc =
+      resourcesPath +
+      'output/' +
+      classpiece.label +
+      '/thumbnails/' +
+      person.fileName;
+    let fullsizeTarget = archivePath + 'images/fullsize/' + hashedName;
+    let fullsizePath = 'images/fullsize/' + hashedName;
     copyFile(fullsizeSrc, fullsizeTarget);
 
-    let thumbnailsTarget = archivePath+"images/thumbnails/"+hashedName;
-    let thumbnailsPath = "images/thumbnails/"+hashedName;
+    let thumbnailsTarget = archivePath + 'images/thumbnails/' + hashedName;
+    let thumbnailsPath = 'images/thumbnails/' + hashedName;
     copyFile(fullsizeSrc, thumbnailsTarget);
 
     let defaultData = {
@@ -762,8 +797,8 @@ const ingestPersonThumbnail = async(person, classpiece, userId) => {
       extension: person.default.extension,
       x: person.default.x,
       y: person.default.y,
-      rotate: person.default.rotate
-    }
+      rotate: person.default.rotate,
+    };
 
     let newPersonImageData = {
       label: person.label,
@@ -772,33 +807,34 @@ const ingestPersonThumbnail = async(person, classpiece, userId) => {
         image: {
           default: defaultData,
           exif: exifData,
-          iptc: iptcData
-        }
+          iptc: iptcData,
+        },
       },
       systemType: thumbnailRef._id,
       resourceType: 'image',
       paths: [
-        {path: thumbnailsPath, pathType: 'thumbnail'},
-        {path: fullsizePath, pathType: 'source'},
-      ]
-    }
+        { path: thumbnailsPath, pathType: 'thumbnail' },
+        { path: fullsizePath, pathType: 'source' },
+      ],
+    };
     newPersonImageData.metadata = JSON.stringify(newPersonImageData.metadata);
-    newPersonImageData.paths = newPersonImageData.paths.map(path=>JSON.stringify(path));
+    newPersonImageData.paths = newPersonImageData.paths.map((path) =>
+      JSON.stringify(path)
+    );
 
     let newPersonThumbnail = new Resource(newPersonImageData);
     let output = newPersonThumbnail.save(userId);
     resolve(output);
-  })
-  .catch((error)=> {
+  }).catch((error) => {
     console.log(error);
   });
   return personThumbnail;
-}
+};
 
-var ingestDiocese = async(person, userId) => {
+var ingestDiocese = async (person, userId) => {
   let organisation = {};
-  if (person.diocese==="") {
-    return ;
+  if (person.diocese === '') {
+    return;
   }
   organisation.label = helpers.addslashes(person.diocese);
   organisation.organisationType = person.dioceseType;
@@ -806,56 +842,56 @@ var ingestDiocese = async(person, userId) => {
   // check if organisation exists
   let session = driver.session();
   let query = `MATCH (n:Organisation) WHERE n.label='${organisation.label}' RETURN n`;
-  if (organisation.organisationType!=="")  {
+  if (organisation.organisationType !== '') {
     query = `MATCH (n:Organisation) WHERE n.label='${organisation.label}' AND n.organisationType='${organisation.organisationType}' RETURN n`;
   }
-  let existingOrganisation = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    session.close();
-    let records = result.records;
-    let outputRecord = null;
-    if (records.length>0) {
-      let record = records[0].toObject();
-      outputRecord = helpers.outputRecord(record.n);
-      return outputRecord;
-    }
-  })
-  .catch((error) => {
-    console.log(error)
-  });
-  if (typeof existingOrganisation==="undefined" || existingOrganisation===null) {
+  let existingOrganisation = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      session.close();
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length > 0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  if (
+    typeof existingOrganisation === 'undefined' ||
+    existingOrganisation === null
+  ) {
     let newOrganisation = new Organisation(organisation);
     let savedOrganisation = await newOrganisation.save(userId);
     existingOrganisation = savedOrganisation.data;
   }
   return existingOrganisation;
-}
+};
 
 var hashFileName = (data) => {
   let timestamp = Date.now();
-  let newName = data+timestamp;
-  return crypto.createHash("md5").update(newName).digest('hex');
-}
+  let newName = data + timestamp;
+  return crypto.createHash('md5').update(newName).digest('hex');
+};
 
-var copyFile = (src=null, target=null) => {
-  if (src===null || target===null) {
-    return "Please provide a valid source and a valid target";
-  }
-  else {
-    return new Promise((resolve, reject) => {
+var copyFile = (src = null, target = null) => {
+  if (src === null || target === null) {
+    return 'Please provide a valid source and a valid target';
+  } else {
+    return new Promise((resolve) => {
       fs.copyFile(src, target, (err) => {
-        if (err){
+        if (err) {
           resolve(err);
-        }
-        else {
-          resolve("File moved successfully to "+target);
+        } else {
+          resolve('File moved successfully to ' + target);
         }
       });
     });
   }
-}
+};
 
 const patchRotate = async (req, resp) => {
   let parameters = req.query;
@@ -865,41 +901,41 @@ const patchRotate = async (req, resp) => {
   const dir = await fs.readdirSync(path);
   let directories = [];
   for await (const dirent of dir) {
-    let stat = await fs.lstatSync(path+dirent);
+    let stat = await fs.lstatSync(path + dirent);
     if (stat.isDirectory()) {
       directories.push(dirent);
     }
   }
   directories.sort();
   const stringToJson = (string) => {
-    if (typeof string==="string") {
+    if (typeof string === 'string') {
       string = JSON.parse(string);
     }
     return string;
-  }
-  const parseJSONFile = async(filePath) => {
+  };
+  const parseJSONFile = async (filePath) => {
     let jsonFile = await helpers.readJSONFile(filePath);
-    if (typeof jsonFile==="undefined") {
+    if (typeof jsonFile === 'undefined') {
       return false;
     }
     let jsonData = stringToJson(jsonFile.data);
-    let faces = jsonData.filter(f=>{
-      if (typeof f.rotate!=="undefined" && f.rotate!==0) {
+    let faces = jsonData.filter((f) => {
+      if (typeof f.rotate !== 'undefined' && f.rotate !== 0) {
         return true;
       }
       return false;
     });
     return faces;
-  }
+  };
 
   let files = [];
-  for (let i=0; i<directories.length; i++) {
-    if (i>=start && i<=end) {
+  for (let i = 0; i < directories.length; i++) {
+    if (i >= start && i <= end) {
       let dir = directories[i];
       let filePath = `${path}${dir}/json/${dir}-faces.json`;
       let faces = await parseJSONFile(filePath);
-      if (faces.length>0) {
-        let file = {name: dir, count: faces.length, faces: faces};
+      if (faces.length > 0) {
+        let file = { name: dir, count: faces.length, faces: faces };
         files.push(file);
       }
     }
@@ -909,13 +945,13 @@ const patchRotate = async (req, resp) => {
     status: true,
     data: files,
     error: [],
-    msg: "Query results",
-  })
-}
+    msg: 'Query results',
+  });
+};
 
 module.exports = {
   preIngestionReportClassPiece: preIngestionReportClassPiece,
   classPieceIdentifyDuplicates: classPieceIdentifyDuplicates,
   ingestClasspiece: ingestClasspiece,
   patchRotate: patchRotate,
-}
+};

@@ -1,9 +1,21 @@
-const driver = require("../config/db-driver");
-const helpers = require("../helpers");
+const driver = require('../config/db-driver');
+const helpers = require('../helpers');
 
 class Entity {
-  constructor({_id=null,label=null,labelId=null,locked=false,definition=null,example=null, parent=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
-    if (_id!==null) {
+  constructor({
+    _id = null,
+    label = null,
+    labelId = null,
+    locked = false,
+    definition = null,
+    example = null,
+    parent = null,
+    createdBy = null,
+    createdAt = null,
+    updatedBy = null,
+    updatedAt = null,
+  }) {
+    if (_id !== null) {
       this._id = _id;
     }
     this.label = label;
@@ -21,53 +33,55 @@ class Entity {
   validate() {
     let status = true;
     let errors = [];
-    if (this.label==="") {
+    if (this.label === '') {
       status = false;
-      errors.push({field: "label", msg: "The label must not be empty"});
+      errors.push({ field: 'label', msg: 'The label must not be empty' });
     }
-    if (this.labelId==="") {
+    if (this.labelId === '') {
       status = false;
-      errors.push({field: "labelId", msg: "The labelId must not be empty"});
+      errors.push({ field: 'labelId', msg: 'The labelId must not be empty' });
     }
-    if (this.labelId==="") {
+    if (this.labelId === '') {
       status = false;
-      errors.push({field: "labelId", msg: "The labelId must not be empty"});
+      errors.push({ field: 'labelId', msg: 'The labelId must not be empty' });
     }
-    if (this.definition==="") {
+    if (this.definition === '') {
       status = false;
-      errors.push({field: "definition", msg: "The definition must not be empty"});
+      errors.push({
+        field: 'definition',
+        msg: 'The definition must not be empty',
+      });
     }
 
-    let msg = "The record is valid";
+    let msg = 'The record is valid';
     if (!status) {
-      msg = "The record is not valid";
+      msg = 'The record is not valid';
     }
     let output = {
       status: status,
       msg: msg,
-      errors: errors
-    }
+      errors: errors,
+    };
     return output;
   }
 
   async load() {
-    if (this._id===null) {
+    if (this._id === null) {
       return false;
     }
-    let session = driver.session()
-    let query = "MATCH (n:Entity) WHERE id(n)="+this._id+" RETURN n";
-    let node = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
-        return outputRecord;
-      }
-    });
+    let session = driver.session();
+    let query = 'MATCH (n:Entity) WHERE id(n)=' + this._id + ' RETURN n';
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+      });
     // assign results to class values
     for (let key in node) {
       this[key] = node[key];
@@ -77,23 +91,22 @@ class Entity {
   }
 
   async loadByLabelId() {
-    if (this.labelId===null) {
+    if (this.labelId === null) {
       return false;
     }
     let session = driver.session();
-    let query = "MATCH (n:Entity {labelId: '"+this.labelId+"'}) return n";
-    let node = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
-        return outputRecord;
-      }
-    });
+    let query = "MATCH (n:Entity {labelId: '" + this.labelId + "'}) return n";
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+      });
     // assign results to class values
     for (let key in node) {
       this[key] = node[key];
@@ -103,23 +116,21 @@ class Entity {
   }
 
   async loadProperties() {
-    if (typeof this._id==="undefined" || this._id===null) {
+    if (typeof this._id === 'undefined' || this._id === null) {
       return false;
     }
     let session = driver.session();
     let query = `MATCH (n:Entity)-[r]->(re:Entity) WHERE id(n)=${this._id} RETURN n,r,re`;
-    let relations = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let properties = prepareRelations(records)
-        return properties;
-      }
-      else return [];
-    })
+    let relations = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let properties = prepareRelations(records);
+          return properties;
+        } else return [];
+      });
     return relations;
   }
 
@@ -127,21 +138,22 @@ class Entity {
     let validateEntity = this.validate();
     if (!validateEntity.status) {
       return validateEntity;
-    }
-    else {
+    } else {
       let session = driver.session();
       // normalize label id
-      if (typeof this._id==="undefined" || this._id===null && this.labelId===null) {
+      if (
+        typeof this._id === 'undefined' ||
+        (this._id === null && this.labelId === null)
+      ) {
         this.labelId = helpers.normalizeLabelId(this.label);
       }
       // timestamps
       let now = new Date().toISOString();
-      if (typeof this._id==="undefined" || this._id===null) {
+      if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
-      }
-      else {
-        let original = new Entity({_id:this._id});
+      } else {
+        let original = new Entity({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
@@ -152,59 +164,71 @@ class Entity {
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
 
-      let query = "";
-      if (typeof this._id==="undefined" || this._id===null) {
-        query = "CREATE (n:Entity "+nodeProperties+") RETURN n";
+      let query = '';
+      if (typeof this._id === 'undefined' || this._id === null) {
+        query = 'CREATE (n:Entity ' + nodeProperties + ') RETURN n';
+      } else {
+        query =
+          'MATCH (n:Entity) WHERE id(n)=' +
+          this._id +
+          ' AND n.locked=false SET n=' +
+          nodeProperties +
+          ' RETURN n';
       }
-      else {
-        query = "MATCH (n:Entity) WHERE id(n)="+this._id+" AND n.locked=false SET n="+nodeProperties+" RETURN n";
-      }
-      let resultPromise = await session.run(
-          query,
-          params
-        )
-        .then(result => {
+      let resultPromise = await session
+        .run(query, params)
+        .then((result) => {
           session.close();
           let records = result.records;
-          let output = {error: ["The record cannot be updated"], status: false, data: []};
-          if (records.length>0) {
+          let output = {
+            error: ['The record cannot be updated'],
+            status: false,
+            data: [],
+          };
+          if (records.length > 0) {
             let record = records[0];
             let key = record.keys[0];
             let resultRecord = record.toObject()[key];
             resultRecord = helpers.outputRecord(resultRecord);
-            output = {error: [], status: true, data: resultRecord};
+            output = { error: [], status: true, data: resultRecord };
           }
           return output;
         })
-      .catch((error) => {
-        console.log(error)
-      });
+        .catch((error) => {
+          console.log(error);
+        });
       return resultPromise;
     }
   }
 
   async delete() {
-    let session = driver.session()
-    let queryRel = "MATCH (n:Entity)-[r]->() WHERE id(n)="+this._id+" AND n.locked=false DELETE r";
-    let queryNode = "MATCH (n:Entity) WHERE id(n)="+this._id+"  AND n.locked=false DELETE n"
-    let deleteRel = await session.writeTransaction(tx=>
-      tx.run(queryRel,{})
-    )
-    .then(async result=> {
-      session.close();
-      return result;
-    });
-    let deleteNode = await session.writeTransaction(tx=>
-      tx.run(queryNode,{})
-    )
-    .then(async result=> {
-      session.close();
-      return result;
-    });
-    return {relations: deleteRel.summary.counters._stats, node: deleteNode.summary.counters._stats};
+    let session = driver.session();
+    let queryRel =
+      'MATCH (n:Entity)-[r]->() WHERE id(n)=' +
+      this._id +
+      ' AND n.locked=false DELETE r';
+    let queryNode =
+      'MATCH (n:Entity) WHERE id(n)=' +
+      this._id +
+      '  AND n.locked=false DELETE n';
+    let deleteRel = await session
+      .writeTransaction((tx) => tx.run(queryRel, {}))
+      .then(async (result) => {
+        session.close();
+        return result;
+      });
+    let deleteNode = await session
+      .writeTransaction((tx) => tx.run(queryNode, {}))
+      .then(async (result) => {
+        session.close();
+        return result;
+      });
+    return {
+      relations: deleteRel.summary.counters._stats,
+      node: deleteNode.summary.counters._stats,
+    };
   }
-
-};
+}
 /**
 * @api {get} /entities Get entities
 * @apiName get entities
@@ -222,23 +246,19 @@ class Entity {
 const getEntities = async (req, resp) => {
   let parameters = req.query;
   let page = 0;
-  let queryPage = 0;
   let limit = 25;
 
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
-
-  let skip = limit*page;
-  let query = "MATCH (n:Entity) RETURN n ORDER BY n.label";
+  let query = 'MATCH (n:Entity) RETURN n ORDER BY n.label';
   let data = await getEntitiesQuery(query, limit);
   if (data.error) {
     resp.json({
@@ -246,23 +266,22 @@ const getEntities = async (req, resp) => {
       data: [],
       error: data.error,
       msg: data.error.message,
-    })
-  }
-  else {
+    });
+  } else {
     let responseData = {
       currentPage: currentPage,
       data: data.nodes,
       totalItems: data.count,
       totalPages: data.totalPages,
-    }
+    };
     resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
-    })
+      msg: 'Query results',
+    });
   }
-}
+};
 
 const prepareRelations = (records) => {
   let relations = [];
@@ -276,7 +295,7 @@ const prepareRelations = (records) => {
     relations.push(newRelation);
   }
   return relations;
-}
+};
 
 const prepareRelation = (sourceItem, relation, targetItem) => {
   let newProperty = {
@@ -286,42 +305,40 @@ const prepareRelation = (sourceItem, relation, targetItem) => {
     },
     entityRef: {
       _id: targetItem._id,
-      label: targetItem.label
-    }
-  }
+      label: targetItem.label,
+    },
+  };
   return newProperty;
-}
+};
 
 const getEntitiesQuery = async (query, limit) => {
   let session = driver.session();
-  let nodes = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    let records = result.records;
-    let outputRecords = helpers.normalizeRecordsOutput(records);
-    return outputRecords;
-  });
+  let nodes = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      let records = result.records;
+      let outputRecords = helpers.normalizeRecordsOutput(records);
+      return outputRecords;
+    });
 
-  let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Entity) RETURN count(*)")
-  )
-  .then(result=> {
-    session.close()
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['count(*)'];
-    return output;
-  });
-  let totalPages = Math.ceil(count/limit)
+  let count = await session
+    .writeTransaction((tx) => tx.run('MATCH (n:Entity) RETURN count(*)'))
+    .then((result) => {
+      session.close();
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['count(*)'];
+      return output;
+    });
+  let totalPages = Math.ceil(count / limit);
   let result = {
     nodes: nodes,
     count: count,
-    totalPages: totalPages
-  }
+    totalPages: totalPages,
+  };
   return result;
-}
+};
 
 /**
 * @api {get} /entity Get entity
@@ -337,37 +354,40 @@ const getEntitiesQuery = async (query, limit) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"_id":"2257","label":"Test entity","labelId":"TestEntity","locked":false,"definition":"This is a test entity.","example":null,"parent":null,"createdBy":"260","createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","updatedAt":"2020-01-14T12:54:12.873Z","properties":[]},"error":[],"msg":"Query results"}
 */
-const getEntity = async(req, resp) => {
+const getEntity = async (req, resp) => {
   let parameters = req.query;
   if (
-    (typeof parameters._id==="undefined" || parameters._id==="") && (typeof parameters.labelId==="undefined" || parameters.labelId==="")
+    (typeof parameters._id === 'undefined' || parameters._id === '') &&
+    (typeof parameters.labelId === 'undefined' || parameters.labelId === '')
   ) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id or a valid label to continue.",
+      msg: 'Please select a valid id or a valid label to continue.',
     });
     return false;
   }
   let entity = null;
-    if (typeof parameters._id!=="undefined" && parameters._id!=="") {
-      let _id = parameters._id;
-      entity = new Entity({_id:_id});
-      await entity.load();
-    }
-    else if (typeof parameters.labelId!=="undefined" && parameters.labelId!=="") {
-      let labelId = parameters.labelId;
-      entity = new Entity({labelId:labelId});
-      await entity.loadByLabelId();
-    }
+  if (typeof parameters._id !== 'undefined' && parameters._id !== '') {
+    let _id = parameters._id;
+    entity = new Entity({ _id: _id });
+    await entity.load();
+  } else if (
+    typeof parameters.labelId !== 'undefined' &&
+    parameters.labelId !== ''
+  ) {
+    let labelId = parameters.labelId;
+    entity = new Entity({ labelId: labelId });
+    await entity.loadByLabelId();
+  }
   resp.json({
     status: true,
     data: entity,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {put} /entity Put entity
@@ -395,14 +415,14 @@ const getEntity = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"createdAt":"2020-01-14T12:54:12.873Z","updatedBy":"260","labelId":"TestEntity","createdBy":"260","definition":"This is a test entity.","label":"Test entity","locked":false,"updatedAt":"2020-01-14T12:54:12.873Z","_id":"2257"},"error":[],"msg":"Query results"}
 */
-const putEntity = async(req, resp) => {
+const putEntity = async (req, resp) => {
   let postData = req.body;
-  if (Object.keys(postData).length===0) {
+  if (Object.keys(postData).length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "The entity must not be empty",
+      msg: 'The entity must not be empty',
     });
     return false;
   }
@@ -413,9 +433,9 @@ const putEntity = async(req, resp) => {
     status: output.status,
     data: output.data,
     error: output.error,
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 /**
 * @api {delete} /entity Delete entity
 * @apiName delete entity
@@ -431,29 +451,29 @@ const putEntity = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"relations":{"nodesCreated":0,"nodesDeleted":0,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0},"node":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"error":[],"msg":"Query results"}
 */
-const deleteEntity = async(req, resp) => {
+const deleteEntity = async (req, resp) => {
   let parameters = req.query;
   if (
-    (typeof parameters._id==="undefined" || parameters._id==="") &&
-    (typeof parameters.labelId==="undefined" || parameters.labelId==="")
+    (typeof parameters._id === 'undefined' || parameters._id === '') &&
+    (typeof parameters.labelId === 'undefined' || parameters.labelId === '')
   ) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id or a valid label to continue.",
+      msg: 'Please select a valid id or a valid label to continue.',
     });
     return false;
   }
-  let entity = new Entity({_id: parameters._id});
+  let entity = new Entity({ _id: parameters._id });
   let data = await entity.delete();
   resp.json({
     status: true,
     data: data,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 module.exports = {
   Entity: Entity,

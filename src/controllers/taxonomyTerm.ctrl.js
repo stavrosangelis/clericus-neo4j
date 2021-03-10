@@ -1,10 +1,23 @@
-const driver = require("../config/db-driver");
-const helpers = require("../helpers");
+const driver = require('../config/db-driver');
+const helpers = require('../helpers');
 
 class TaxonomyTerm {
-  constructor({_id=null,label=null,labelId=null,locked=false,inverseLabel=null,inverseLabelId=null,scopeNote=null,count=0,relations=[],createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({
+    _id = null,
+    label = null,
+    labelId = null,
+    locked = false,
+    inverseLabel = null,
+    inverseLabelId = null,
+    scopeNote = null,
+    count = 0,
+    createdBy = null,
+    createdAt = null,
+    updatedBy = null,
+    updatedAt = null,
+  }) {
     this._id = null;
-    if (_id!==null) {
+    if (_id !== null) {
       this._id = _id;
     }
     this.label = label;
@@ -23,59 +36,66 @@ class TaxonomyTerm {
   validate() {
     let status = true;
     let errors = [];
-    if (this.label==="") {
+    if (this.label === '') {
       status = false;
-      errors.push({field: "label", msg: "The label must not be empty"});
+      errors.push({ field: 'label', msg: 'The label must not be empty' });
     }
-    if (this.inverseLabel==="") {
+    if (this.inverseLabel === '') {
       status = false;
-      errors.push({field: "inverseLabel", msg: "The inverseLabel must not be empty"});
+      errors.push({
+        field: 'inverseLabel',
+        msg: 'The inverseLabel must not be empty',
+      });
     }
 
-    let msg = "The record is valid";
+    let msg = 'The record is valid';
     if (!status) {
-      msg = "The record is not valid";
+      msg = 'The record is not valid';
     }
     let output = {
       status: status,
       msg: msg,
-      errors: errors
-    }
+      errors: errors,
+    };
     return output;
   }
 
   async load() {
-    if (this._id===null && this.labelId==="" && this.inverseLabelId==="") {
+    if (
+      this._id === null &&
+      this.labelId === '' &&
+      this.inverseLabelId === ''
+    ) {
       return false;
     }
-    let session = driver.session()
-    let query = "";
-    if (this._id!==null) {
-      query = "MATCH (n:TaxonomyTerm) WHERE id(n)="+this._id+" return n";
-    }
-    else if (this.labelId!==null) {
-      query = "MATCH (n:TaxonomyTerm {labelId: '"+this.labelId+"'}) return n";
-    }
-    else if (this.inverseLabelId!==null) {
-      query = "MATCH (n:TaxonomyTerm {inverseLabelId: '"+this.inverseLabelId+"'}) return n";
-    }
-    else {
+    let session = driver.session();
+    let query = '';
+    if (this._id !== null) {
+      query = 'MATCH (n:TaxonomyTerm) WHERE id(n)=' + this._id + ' return n';
+    } else if (this.labelId !== null) {
+      query =
+        "MATCH (n:TaxonomyTerm {labelId: '" + this.labelId + "'}) return n";
+    } else if (this.inverseLabelId !== null) {
+      query =
+        "MATCH (n:TaxonomyTerm {inverseLabelId: '" +
+        this.inverseLabelId +
+        "'}) return n";
+    } else {
       return false;
     }
-    let node = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0];
-        let key = record.keys[0];
-        let output = record.toObject()[key];
-        output = helpers.outputRecord(output);
-        return output;
-      }
-    })
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let output = record.toObject()[key];
+          output = helpers.outputRecord(output);
+          return output;
+        }
+      });
     // assign results to class values
     for (let key in node) {
       this[key] = node[key];
@@ -86,140 +106,137 @@ class TaxonomyTerm {
   }
 
   async countRelations() {
-    if (this._id===null || this.labelId==="") {
+    if (this._id === null || this.labelId === '') {
       return false;
     }
     let session = driver.session();
     let query = `MATCH ()-[r:\`${this.labelId}\`]->() RETURN count(*) AS c`;
-    let count = await session.writeTransaction(tx=>
-      tx.run(query, {})
-    )
-    .then(result=> {
-      session.close()
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0];
-        let key = record.keys[0];
-        let output = record.toObject();
-        helpers.prepareOutput(output);
-        output = output[key];
-        return output;
-      }
-    });
+    let count = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let output = record.toObject();
+          helpers.prepareOutput(output);
+          output = output[key];
+          return output;
+        }
+      });
     this.count = count;
   }
 
   async loadRelations() {
-    if (this._id===null || this.labelId==="") {
+    if (this._id === null || this.labelId === '') {
       return false;
     }
     let session = driver.session();
     let query = `MATCH (s)-[r:\`${this.labelId}\`]->(t) RETURN s,t ORDER BY s.labels[0] SKIP 0 LIMIT 25`;
-    let relations = await session.writeTransaction(tx=>
-      tx.run(query, {})
-    )
-    .then(result=> {
-      session.close()
-      let records = result.records;
-      let outputRecords = [];
-      if (records.length>0) {
-        outputRecords = records.map(record=>{
-          let sourceKey = record.keys[0];
-          let targetKey = record.keys[1];
-          let output = record.toObject();
-          helpers.prepareOutput(output);
-          let sourceItem = output[sourceKey];
-          let source = sourceItem.properties;
-          source.nodeType = sourceItem.labels[0];
-          if(typeof source._id==="undefined") {
-            source._id = sourceItem.identity;
+    let relations = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        let outputRecords = [];
+        if (records.length > 0) {
+          outputRecords = records.map((record) => {
+            let sourceKey = record.keys[0];
+            let targetKey = record.keys[1];
+            let output = record.toObject();
+            helpers.prepareOutput(output);
+            let sourceItem = output[sourceKey];
+            let source = sourceItem.properties;
+            source.nodeType = sourceItem.labels[0];
+            if (typeof source._id === 'undefined') {
+              source._id = sourceItem.identity;
+            }
+            let targetItem = output[targetKey];
+            let target = targetItem.properties;
+            target.nodeType = targetItem.labels[0];
+            if (typeof target._id === 'undefined') {
+              target._id = targetItem.identity;
+            }
+            output = {
+              source: source,
+              target: target,
+            };
+            return output;
+          });
+        }
+        outputRecords.sort((a, b) => {
+          let akey = a.source.nodeType;
+          let bkey = b.source.nodeType;
+          if (akey < bkey) {
+            return 1;
           }
-          let targetItem = output[targetKey];
-          let target = targetItem.properties;
-          target.nodeType = targetItem.labels[0];
-          if(typeof target._id==="undefined") {
-            target._id = targetItem.identity;
+          if (bkey < bkey) {
+            return -1;
           }
-          output = {
-            source: source,
-            target: target
-          }
-          return output;
+          return 0;
         });
-      }
-      outputRecords.sort((a, b) =>{
-        let akey = a.source.nodeType;
-        let bkey = b.source.nodeType;
-        if (akey<bkey) {
-          return 1;
-        }
-        if (bkey<bkey) {
-          return -1;
-        }
-        return 0;
+        return outputRecords;
       });
-      return outputRecords;
-    });
     this.relations = relations;
   }
 
   async loadParentRef() {
-    if (this._id===null || this.labelId==="") {
+    if (this._id === null || this.labelId === '') {
       return false;
     }
     let session = driver.session();
     let query = `MATCH (n:TaxonomyTerm)-[r:hasChild]->(t:TaxonomyTerm) WHERE id(t)=${this._id} RETURN n`;
-    let parentNode = await session.writeTransaction(tx=>
-      tx.run(query, {})
-    )
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0];
-        let key = record.keys[0];
-        let output = record.toObject()[key];
-        output = helpers.outputRecord(output);
-        return output;
-      }
-    });
-    if(typeof parentNode!=="undefined") {
+    let parentNode = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let output = record.toObject()[key];
+          output = helpers.outputRecord(output);
+          return output;
+        }
+      });
+    if (typeof parentNode !== 'undefined') {
       this.parentRef = parentNode._id;
     }
   }
 
-  async uniqueId(value, type="labelId") {
+  async uniqueId(value, type = 'labelId') {
     let session = driver.session();
     const normalizeLabel = (label) => {
-    	if (!label.includes("_")) {
-    		label = `${label}_2`;
-       	}
-        else {
-        	let parts = label.split("_");
-        	let numPart = parts[1];
-            let num = Number(numPart)+1;
-            label = `${parts[0]}_${num}`;
-
-        }
-        return label;
-    }
+      if (!label.includes('_')) {
+        label = `${label}_2`;
+      } else {
+        let parts = label.split('_');
+        let numPart = parts[1];
+        let num = Number(numPart) + 1;
+        label = `${parts[0]}_${num}`;
+      }
+      return label;
+    };
     let label = value;
     let query = `MATCH (n:TaxonomyTerm) WHERE n.${type}="${value}" RETURN n`;
-    let node = await session.writeTransaction(tx=>tx.run(query,{}))
-    .then(result=> {
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0];
-        let key = record.keys[0];
-        let output = record.toObject()[key];
-        output = helpers.outputRecord(output);
-        return output;
-      }
-      return null;
-    }).catch((error) => {
-      console.log(error)
-    });
-    if (node!==null) {
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let output = record.toObject()[key];
+          output = helpers.outputRecord(output);
+          return output;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    if (node !== null) {
       let newValue = normalizeLabel(value);
       label = await this.uniqueId(newValue, type);
     }
@@ -231,17 +248,15 @@ class TaxonomyTerm {
     let validateTaxonomyTerm = this.validate();
     if (!validateTaxonomyTerm.status) {
       return validateTaxonomyTerm;
-    }
-    else {
+    } else {
       let session = driver.session();
       // timestamps
       let now = new Date().toISOString();
-      if (typeof this._id==="undefined" || this._id===null) {
+      if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
-      }
-      else {
-        let original = new TaxonomyTerm({_id:this._id});
+      } else {
+        let original = new TaxonomyTerm({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
@@ -250,55 +265,69 @@ class TaxonomyTerm {
       this.updatedAt = now;
 
       let newData = this;
-      if (typeof this._id==="undefined" || this._id===null) {
+      if (typeof this._id === 'undefined' || this._id === null) {
         this.labelId = helpers.normalizeLabelId(this.label);
         this.inverseLabelId = helpers.normalizeLabelId(this.inverseLabel);
         // check if labelId and inverseLabelId is unique
-        this.labelId = await this.uniqueId(this.labelId, "labelId");
-        this.inverseLabelId = await this.uniqueId(this.inverseLabelId, "inverseLabelId");
-      }
-      else {
+        this.labelId = await this.uniqueId(this.labelId, 'labelId');
+        this.inverseLabelId = await this.uniqueId(
+          this.inverseLabelId,
+          'inverseLabelId'
+        );
+      } else {
         await this.load();
         newData.labelId = this.labelId;
         newData.inverseLabelId = this.inverseLabelId;
       }
 
-      if (parseInt(this.count,10)>0) {
-        let output = {error: ["You must remove the record's relations before updating"], status: false, data: []};
+      if (parseInt(this.count, 10) > 0) {
+        let output = {
+          error: ["You must remove the record's relations before updating"],
+          status: false,
+          data: [],
+        };
         return output;
       }
       let nodeProperties = helpers.prepareNodeProperties(newData);
       let params = helpers.prepareParams(newData);
 
-      let query = "";
-      if (typeof this._id==="undefined" || this._id===null) {
-        query = "CREATE (n:TaxonomyTerm "+nodeProperties+") RETURN n";
+      let query = '';
+      if (typeof this._id === 'undefined' || this._id === null) {
+        query = 'CREATE (n:TaxonomyTerm ' + nodeProperties + ') RETURN n';
+      } else {
+        query =
+          'MATCH (n:TaxonomyTerm) WHERE id(n)=' +
+          this._id +
+          ' SET n=' +
+          nodeProperties +
+          ' RETURN n';
       }
-      else {
-        query = "MATCH (n:TaxonomyTerm) WHERE id(n)="+this._id+" SET n="+nodeProperties+" RETURN n";
-      }
-      let resultPromise = await session.run(
-        query,
-        params
-      ).then(result => {
-        let records = result.records;
-        let output = {error: ["The record cannot be updated"], status: false, data: []};
-        if (records.length>0) {
-          let record = records[0];
-          let key = record.keys[0];
-          let resultRecord = record.toObject()[key];
-          resultRecord = helpers.outputRecord(resultRecord);
-          output = {error: [], status: true, data: resultRecord};
-        }
-        return output;
-      }).catch((error) => {
-        console.log(error)
-      });
+      let resultPromise = await session
+        .run(query, params)
+        .then((result) => {
+          let records = result.records;
+          let output = {
+            error: ['The record cannot be updated'],
+            status: false,
+            data: [],
+          };
+          if (records.length > 0) {
+            let record = records[0];
+            let key = record.keys[0];
+            let resultRecord = record.toObject()[key];
+            resultRecord = helpers.outputRecord(resultRecord);
+            output = { error: [], status: true, data: resultRecord };
+          }
+          return output;
+        })
+        .catch((error) => {
+          console.log(error);
+        });
 
       // remove hasChild ref
-      let termId = parseInt(resultPromise.data._id,10);
+      let termId = parseInt(resultPromise.data._id, 10);
       let removeParentRefQuery = `MATCH (t:TaxonomyTerm) WHERE id(t)=${termId} MATCH (p:TaxonomyTerm)-[r1:hasChild]->(t) MATCH (t)-[r2:isChildOf]->(p) DELETE r1, r2`;
-      let removeParent = await session.run(removeParentRefQuery,{}).then(result => {
+      await session.run(removeParentRefQuery, {}).then(() => {
         session.close();
       });
       return resultPromise;
@@ -306,39 +335,44 @@ class TaxonomyTerm {
   }
 
   async delete() {
-    let session = driver.session()
+    let session = driver.session();
     await this.load();
-    if (parseInt(this.count,10)>0) {
-      let output = {error: true, msg: ["You must remove the record's relations before deleting"], status: false, data: []};
+    if (parseInt(this.count, 10) > 0) {
+      let output = {
+        error: true,
+        msg: ["You must remove the record's relations before deleting"],
+        status: false,
+        data: [],
+      };
       return output;
     }
     // 1. disassociate with the taxonomy
-    let query1 = "MATCH (n:TaxonomyTerm)-[r]-(l:Taxonomy) WHERE id(n)="+this._id+" DELETE r";
-    let deleteRel = await session.writeTransaction(tx=>
-      tx.run(query1,{})
-    )
-    .then(result => {
-      return result;
-    })
-    .catch((error) => {
-      console.log(error)
-    });
+    let query1 =
+      'MATCH (n:TaxonomyTerm)-[r]-(l:Taxonomy) WHERE id(n)=' +
+      this._id +
+      ' DELETE r';
+    await session
+      .writeTransaction((tx) => tx.run(query1, {}))
+      .then((result) => {
+        return result;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
     // 2. delete term
-    let query = "MATCH (n:TaxonomyTerm) WHERE id(n)="+this._id+" DELETE n";
-    let deleteRecord = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result => {
-      session.close();
-      return result;
-    })
-    .catch((error) => {
-      console.log(error)
-    });
+    let query = 'MATCH (n:TaxonomyTerm) WHERE id(n)=' + this._id + ' DELETE n';
+    let deleteRecord = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        return result;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
     return deleteRecord;
   }
-
-};
+}
 /**
 * @api {get} /taxonomy-terms Get taxonomy terms
 * @apiName get taxonomy terms
@@ -376,23 +410,22 @@ class TaxonomyTerm {
 const getTaxonomyTerms = async (req, resp) => {
   let parameters = req.query;
   let page = 0;
-  let queryPage = 0;
   let limit = 25;
+  let query = '';
 
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
 
-  let skip = limit*page;
-  query = "MATCH (n:TaxonomyTerm) RETURN n SKIP "+skip+" LIMIT "+limit;
+  let skip = limit * page;
+  query = 'MATCH (n:TaxonomyTerm) RETURN n SKIP ' + skip + ' LIMIT ' + limit;
   let data = await getTaxonomyTermsQuery(query, limit);
   if (data.error) {
     resp.json({
@@ -400,55 +433,52 @@ const getTaxonomyTerms = async (req, resp) => {
       data: [],
       error: data.error,
       msg: data.error.message,
-    })
-  }
-  else {
+    });
+  } else {
     let responseData = {
       currentPage: currentPage,
       data: data.nodes,
       totalItems: data.count,
       totalPages: data.totalPages,
-    }
+    };
     resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
-    })
+      msg: 'Query results',
+    });
   }
-}
+};
 
 const getTaxonomyTermsQuery = async (query, limit) => {
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  })
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
 
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
 
-  let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:TaxonomyTerm) RETURN count(*)")
-  )
-  .then(result=> {
-    session.close()
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['count(*)'];
-    output = parseInt(output,10);
-    return output;
-  });
-  let totalPages = Math.ceil(count/limit)
+  let count = await session
+    .writeTransaction((tx) => tx.run('MATCH (n:TaxonomyTerm) RETURN count(*)'))
+    .then((result) => {
+      session.close();
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['count(*)'];
+      output = parseInt(output, 10);
+      return output;
+    });
+  let totalPages = Math.ceil(count / limit);
   let result = {
     nodes: nodes,
     count: count,
-    totalPages: totalPages
-  }
+    totalPages: totalPages,
+  };
   return result;
-}
+};
 
 /**
 * @api {get} /taxonomy-term Get taxonomy term
@@ -461,37 +491,43 @@ const getTaxonomyTermsQuery = async (query, limit) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"_id":"87","label":"Classpiece","labelId":"Classpiece","locked":false,"inverseLabel":"Classpiece","inverseLabelId":"Classpiece","scopeNote":null,"count":"0","createdBy":null,"createdAt":null,"updatedBy":null,"updatedAt":null},"error":[],"msg":"Query results"}
 */
-const getTaxonomyTerm = async(req, resp) => {
+const getTaxonomyTerm = async (req, resp) => {
   let parameters = req.query;
   if (
-    (typeof parameters._id==="undefined" || parameters._id==="") && (typeof parameters.labelId==="undefined" || parameters.labelId==="")
+    (typeof parameters._id === 'undefined' || parameters._id === '') &&
+    (typeof parameters.labelId === 'undefined' || parameters.labelId === '')
   ) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
-  let _id=null, labelId=null, inverseLabel=null;
-  if (typeof parameters._id!=="undefined" && parameters._id!=="") {
+  let _id = null;
+  let labelId = null;
+  let inverseLabel = null;
+  if (typeof parameters._id !== 'undefined' && parameters._id !== '') {
     _id = parameters._id;
   }
-  if (typeof parameters.labelId!=="undefined" && parameters.labelId!=="") {
+  if (typeof parameters.labelId !== 'undefined' && parameters.labelId !== '') {
     labelId = parameters.labelId;
   }
-  if (typeof parameters.inverseLabel!=="undefined" && parameters.inverseLabel!=="") {
+  if (
+    typeof parameters.inverseLabel !== 'undefined' &&
+    parameters.inverseLabel !== ''
+  ) {
     inverseLabel = parameters.inverseLabel;
   }
   let query = {};
-  if (_id!==null) {
+  if (_id !== null) {
     query._id = _id;
   }
-  if (labelId!==null) {
+  if (labelId !== null) {
     query.labelId = labelId;
   }
-  if (inverseLabel!==null) {
+  if (inverseLabel !== null) {
     query.inverseLabel = inverseLabel;
   }
   let term = new TaxonomyTerm(query);
@@ -500,9 +536,9 @@ const getTaxonomyTerm = async(req, resp) => {
     status: true,
     data: term,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {put} /taxonomy-term Put taxonomy term
@@ -523,14 +559,14 @@ const getTaxonomyTerm = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"error":[],"status":true,"data":{"inverseLabel":"enteredSchool","inverseLabelId":"enteredSchool","updatedBy":"260","labelId":"enteredSchool","count":"0","_id":"102","label":"enteredSchool","locked":false,"updatedAt":"2020-01-15T15:02:48.163Z"}},"error":[],"msg":"Query results"}
 */
-const putTaxonomyTerm = async(req, resp) => {
+const putTaxonomyTerm = async (req, resp) => {
   let postData = req.body;
-  if (Object.keys(postData).length===0) {
+  if (Object.keys(postData).length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "The taxonomy term must not be empty",
+      msg: 'The taxonomy term must not be empty',
     });
     return false;
   }
@@ -541,9 +577,9 @@ const putTaxonomyTerm = async(req, resp) => {
     status: true,
     data: data,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {delete} /taxonomy-term Delete taxonomy term
@@ -556,24 +592,23 @@ const putTaxonomyTerm = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:TaxonomyTerm) WHERE id(n)=2500 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":1,"high":0},"resultAvailableAfter":{"low":9,"high":0}}},"error":[],"msg":"Query results"}
 */
-const deleteTaxonomyTerm = async(req, resp) => {
+const deleteTaxonomyTerm = async (req, resp) => {
   let postData = req.body;
   let term = new TaxonomyTerm(postData);
   let data = await term.delete();
   let output = {};
   if (data.error) {
     output = data;
-  }
-  else {
+  } else {
     output = {
       status: true,
       data: data,
       error: [],
-      msg: "Query results",
-    }
+      msg: 'Query results',
+    };
   }
   resp.json(output);
-}
+};
 
 module.exports = {
   TaxonomyTerm: TaxonomyTerm,

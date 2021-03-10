@@ -1,26 +1,26 @@
-if (process.env.NODE_ENV==="production") {
-  require('dotenv').config({path:'.env.production'});
+if (process.env.NODE_ENV === 'production') {
+  require('dotenv').config({ path: '.env.production' });
 }
-if (process.env.NODE_ENV==="development") {
-  require('dotenv').config({path:'.env.development'});
+if (process.env.NODE_ENV === 'development') {
+  require('dotenv').config({ path: '.env.development' });
 }
-if (process.env.NODE_ENV==="devserver") {
-  require('dotenv').config({path:'.env.develserver'});
+if (process.env.NODE_ENV === 'devserver') {
+  require('dotenv').config({ path: '.env.develserver' });
 }
-const compression = require("compression");
-const neo4j = require('neo4j-driver');
+const compression = require('compression');
 const cors = require('cors');
-const express = require("express");
-//const bodyParser = require('body-parser')
+const express = require('express');
+// const bodyParser = require('body-parser')
 const port = process.env.PORT;
 const api = require('./routes/api');
 const app = express();
 app.use(compression());
-const Promise = require("bluebird");
 
 app.use(cors());
-app.use(express.json({limit: '50mb',extended: true}));
-app.use(express.urlencoded({ limit: '50mb', extended: true, parameterLimit: 1000}));
+app.use(express.json({ limit: '50mb', extended: true }));
+app.use(
+  express.urlencoded({ limit: '50mb', extended: true, parameterLimit: 1000 })
+);
 
 app.use('/api', api);
 // serve files from archive
@@ -30,8 +30,8 @@ app.use(express.static(process.env.RESOURCESPATH));
 // serve uploads
 app.use(express.static(process.env.UPLOADSPATH));
 // set json & file limit
-//app.use(bodyParser.json({limit: '50mb',extended: true}));
-//app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 1000}));
+// app.use(bodyParser.json({limit: '50mb',extended: true}));
+// app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 1000}));
 
 /** start express server */
 app.listen(port, () => {

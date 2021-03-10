@@ -1,27 +1,19 @@
 const Entity = require('../controllers/entity.ctrl').Entity;
 const readJSONFile = require('../helpers').readJSONFile;
 
-const seedEntities = async(userId) => {
-  const entries = await readJSONFile(process.env.ABSPATH+'src/seed/data/entities.json');
-  const promises = [];
+const seedEntities = async (userId) => {
+  const entries = await readJSONFile(
+    process.env.ABSPATH + 'src/seed/data/entities.json'
+  );
+  let output = [];
   for (let key in entries.data) {
-    let insertPromise = new Promise(async(resolve, reject)=> {
-      let entry = entries.data[key];
-      let entity = new Entity(entry);
-      resolve(await entity.save(userId));
-    });
-    promises.push(insertPromise);
+    let entry = entries.data[key];
+    let entity = new Entity(entry);
+    output.push(await entity.save(userId));
   }
-
-  return Promise.all(promises).then((data)=> {
-    return data;
-  })
-  .catch((error)=> {
-    console.log(error);
-  });;
-}
-
+  return output;
+};
 
 module.exports = {
-  seedEntities: seedEntities
-}
+  seedEntities: seedEntities,
+};

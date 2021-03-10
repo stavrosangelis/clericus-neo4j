@@ -256,6 +256,36 @@
   },
   {
     "type": "get",
+    "url": "/highlights",
+    "title": "Get highlights",
+    "name": "get_highlights",
+    "group": "Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "description": "<p>The page of the requested highlights.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "description": "<p>The number of the requested highlights.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "get",
     "url": "/images-browser",
     "title": "Browse images",
     "name": "images_browser",
@@ -374,6 +404,25 @@
     "version": "0.0.0",
     "filename": "src/controllers/article.ctrl.js",
     "groupTitle": "Articles"
+  },
+  {
+    "type": "get",
+    "url": "/carousel",
+    "title": "Get carousel items",
+    "name": "get_carousel_items",
+    "group": "Carousel",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-02-19T12:11:02.733Z\",\"image\":\"3079\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"caption\":\"caption 2\",\"_id\":\"3046\",\"label\":\"test 2\",\"url\":\"http://google.com\",\"updatedAt\":\"2020-02-26T12:27:15.260Z\",\"status\":\"private\",\"order\":\"1\",\"systemLabels\":[\"Slideshow\"],\"imageDetails\":{\"_id\":\"3079\",\"filename\":\"slideshow.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"5889d821aae8cf508f1b12b030dc62fd.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/5889d821aae8cf508f1b12b030dc62fd.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-26T12:27:09.950Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-26T12:27:09.950Z\"}},{\"createdAt\":\"2020-02-19T12:10:43.691Z\",\"image\":\"2942\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"caption\":\"test caption\",\"label\":\"test\",\"url\":\"http://www.google.gr\",\"updatedAt\":\"2020-02-19T12:10:43.691Z\",\"order\":0,\"status\":\"private\",\"_id\":\"2876\",\"systemLabels\":[\"Slideshow\"],\"imageDetails\":{\"_id\":\"2942\",\"filename\":\"IMG_20200218_145701.jpg\",\"year\":2020,\"month\":2,\"hashedName\":\"64fead2233879c89f47d8358530d1d41.jpg\",\"paths\":[{\"path\":\"http://localhost:5100/uploads/2020/2/images/64fead2233879c89f47d8358530d1d41.jpg\",\"pathType\":\"source\"},{\"path\":\"http://localhost:5100/uploads/2020/2/thumbnails/64fead2233879c89f47d8358530d1d41.jpg\",\"pathType\":\"thumbnail\"}],\"createdBy\":\"437\",\"createdAt\":\"2020-02-18T16:01:16.685Z\",\"updatedBy\":\"437\",\"updatedAt\":\"2020-02-18T16:01:16.685Z\"}}],\"totalItems\":2},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/carousel.ctrl.js",
+    "groupTitle": "Carousel"
   },
   {
     "type": "get",
@@ -552,6 +601,20 @@
             "optional": true,
             "field": "resources",
             "description": "<p>An array of resources ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "temporal",
+            "description": "<p>An array of temporal ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "spatial",
+            "description": "<p>An array of spatial ids</p>"
           },
           {
             "group": "Parameter",
@@ -1188,6 +1251,45 @@
   },
   {
     "type": "get",
+    "url": "/event",
+    "title": "Get event",
+    "name": "get_event",
+    "group": "Events",
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/event?_id=2255",
+        "type": "request"
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested event.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"2255\",\"label\":\"Test event\",\"description\":\"test event description\",\"eventType\":\"293\",\"createdBy\":null,\"createdAt\":null,\"updatedBy\":\"260\",\"updatedAt\":\"2020-01-14T15:00:13.430Z\",\"events\":[],\"organisations\":[],\"people\":[],\"resources\":[]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/events.ctrl.js",
+    "groupTitle": "Events"
+  },
+  {
+    "type": "get",
     "url": "/events",
     "title": "Get events",
     "name": "get_events",
@@ -1201,6 +1303,20 @@
             "optional": true,
             "field": "label",
             "description": "<p>A string to match against the events labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "temporal",
+            "description": "<p>A temporal value.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "spatial",
+            "description": "<p>A spatial label.</p>"
           },
           {
             "group": "Parameter",
@@ -1255,6 +1371,91 @@
     },
     "version": "0.0.0",
     "filename": "src/controllers/event.ctrl.js",
+    "groupTitle": "Events"
+  },
+  {
+    "type": "get",
+    "url": "/events",
+    "title": "Get events",
+    "name": "get_events",
+    "group": "Events",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the events labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "temporal",
+            "description": "<p>A temporal value.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "spatial",
+            "description": "<p>A spatial label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/events?label=test&page=1&limit=25",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"currentPage\":1,\"data\":[{\"createdAt\":\"2020-01-14T14:48:31.753Z\",\"updatedBy\":\"260\",\"createdBy\":\"260\",\"description\":\"test event description\",\"label\":\"Test event\",\"eventType\":\"293\",\"updatedAt\":\"2020-01-14T14:48:31.753Z\",\"_id\":\"2255\",\"systemLabels\":[\"Event\"]}],\"totalItems\":\"1\",\"totalPages\":1},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/events.ctrl.js",
     "groupTitle": "Events"
   },
   {
@@ -1617,6 +1818,29 @@
   },
   {
     "type": "get",
+    "url": "/menu",
+    "title": "Get menu",
+    "name": "get_menu",
+    "group": "Menus",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested menu. Either the _id or the systemType should be provided.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/menu.ctrl.js",
+    "groupTitle": "Menus"
+  },
+  {
+    "type": "get",
     "url": "/menus",
     "title": "Get menus",
     "name": "get_menus",
@@ -1919,6 +2143,38 @@
   },
   {
     "type": "get",
+    "url": "/organisation",
+    "title": "Get organisation",
+    "name": "get_organisation",
+    "group": "Organisations",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested organisation.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"375\",\"label\":\"Cill Da Lua\",\"labelSoundex\":\"C434\",\"description\":null,\"organisationType\":\"Diocese\",\"status\":false,\"alternateAppelations\":[],\"createdBy\":null,\"createdAt\":null,\"updatedBy\":null,\"updatedAt\":null,\"events\":[],\"organisations\":[],\"people\":[],\"resources\":[]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/organisations.ctrl.js",
+    "groupTitle": "Organisations"
+  },
+  {
+    "type": "get",
     "url": "/organisations",
     "title": "Get organisations",
     "name": "get_organisations",
@@ -1986,6 +2242,77 @@
     },
     "version": "0.0.0",
     "filename": "src/controllers/organisation.ctrl.js",
+    "groupTitle": "Organisations"
+  },
+  {
+    "type": "get",
+    "url": "/organisations",
+    "title": "Get organisations",
+    "name": "get_organisations",
+    "group": "Organisations",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the organisations' labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "organisationType",
+            "description": "<p>An organisation type label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n  \"status\": true,\n  \"data\": {\n    \"currentPage\": 1,\n    \"data\": [{\n      \"label\": \"Achadh Conaire\",\n      \"labelSoundex\": \"A232\",\n      \"alternateAppelations\": [],\n      \"organisationType\": \"Diocese\",\n      \"status\": false,\n      \"_id\": \"135\",\n      \"systemLabels\": [\"Organisation\"],\n      \"resources\": []\n    }],\n    \"totalItems\": 80,\n    \"totalPages\": 4\n  },\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/organisations.ctrl.js",
     "groupTitle": "Organisations"
   },
   {
@@ -2215,6 +2542,13 @@
           },
           {
             "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "classpieceId",
+            "description": "<p>The id of a related classpiece.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "string",
             "optional": true,
             "field": "orderField",
@@ -2262,6 +2596,112 @@
     "groupTitle": "People"
   },
   {
+    "type": "post",
+    "url": "/people",
+    "title": "Get people",
+    "name": "get_people",
+    "group": "People",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the peoples' labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "firstName",
+            "description": "<p>A string to match against the peoples' first names.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "lastName",
+            "description": "<p>A string to match against the peoples' last names.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "fnameSoundex",
+            "description": "<p>A string to match against the peoples' first name soundex.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "lnameSoundex",
+            "description": "<p>A string to match against the peoples' last name soundex.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "description",
+            "description": "<p>A string to match against the peoples' description.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "personType",
+            "description": "<p>The person type.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n  \"status\": true,\n  \"data\": {\n    \"currentPage\": 1,\n    \"data\": [\n      {\"lastName\": \"Fox\", \"firstName\": \"Aidan\", \"honorificPrefix\": [\"\"], \"middleName\": \"\", \"label\": \"Aidan Fox\",…},\n    …],\n    \"totalItems\": \"221\",\n    \"totalPages\": 9\n  },\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/people.ctrl.js",
+    "groupTitle": "People"
+  },
+  {
     "type": "get",
     "url": "/person",
     "title": "Get person",
@@ -2291,6 +2731,38 @@
     },
     "version": "0.0.0",
     "filename": "src/controllers/person.ctrl.js",
+    "groupTitle": "People"
+  },
+  {
+    "type": "get",
+    "url": "/person",
+    "title": "Get person",
+    "name": "get_person",
+    "group": "People",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested person.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"2069\",\"honorificPrefix\":[\"My\"],\"firstName\":\"fname\",\"middleName\":\"mname\",\"lastName\":\"lname\",\"label\":\"fname mname lname\",\"fnameSoundex\":\"F550\",\"lnameSoundex\":\"L550\",\"description\":\"description\",\"status\":\"private\",\"alternateAppelations\":[{\"appelation\":\"\",\"firstName\":\"altfname\",\"middleName\":\"altmname\",\"lastName\":\"altlname\",\"note\":\"note\",\"language\":{\"value\":\"en\",\"label\":\"English\"}}],\"createdBy\":\"260\",\"createdAt\":\"2020-01-14T15:39:10.638Z\",\"updatedBy\":\"260\",\"updatedAt\":\"2020-01-14T15:42:42.939Z\",\"events\":[],\"organisations\":[],\"people\":[],\"resources\":[]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/people.ctrl.js",
     "groupTitle": "People"
   },
   {
@@ -2733,6 +3205,45 @@
   {
     "type": "delete",
     "url": "/resource",
+    "title": "Delete classpiece",
+    "name": "delete_classpiece",
+    "group": "Resources",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the classpiece for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Resource) WHERE id(n)=2069 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":11,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/resource.ctrl.js",
+    "groupTitle": "Resources"
+  },
+  {
+    "type": "delete",
+    "url": "/resource",
     "title": "Delete resource",
     "name": "delete_resource",
     "group": "Resources",
@@ -2885,6 +3396,22 @@
             "field": "limit",
             "defaultValue": "25",
             "description": "<p>The number of results per page</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending</p>"
           }
         ]
       }
@@ -3065,6 +3592,367 @@
     "version": "0.0.0",
     "filename": "src/controllers/resource.ctrl.js",
     "groupTitle": "Resources"
+  },
+  {
+    "type": "get",
+    "url": "/resource",
+    "title": "Resource",
+    "name": "resource",
+    "group": "Resources",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the requested resource</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "resource object": [
+          {
+            "group": "resource object",
+            "type": "object",
+            "optional": false,
+            "field": "metadata",
+            "description": "<p>The resource metadata</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "fileName",
+            "description": "<p>The file name of the resource</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "array",
+            "optional": false,
+            "field": "paths",
+            "description": "<p>An array containing the path to the fullsize version of the resource and to the thumbnail of the resource</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "systemType",
+            "description": "<p>The system type _id</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "label",
+            "description": "<p>The label of the resource</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "resourceType",
+            "description": "<p>The type of the resource, i.e. image</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "status",
+            "description": "<p>If the resource is private or public</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The resource _id</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "array",
+            "optional": false,
+            "field": "events",
+            "description": "<p>A list of associated events</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "array",
+            "optional": false,
+            "field": "organisations",
+            "description": "<p>A list of associated organisations</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "array",
+            "optional": false,
+            "field": "people",
+            "description": "<p>A list of associated people</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "array",
+            "optional": false,
+            "field": "resources",
+            "description": "<p>A list of associated resources</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n    \"status\": true,\n    \"data\": {\n        \"metadata\": {},\n        \"fileName\": \"1969-1970.jpg\",\n        \"paths\": [\n            {\n                \"path\": \"images/fullsize/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg\",\n                \"pathType\": \"source\"\n            },\n            {\n                \"path\": \"images/thumbnails/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg\",\n                \"pathType\": \"thumbnail\"\n            }\n        ],\n        \"systemType\": \"{\\\"ref\\\":\\\"87\\\"}\",\n        \"label\": \"1969-1970\",\n        \"resourceType\": \"image\",\n        \"status\": false,\n        \"_id\": \"389\",\n        \"events\": [],\n        \"organisations\": [],\n        \"people\": [],\n        \"resources\": [],\n      },\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/resource?_id=389",
+        "type": "request"
+      }
+    ],
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/resources.ctrl.js",
+    "groupTitle": "Resources"
+  },
+  {
+    "type": "get",
+    "url": "/resources",
+    "title": "Resources",
+    "name": "resources",
+    "group": "Resources",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against a resource label</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "description",
+            "description": "<p>A string to match against a resource description</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "events",
+            "description": "<p>An array of event ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "organisations",
+            "description": "<p>An array of organisations ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "people",
+            "description": "<p>An array of people ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "resources",
+            "description": "<p>An array of resources ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "temporal",
+            "description": "<p>An array of temporal ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "spatial",
+            "description": "<p>An array of spatial ids</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "resourcesTypes",
+            "description": "<p>An array of resource types</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "number",
+            "optional": false,
+            "field": "currentPage",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "array",
+            "optional": false,
+            "field": "data",
+            "description": "<p>An array of resources objects</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "number",
+            "optional": false,
+            "field": "totalItems",
+            "description": "<p>The total number of results</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "number",
+            "optional": false,
+            "field": "totalPages",
+            "description": "<p>The total number of available pages of results</p>"
+          }
+        ],
+        "resource object": [
+          {
+            "group": "resource object",
+            "type": "object",
+            "optional": false,
+            "field": "Resource",
+            "description": "<p>A resource object as part of the data array contains the following fields</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "Resource[metadata]",
+            "description": "<p>A stringified JSON object containing the resource metadata</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "Resource[fileName]",
+            "description": "<p>The file name of the resource</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "array",
+            "optional": false,
+            "field": "Resource[paths]",
+            "description": "<p>An array containing the path to the fullsize version of the resource and to the thumbnail of the resource</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "Resource[systemType]",
+            "description": "<p>The system type _id</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "Resource[label]",
+            "description": "<p>The label of the resource</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "Resource[resourceType]",
+            "description": "<p>The type of the resource, i.e. image</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "Resource[status]",
+            "description": "<p>If the resource is private or public.</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "string",
+            "optional": false,
+            "field": "Resource[_id]",
+            "description": "<p>The resource _id</p>"
+          },
+          {
+            "group": "resource object",
+            "type": "array",
+            "optional": false,
+            "field": "Resource[systemLabels]",
+            "description": "<p>A list of system tags for the resource</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n    \"status\": true,\n    \"data\": {\n        \"currentPage\": 1,\n        \"data\": [\n            {\n                \"metadata\": \"\\\"{\\\\\\\"image\\\\\\\":{\\\\\\\"default\\\\\\\":{\\\\\\\"height\\\\\\\":6464,\\\\\\\"width\\\\\\\":4808,\\\\\\\"extension\\\\\\\":\\\\\\\"jpg\\\\\\\",\\\\\\\"x\\\\\\\":0,\\\\\\\"y\\\\\\\":0,\\\\\\\"rotate\\\\\\\":0},\\\\\\\"exif\\\\\\\":{\\\\\\\"image\\\\\\\":{\\\\\\\"XResolution\\\\\\\":240,\\\\\\\"YResolution\\\\\\\":240,\\\\\\\"ResolutionUnit\\\\\\\":2,\\\\\\\"Software\\\\\\\":\\\\\\\"Adobe Photoshop Lightroom Classic 7.3.1 (Windows)\\\\\\\",\\\\\\\"ModifyDate\\\\\\\":\\\\\\\"2018:07:02 12:56:59\\\\\\\",\\\\\\\"ExifOffset\\\\\\\":172},\\\\\\\"thumbnail\\\\\\\":{},\\\\\\\"exif\\\\\\\":{\\\\\\\"ExifVersion\\\\\\\":{\\\\\\\"type\\\\\\\":\\\\\\\"Buffer\\\\\\\",\\\\\\\"data\\\\\\\":[48,50,51,48]},\\\\\\\"ColorSpace\\\\\\\":1},\\\\\\\"gps\\\\\\\":{},\\\\\\\"interoperability\\\\\\\":{},\\\\\\\"makernote\\\\\\\":{}},\\\\\\\"iptc\\\\\\\":{}}}\\\"\",\n                \"fileName\": \"1969-1970.jpg\",\n                \"paths\": [\n                    \"{\\\"path\\\":\\\"images/fullsize/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg\\\",\\\"pathType\\\":\\\"source\\\"}\",\n                    \"{\\\"path\\\":\\\"images/thumbnails/46aa1dc4cfa9bf4c4d774b9121b2cd38.jpg\\\",\\\"pathType\\\":\\\"thumbnail\\\"}\"\n                ],\n                \"systemType\": \"{\\\"ref\\\":\\\"87\\\"}\",\n                \"label\": \"1969-1970\",\n                \"resourceType\": \"image\",\n                \"status\": false,\n                \"_id\": \"389\",\n                \"systemLabels\": [\n                    \"Resource\"\n                ]\n            }\n        ],\n        \"totalItems\": 1,\n        \"totalPages\": 1\n    },\n    \"error\": [],\n    \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/resource?label=1971&description=test&page=1&limit=25",
+        "type": "request"
+      }
+    ],
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/resources.ctrl.js",
+    "groupTitle": "Resources"
+  },
+  {
+    "type": "post",
+    "url": "/search",
+    "title": "Generic search",
+    "name": "generic-search",
+    "group": "Search",
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"people\":220,\"resources\":220,\"organisations\":80,\"events\":0},\"error\":false,\"msg\":\"\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/search.ctrl.js",
+    "groupTitle": "Search"
   },
   {
     "type": "post",
@@ -4140,6 +5028,45 @@
   },
   {
     "type": "get",
+    "url": "/temporal",
+    "title": "Get temporal",
+    "name": "get_temporal",
+    "group": "Temporals",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested temporal</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/temporal?_id=2514",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"_id\":\"2514\",\"label\":\"00s\",\"startDate\":\"1990\",\"endDate\":\"1999\",\"format\":\"\",\"createdBy\":\"260\",\"createdAt\":\"2020-01-17T10:07:49.237Z\",\"updatedBy\":\"260\",\"updatedAt\":\"2020-01-17T10:07:49.237Z\",\"events\":[]},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/temporals.ctrl.js",
+    "groupTitle": "Temporals"
+  },
+  {
+    "type": "get",
     "url": "/temporals",
     "title": "Get temporals",
     "name": "get_temporals",
@@ -4207,6 +5134,77 @@
     },
     "version": "0.0.0",
     "filename": "src/controllers/temporal.ctrl.js",
+    "groupTitle": "Temporals"
+  },
+  {
+    "type": "get",
+    "url": "/temporals",
+    "title": "Get temporals",
+    "name": "get_temporals",
+    "group": "Temporals",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A label to match against the temporals' label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "firstName",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "http://localhost:5100/api/temporals?page=1&limit=25",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"status\":true,\"data\":{\"currentPage\":1,\"data\":[{\"createdAt\":\"2020-01-17T10:07:49.237Z\",\"updatedBy\":\"260\",\"createdBy\":\"260\",\"endDate\":\"1999\",\"format\":\"\",\"label\":\"00s\",\"startDate\":\"1990\",\"updatedAt\":\"2020-01-17T10:07:49.237Z\",\"_id\":\"2514\",\"systemLabels\":[\"Temporal\"]}],\"totalItems\":\"1\",\"totalPages\":1},\"error\":[],\"msg\":\"Query results\"}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/temporals.ctrl.js",
     "groupTitle": "Temporals"
   },
   {

@@ -1,7 +1,6 @@
-const driver = require("../../config/db-driver");
-const helpers = require("../../helpers");
-const Resource = require("../resource.ctrl").Resource;
-const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
+const driver = require('../../config/db-driver');
+const helpers = require('../../helpers');
+const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 
 /**
 * @api {get} /classpieces Classpieces
@@ -72,63 +71,67 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 
 const getClasspieces = async (req, resp) => {
   let params = await getClasspiecesPrepareQueryParams(req);
+  let responseData = {};
   if (!params.returnResults) {
     responseData = {
       currentPage: 1,
       data: [],
       totalItems: 0,
-      totalPages: 1
-    }
-    resp.json({
+      totalPages: 1,
+    };
+    return resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
+      msg: 'Query results',
     });
-    return false;
-  }
-  else {
+  } else {
     let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    let data = await getResourcesQuery(query, params.match, params.queryParams, params.limit);
+    let data = await getResourcesQuery(
+      query,
+      params.match,
+      params.queryParams,
+      params.limit
+    );
     if (data.error) {
-      resp.json({
+      return resp.json({
         status: false,
         data: [],
         error: data.error,
         msg: data.error.message,
-      })
-    }
-    else {
-      let responseData = {
+      });
+    } else {
+      responseData = {
         currentPage: params.currentPage,
         data: data.nodes,
         totalItems: data.count,
         totalPages: data.totalPages,
-      }
-      resp.json({
+      };
+      return resp.json({
         status: true,
         data: responseData,
         error: [],
-        msg: "Query results",
+        msg: 'Query results',
       });
     }
   }
-}
+};
 
 const getResourcesQuery = async (query, match, queryParams, limit) => {
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
-  .then(result=> {
-    return result.records;
-  })
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise, "n");
-  let nodesOutput = nodes.map(node=> {
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  let nodesOutput = nodes.map((node) => {
     let nodeOutput = {};
     for (let key in node) {
       nodeOutput[key] = node[key];
       let paths = [];
-      if (key==="paths" && node[key].length>0) {
+      if (key === 'paths' && node[key].length > 0) {
         for (let akey in node[key]) {
           let path = JSON.parse(node[key][akey]);
           paths.push(path);
@@ -138,24 +141,27 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
     }
     return nodeOutput;
   });
-  let count = await session.writeTransaction(tx=>tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`))
-  .then(result=> {
-    session.close()
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['c'];
-    output = parseInt(output,10);
-    return output;
-  });
-  let totalPages = Math.ceil(count/limit)
+  let count = await session
+    .writeTransaction((tx) =>
+      tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
+    )
+    .then((result) => {
+      session.close();
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['c'];
+      output = parseInt(output, 10);
+      return output;
+    });
+  let totalPages = Math.ceil(count / limit);
   let result = {
     nodes: nodesOutput,
     count: count,
-    totalPages: totalPages
-  }
+    totalPages: totalPages,
+  };
   return result;
-}
+};
 
 /**
 * @api {get} /classpiece Classpiece
@@ -210,69 +216,100 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
   "msg": "Query results"
 }
 */
-const getClasspiece = async(req, resp) => {
+const getClasspiece = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
 
   let _id = parameters._id;
   let session = driver.session();
-  let query = "MATCH (n:Resource) WHERE id(n)="+_id+" AND n.status='public' return n";
-  let classpiece = await session.writeTransaction(tx=>tx.run(query,{}))
-  .then(result=> {
-    session.close();
-    let records = result.records;
-    if (records.length>0) {
-      let record = records[0].toObject();
-      let outputRecord = helpers.outputRecord(record.n);
-      return outputRecord;
-    }
-  }).catch((error) => {
-    console.log(error)
-  });
-  if(typeof classpiece!=="undefined") {
-    if (typeof classpiece.metadata==="string") {
+  let query =
+    'MATCH (n:Resource) WHERE id(n)=' + _id + " AND n.status='public' return n";
+  let classpiece = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      session.close();
+      let records = result.records;
+      if (records.length > 0) {
+        let record = records[0].toObject();
+        let outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  if (typeof classpiece !== 'undefined') {
+    if (typeof classpiece.metadata === 'string') {
       classpiece.metadata = JSON.parse(classpiece.metadata);
     }
-    if (typeof classpiece.metadata==="string") {
+    if (typeof classpiece.metadata === 'string') {
       classpiece.metadata = JSON.parse(classpiece.metadata);
     }
-    if (typeof classpiece.paths[0]==="string") {
-      classpiece.paths = classpiece.paths.map(p=>{
+    if (typeof classpiece.paths[0] === 'string') {
+      classpiece.paths = classpiece.paths.map((p) => {
         let path = JSON.parse(p);
-        if (typeof path==="string") {
-          path = JSON.parse(path)
+        if (typeof path === 'string') {
+          path = JSON.parse(path);
         }
         return path;
       });
     }
 
-    let events = await helpers.loadRelations(_id, "Resource", "Event", true);
-    let organisations = await helpers.loadRelations(_id, "Resource", "Organisation", true);
-    let people = await helpers.loadRelations(_id, "Resource", "Person", true, null, "rn.lastName");
-    let resources = await classpieceResources(_id, "Resource", "Resource", true);
-    for (let i=0;i<events.length;i++) {
+    let events = await helpers.loadRelations(_id, 'Resource', 'Event', true);
+    let organisations = await helpers.loadRelations(
+      _id,
+      'Resource',
+      'Organisation',
+      true
+    );
+    let people = await helpers.loadRelations(
+      _id,
+      'Resource',
+      'Person',
+      true,
+      null,
+      'rn.lastName'
+    );
+    let resources = await classpieceResources(
+      _id,
+      'Resource',
+      'Resource',
+      true
+    );
+    for (let i = 0; i < events.length; i++) {
       let eventItem = events[i];
-      eventItem.temporal = await helpers.loadRelations(eventItem.ref._id, "Event", "Temporal", true);
+      eventItem.temporal = await helpers.loadRelations(
+        eventItem.ref._id,
+        'Event',
+        'Temporal',
+        true
+      );
     }
 
-    let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+    let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
     await classpieceSystemType.load();
     let classpieces = [];
     let systemType = classpieceSystemType._id;
-    for (let i=0;i<resources.length; i++) {
+    for (let i = 0; i < resources.length; i++) {
       let resource = resources[i];
-      if (typeof resource.ref.person!=="undefined") {
-        resource.ref.person.affiliations = await helpers.loadRelations(resource.ref.person._id, "Person", "Organisation", true, "hasAffiliation");
+      if (typeof resource.ref.person !== 'undefined') {
+        resource.ref.person.affiliations = await helpers.loadRelations(
+          resource.ref.person._id,
+          'Person',
+          'Organisation',
+          true,
+          'hasAffiliation'
+        );
       }
-      if (resource.ref.systemType===systemType) {
+      if (resource.ref.systemType === systemType) {
         classpieces.push(resource);
         resources.splice(i, 1);
       }
@@ -286,77 +323,97 @@ const getClasspiece = async(req, resp) => {
       status: true,
       data: classpiece,
       error: [],
-      msg: "Query results",
+      msg: 'Query results',
     });
-  }
-  else {
+  } else {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Classpiece not available!",
+      msg: 'Classpiece not available!',
     });
   }
-}
+};
 
-const classpieceResources = async (srcId=null, srcType=null, targetType=null, status=false) => {
-  if (srcId===null || srcType===null) {
+const classpieceResources = async (
+  srcId = null,
+  srcType = null,
+  targetType = null,
+  status = false
+) => {
+  if (srcId === null || srcType === null) {
     return false;
   }
-  let session = driver.session()
-  let query = "MATCH (n:"+srcType+")-[r]->(rn) WHERE id(n)="+srcId+" return n, r, rn";
+  let session = driver.session();
+  let query =
+    'MATCH (n:' +
+    srcType +
+    ')-[r]->(rn) WHERE id(n)=' +
+    srcId +
+    ' return n, r, rn';
   if (status) {
     query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
     OPTIONAL MATCH (n)-[r]->(rn) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
   }
-  if (targetType!==null) {
-    query = "MATCH (n:"+srcType+")-[r]->(rn:"+targetType+") WHERE id(n)="+srcId+" return n, r, rn";
+  if (targetType !== null) {
+    query =
+      'MATCH (n:' +
+      srcType +
+      ')-[r]->(rn:' +
+      targetType +
+      ') WHERE id(n)=' +
+      srcId +
+      ' return n, r, rn';
     if (status) {
       query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
       OPTIONAL MATCH (n)-[r]->(rn:${targetType}) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
     }
   }
-  let relations = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(async result=> {
-    session.close();
-    let records = result.records;
-    let relations = [];
-    for (let key in records) {
-      let record = records[key].toObject();
-      let sourceItem = helpers.outputRecord(record.n);
-      let relation = record.r;
-      helpers.prepareOutput(relation);
-      let targetItem = null;
-      if (record.rn!==null) {
-        targetItem = helpers.outputRecord(record.rn);
-        if (record.rn.labels[0]==="Resource") {
-          if (typeof targetItem.metadata==="string") {
-            targetItem.metadata = JSON.parse(targetItem.metadata);
+  let relations = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then(async (result) => {
+      session.close();
+      let records = result.records;
+      let relations = [];
+      for (let key in records) {
+        let record = records[key].toObject();
+        let sourceItem = helpers.outputRecord(record.n);
+        let relation = record.r;
+        helpers.prepareOutput(relation);
+        let targetItem = null;
+        if (record.rn !== null) {
+          targetItem = helpers.outputRecord(record.rn);
+          if (record.rn.labels[0] === 'Resource') {
+            if (typeof targetItem.metadata === 'string') {
+              targetItem.metadata = JSON.parse(targetItem.metadata);
+            }
+            if (typeof targetItem.metadata === 'string') {
+              targetItem.metadata = JSON.parse(targetItem.metadata);
+            }
+            targetItem.person = await relatedPerson(targetItem._id);
           }
-          if (typeof targetItem.metadata==="string") {
-            targetItem.metadata = JSON.parse(targetItem.metadata);
-          }
-          targetItem.person = await relatedPerson(targetItem._id);
+          let newRelation = await helpers.prepareRelation(
+            sourceItem,
+            relation,
+            targetItem
+          );
+          relations.push(newRelation);
         }
-        let newRelation = await helpers.prepareRelation(sourceItem, relation, targetItem);
-        relations.push(newRelation);
       }
-    }
-    return relations;
-  });
+      return relations;
+    });
   return relations;
-}
+};
 
-const getClasspiecesActiveFilters = async(req, resp) => {
+const getClasspiecesActiveFilters = async (req, resp) => {
   let params = await getClasspiecesPrepareQueryParams(req);
   let session = driver.session();
   let itemsIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
-  let itemsIdsResults = await session.writeTransaction(tx=>tx.run(itemsIdsQuery,{}))
-  .then(result=> {
-    return result.records;
-  });
+  let itemsIdsResults = await session
+    .writeTransaction((tx) => tx.run(itemsIdsQuery, {}))
+    .then((result) => {
+      return result.records;
+    });
   let itemsIds = [];
   for (let i in itemsIdsResults) {
     let record = itemsIdsResults[i];
@@ -364,12 +421,13 @@ const getClasspiecesActiveFilters = async(req, resp) => {
     itemsIds.push(record.toObject()['_id']);
   }
   let query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND n.status='public' AND id(c) IN [${itemsIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.systemType as systemType, n.eventType as eventType`;
-  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
-  .then(result=> {
-    return result.records;
-  });
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
   session.close();
-  let nodes = nodesPromise.map(record=> {
+  let nodes = nodesPromise.map((record) => {
     helpers.prepareOutput(record);
     let outputItem = record.toObject();
     outputItem.type = outputItem.labels[0];
@@ -378,20 +436,20 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   });
   let events = [];
   let organisations = [];
-  let eventsFind = nodes.filter(n=>n.type==="Event");
-  if (eventsFind!=="undefined") {
+  let eventsFind = nodes.filter((n) => n.type === 'Event');
+  if (eventsFind !== 'undefined') {
     events = [];
-    for (let i=0;i<eventsFind.length; i++) {
+    for (let i = 0; i < eventsFind.length; i++) {
       let e = eventsFind[i];
-      if (events.indexOf(e.eventType)===-1)  {
+      if (events.indexOf(e.eventType) === -1) {
         events.push(e.eventType);
       }
     }
   }
-  let organisationsFind = nodes.filter(n=>n.type==="Organisation");
-  if (organisationsFind!=="undefined") {
+  let organisationsFind = nodes.filter((n) => n.type === 'Organisation');
+  if (organisationsFind !== 'undefined') {
     let organisationsResult = [];
-    for (let i=0;i<organisationsFind.length; i++) {
+    for (let i = 0; i < organisationsFind.length; i++) {
       let org = organisationsFind[i];
       organisationsResult.push(org._id);
     }
@@ -401,256 +459,251 @@ const getClasspiecesActiveFilters = async(req, resp) => {
   let output = {
     events: events,
     organisations: organisations,
-  }
+  };
   resp.json({
     status: true,
     data: output,
     error: [],
-    msg: "Query results",
-  })
-}
+    msg: 'Query results',
+  });
+};
 
-const relatedPerson = async (resourceId=null) => {
-  if (resourceId===null) {
+const relatedPerson = async (resourceId = null) => {
+  if (resourceId === null) {
     return false;
   }
-  let session = driver.session()
-  let query = "MATCH (n:Resource)-[r:isRepresentationOf]->(rn) WHERE id(n)="+resourceId+" return rn";
-  let person = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(async result=> {
-    session.close();
-    let records = result.records;
-    if (records.length>0) {
-      let record = records[0].toObject();
-      let outputRecord = helpers.outputRecord(record.rn);
-      return outputRecord;
-    }
-  });
+  let session = driver.session();
+  let query =
+    'MATCH (n:Resource)-[r:isRepresentationOf]->(rn) WHERE id(n)=' +
+    resourceId +
+    ' return rn';
+  let person = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then(async (result) => {
+      session.close();
+      let records = result.records;
+      if (records.length > 0) {
+        let record = records[0].toObject();
+        let outputRecord = helpers.outputRecord(record.rn);
+        return outputRecord;
+      }
+    });
   return person;
-}
+};
 
-const getClasspiecesPrepareQueryParams = async(req)=>{
+const getClasspiecesPrepareQueryParams = async (req) => {
   let parameters = req.query;
-  let label = "";
-  let description = "";
+  let label = '';
+  let description = '';
   let events = [];
   let organisations = [];
   let people = [];
   let resources = [];
-  let temporal = [];
-  let spatial = [];
   let page = 0;
-  let orderField = "label";
+  let orderField = 'label';
   let queryPage = 0;
-  let queryOrder = "";
+  let queryOrder = '';
   let limit = 25;
   let returnResults = true;
 
-  let match = "(n:Resource)";
+  let match = '(n:Resource)';
 
-  let query = "";
   let queryParams = " n.status='public'";
 
   // temporal
   let temporalEventIds = [];
-  if (typeof parameters.temporals!=="undefined") {
+  if (typeof parameters.temporals !== 'undefined') {
     let eventTypes = [];
-    if (typeof parameters.events!=="undefined") {
+    if (typeof parameters.events !== 'undefined') {
       eventTypes = parameters.events;
     }
     let temporals = parameters.temporals;
-    if (typeof temporals==="string") {
+    if (typeof temporals === 'string') {
       temporals = JSON.parse(temporals);
     }
-    if (typeof temporals.startDate!=="undefined" && temporals.startDate!=="") {
+    if (
+      typeof temporals.startDate !== 'undefined' &&
+      temporals.startDate !== ''
+    ) {
       temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
-      if (temporalEventIds.length===0) {
-         returnResults = false;
-       }
-    }
-    else if (typeof eventTypes!=="undefined") {
+      if (temporalEventIds.length === 0) {
+        returnResults = false;
+      }
+    } else if (typeof eventTypes !== 'undefined') {
       temporalEventIds = await helpers.eventsFromTypes(eventTypes);
     }
   }
   // spatial
   let spatialEventIds = [];
-  if (typeof parameters.spatial!=="undefined") {
+  if (typeof parameters.spatial !== 'undefined') {
     let session = driver.session();
     let querySpatial = `MATCH (n:Spatial)-[r]-(e:Event) WHERE id(n) IN [${parameters.spatial}] RETURN DISTINCT id(e)`;
-    let spatialResults = await session.writeTransaction(tx=>
-      tx.run(querySpatial,{})
-    )
-    .then(result=> {
-      session.close();
-      return result.records;
-    });
-    for (let s=0;s<spatialResults.length; s++) {
-      let sr=spatialResults[s];
+    let spatialResults = await session
+      .writeTransaction((tx) => tx.run(querySpatial, {}))
+      .then((result) => {
+        session.close();
+        return result.records;
+      });
+    for (let s = 0; s < spatialResults.length; s++) {
+      let sr = spatialResults[s];
       helpers.prepareOutput(sr);
-      spatialEventIds.push(sr._fields[0])
+      spatialEventIds.push(sr._fields[0]);
     }
   }
 
   // get classpiece resource type id
-  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
   await classpieceSystemType.load();
 
   let systemType = classpieceSystemType._id;
-  if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.label !== 'undefined') {
     label = parameters.label;
-    if (label!=="") {
-      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
+    if (label !== '') {
+      queryParams = "toLower(n.label) =~ toLower('.*" + label + ".*') ";
     }
   }
-  if (systemType!=="") {
-    if (queryParams!=="") {
-      queryParams += " AND ";
+  if (systemType !== '') {
+    if (queryParams !== '') {
+      queryParams += ' AND ';
     }
     queryParams += `toLower(n.systemType) = '${systemType}' `;
   }
-  if (typeof parameters.description!=="undefined") {
+  if (typeof parameters.description !== 'undefined') {
     description = parameters.description;
-    if (description!=="") {
-      if (queryParams !=="") {
-        queryParams += " AND ";
+    if (description !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
-      queryParams += "toLower(n.description) =~ toLower('.*"+description+".*') ";
+      queryParams +=
+        "toLower(n.description) =~ toLower('.*" + description + ".*') ";
     }
   }
 
-  if (typeof parameters.orderField!=="undefined") {
+  if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
   }
-  if (orderField!=="") {
-    queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
-      queryOrder += " DESC";
+  if (orderField !== '') {
+    queryOrder = 'ORDER BY n.' + orderField;
+    if (
+      typeof parameters.orderDesc !== 'undefined' &&
+      parameters.orderDesc === 'true'
+    ) {
+      queryOrder += ' DESC';
     }
   }
 
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
+    queryPage = parseInt(parameters.page, 10) - 1;
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
 
-  if (typeof parameters.events!=="undefined") {
-    if (temporalEventIds.length>0) {
-      for (let i=0;i<temporalEventIds.length; i++) {
+  if (typeof parameters.events !== 'undefined') {
+    if (temporalEventIds.length > 0) {
+      for (let i = 0; i < temporalEventIds.length; i++) {
         let tei = temporalEventIds[i];
-        if (events.indexOf(tei)===-1) {
+        if (events.indexOf(tei) === -1) {
           events.push(tei);
         }
       }
     }
-    if (spatialEventIds.length>0) {
-      for (let i=0;i<spatialEventIds.length; i++) {
+    if (spatialEventIds.length > 0) {
+      for (let i = 0; i < spatialEventIds.length; i++) {
         let sei = spatialEventIds[i];
-        if (events.indexOf(sei)===-1) {
+        if (events.indexOf(sei) === -1) {
           events.push(sei);
         }
       }
     }
-    match = "(n:Resource)-[revent]->(e:Event)";
-    if (events.length===1) {
+    match = '(n:Resource)-[revent]->(e:Event)';
+    if (events.length === 1) {
       queryParams += `AND id(e)=${events[0]} `;
-    }
-    else if (events.length>1){
+    } else if (events.length > 1) {
       queryParams += `AND id(e) IN [${events}] `;
     }
-  }
-  else {
+  } else {
     events = [];
-    if (temporalEventIds.length>0) {
-      for (let i=0;i<temporalEventIds.length; i++) {
+    if (temporalEventIds.length > 0) {
+      for (let i = 0; i < temporalEventIds.length; i++) {
         let tei = temporalEventIds[i];
-        if (events.indexOf(tei)===-1) {
+        if (events.indexOf(tei) === -1) {
           events.push(tei);
         }
       }
     }
-    if (spatialEventIds.length>0) {
-      for (let i=0;i<spatialEventIds.length; i++) {
+    if (spatialEventIds.length > 0) {
+      for (let i = 0; i < spatialEventIds.length; i++) {
         let sei = spatialEventIds[i];
-        if (events.indexOf(sei)===-1) {
+        if (events.indexOf(sei) === -1) {
           events.push(sei);
         }
       }
     }
-    if (events.length>0) {
-      match = "(n:Resource)-[revent]->(e:Event)";
+    if (events.length > 0) {
+      match = '(n:Resource)-[revent]->(e:Event)';
     }
-    if (events.length===1) {
+    if (events.length === 1) {
       queryParams += `AND id(e)=${events[0]} `;
-    }
-    else if (events.length>1) {
+    } else if (events.length > 1) {
       queryParams += `AND id(e) IN [${events}] `;
     }
   }
-  if (typeof parameters.organisations!=="undefined") {
+  if (typeof parameters.organisations !== 'undefined') {
     organisations = parameters.organisations;
-    if (events.length>0) {
-      match += ", (n:Resource)-[rorganisation]->(o:Organisation)";
+    if (events.length > 0) {
+      match += ', (n:Resource)-[rorganisation]->(o:Organisation)';
+    } else {
+      match = '(n:Resource)-[rorganisation]->(o:Organisation)';
     }
-    else {
-      match = "(n:Resource)-[rorganisation]->(o:Organisation)";
-    }
-    if (organisations.length===1) {
+    if (organisations.length === 1) {
       queryParams += `AND id(o)=${organisations[0]} `;
-    }
-    else {
+    } else {
       queryParams += `AND id(o) IN [${organisations}] `;
     }
   }
-  if (typeof parameters.people!=="undefined") {
+  if (typeof parameters.people !== 'undefined') {
     people = parameters.people;
-    if (events.length>0 || organisations.length>0) {
-      match += ", (n:Resource)-[rperson]->(p:Person)";
+    if (events.length > 0 || organisations.length > 0) {
+      match += ', (n:Resource)-[rperson]->(p:Person)';
+    } else {
+      match = '(n:Resource)-[rperson]->(p:Person)';
     }
-    else {
-      match = "(n:Resource)-[rperson]->(p:Person)";
-    }
-    if (people.length===1) {
+    if (people.length === 1) {
       queryParams += `AND id(p)=${people[0]} `;
-    }
-    else {
+    } else {
       queryParams += `AND id(p) IN [${people}] `;
     }
   }
-  if (typeof parameters.resources!=="undefined") {
+  if (typeof parameters.resources !== 'undefined') {
     resources = parameters.resources;
-    if (events.length>0 || organisations.length>0 || people.length>0) {
-      match += ", (n:Resource)-[rresource]->(re:Resource)";
+    if (events.length > 0 || organisations.length > 0 || people.length > 0) {
+      match += ', (n:Resource)-[rresource]->(re:Resource)';
+    } else {
+      match = '(n:Resource)-[rresource]->(re:Resource)';
     }
-    else {
-      match = "(n:Resource)-[rresource]->(re:Resource)";
-    }
-    if (resources.length===1) {
+    if (resources.length === 1) {
       queryParams += `AND id(re)=${resources[0]} `;
-    }
-    else {
+    } else {
       queryParams += `AND id(re) IN [${resources}] `;
     }
   }
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
+    queryPage = parseInt(parameters.page, 10) - 1;
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
 
-  let skip = limit*queryPage;
-  if (queryParams!=="") {
-    queryParams = "WHERE "+queryParams;
+  let skip = limit * queryPage;
+  if (queryParams !== '') {
+    queryParams = 'WHERE ' + queryParams;
   }
 
   return {
@@ -660,12 +713,12 @@ const getClasspiecesPrepareQueryParams = async(req)=>{
     limit: limit,
     currentPage: currentPage,
     queryOrder: queryOrder,
-    returnResults: returnResults
+    returnResults: returnResults,
   };
-}
+};
 
 module.exports = {
   getClasspieces: getClasspieces,
   getClasspiece: getClasspiece,
-  getClasspiecesActiveFilters: getClasspiecesActiveFilters
+  getClasspiecesActiveFilters: getClasspiecesActiveFilters,
 };

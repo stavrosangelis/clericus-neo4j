@@ -3,14 +3,14 @@
   "title": "Clericus-neo4j REST API Documentation",
   "url": "http://localhost:5100/api",
   "name": "clericus-neo4j",
-  "version": "0.30.43",
+  "version": "0.53.190",
   "sampleUrl": false,
   "defaultVersion": "0.0.0",
   "apidoc": "0.3.0",
   "generator": {
     "name": "apidoc",
-    "time": "2020-03-03T11:09:52.135Z",
-    "url": "http://apidocjs.com",
-    "version": "0.19.1"
+    "time": "2021-03-10T13:59:50.351Z",
+    "url": "https://apidocjs.com",
+    "version": "0.26.0"
   }
 }

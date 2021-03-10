@@ -1,6 +1,6 @@
-const driver = require("../../config/db-driver");
-const helpers = require("../../helpers");
-const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
+const driver = require('../../config/db-driver');
+const helpers = require('../../helpers');
+const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 
 /**
 * @api {get} /events Get events
@@ -23,184 +23,192 @@ const TaxonomyTerm = require("../taxonomyTerm.ctrl").TaxonomyTerm;
 */
 const getEvents = async (req, resp) => {
   let params = await getEventsPrepareQueryParams(req);
+  let responseData = {};
   if (!params.returnResults) {
     responseData = {
       currentPage: 1,
       data: [],
       totalItems: 0,
-      totalPages: 1
-    }
-    resp.json({
+      totalPages: 1,
+    };
+    return resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
+      msg: 'Query results',
     });
-    return false;
-  }
-  else {
+  } else {
     let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    let data = await getEventsQuery(query, params.match, params.queryParams, params.limit);
+    let data = await getEventsQuery(
+      query,
+      params.match,
+      params.queryParams,
+      params.limit
+    );
     if (data.error) {
       resp.json({
         status: false,
         data: [],
         error: data.error,
         msg: data.error.message,
-      })
-    }
-    else {
+      });
+    } else {
       let responseData = {
         currentPage: params.currentPage,
         data: data.nodes,
         totalItems: data.count,
         totalPages: data.totalPages,
-      }
+      };
       resp.json({
         status: true,
         data: responseData,
         error: [],
-        msg: "Query results",
-      })
+        msg: 'Query results',
+      });
     }
   }
-}
+};
 
 const getEventsQuery = async (query, match, queryParams, limit) => {
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>tx.run(query,{}))
-  .then(result=> {
-    return result.records;
-  });
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
 
   let nodes = [];
   let nodesOutput = helpers.normalizeRecordsOutput(nodesPromise);
-  for (let i=0;i<nodesOutput.length; i++) {
+  for (let i = 0; i < nodesOutput.length; i++) {
     let node = nodesOutput[i];
-    let temporal = await helpers.loadRelations(node._id, "Event", "Temporal", true);
-    let spatial = await helpers.loadRelations(node._id, "Event", "Spatial", true);
+    let temporal = await helpers.loadRelations(
+      node._id,
+      'Event',
+      'Temporal',
+      true
+    );
+    let spatial = await helpers.loadRelations(
+      node._id,
+      'Event',
+      'Spatial',
+      true
+    );
     node.temporal = temporal;
     node.spatial = spatial;
     nodes.push(node);
   }
-  let count = await session.writeTransaction(tx=>tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`))
-  .then(result=> {
-    session.close()
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['c'];
-    output = parseInt(output,10);
-    return output;
-  });
-  let totalPages = Math.ceil(count/limit)
+  let count = await session
+    .writeTransaction((tx) =>
+      tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
+    )
+    .then((result) => {
+      session.close();
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['c'];
+      output = parseInt(output, 10);
+      return output;
+    });
+  let totalPages = Math.ceil(count / limit);
   let result = {
     nodes: nodes,
     count: count,
-    totalPages: totalPages
-  }
+    totalPages: totalPages,
+  };
   return result;
-}
+};
 
-const getEventsPrepareQueryParams = async(req)=>{
+const getEventsPrepareQueryParams = async (req) => {
   let parameters = req.query;
-  let label = "";
-  let temporal = "";
-  let spatial = "";
-  let eventType = "";
+  let label = '';
+  let temporal = '';
+  let spatial = '';
+  let eventType = '';
   let page = 0;
-  let orderField = "label";
-  let status = "";
+  let orderField = 'label';
   let queryPage = 0;
-  let queryOrder = "";
+  let queryOrder = '';
   let limit = 25;
   let returnResults = true;
 
-  let match = "(n:Event)";
+  let match = '(n:Event)';
 
-  let query = "";
   let queryParams = " n.status='public'";
 
-  if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.label !== 'undefined') {
     label = parameters.label;
-    if (label!=="") {
-      if (queryParams!=="") {
-        queryParams +=" AND ";
+    if (label !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
-      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
+      queryParams = "toLower(n.label) =~ toLower('.*" + label + ".*') ";
     }
   }
 
   // temporal
-  if (typeof parameters.temporals!=="undefined") {
+  if (typeof parameters.temporals !== 'undefined') {
     let eventTypes = [];
-    if (typeof parameters.events!=="undefined") {
+    let temporalEventIds = [];
+    if (typeof parameters.events !== 'undefined') {
       eventTypes = parameters.events;
     }
     let temporals = parameters.temporals;
-    if (typeof temporals==="string") {
+    if (typeof temporals === 'string') {
       temporals = JSON.parse(temporals);
     }
-    if (temporals.startDate!=="" && temporals.startDate!==null) {
+    if (temporals.startDate !== '' && temporals.startDate !== null) {
       temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
-      if (temporalEventIds.length===0) {
+      if (temporalEventIds.length === 0) {
         returnResults = false;
-       }
-    }
-    else if (typeof eventTypes!=="undefined") {
+      }
+    } else if (typeof eventTypes !== 'undefined') {
       temporalEventIds = await helpers.eventsFromTypes(eventTypes);
     }
-    if (temporalEventIds.length===1) {
+    if (temporalEventIds.length === 1) {
       queryParams += `AND id(n)=${temporalEventIds[0]} `;
-    }
-    else if (temporalEventIds.length>1) {
+    } else if (temporalEventIds.length > 1) {
       queryParams += `AND id(n) IN [${temporalEventIds}] `;
     }
   }
 
-  if (typeof parameters.eventType!=="undefined") {
+  if (typeof parameters.eventType !== 'undefined') {
     eventType = parameters.eventType;
-    if (eventType!=="") {
-      if (queryParams!=="") {
-        queryParams +=" AND ";
+    if (eventType !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
       queryParams += `toLower(n.eventType)= "${eventType}" `;
     }
   }
-  if (typeof parameters.orderField!=="undefined") {
+  if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
   }
-  if (orderField!=="") {
-    queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
-      queryOrder += " DESC";
-    }
-  }
-  if (typeof parameters.status!=="undefined") {
-    status = parameters.status;
-    if (status!=="") {
-      if (queryParams !=="") {
-        queryParams += " AND ";
-      }
-      queryParams += "n.status='"+status+"' ";
+  if (orderField !== '') {
+    queryOrder = 'ORDER BY n.' + orderField;
+    if (
+      typeof parameters.orderDesc !== 'undefined' &&
+      parameters.orderDesc === 'true'
+    ) {
+      queryOrder += ' DESC';
     }
   }
 
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
+    queryPage = parseInt(parameters.page, 10) - 1;
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
-  let skip = limit*queryPage;
+  let skip = limit * queryPage;
 
-  if (queryParams!=="") {
-    if (temporal==="" && spatial==="") {
+  if (queryParams !== '') {
+    if (temporal === '' && spatial === '') {
       queryParams = `WHERE ${queryParams}`;
     }
   }
@@ -213,8 +221,8 @@ const getEventsPrepareQueryParams = async(req)=>{
     currentPage: currentPage,
     queryOrder: queryOrder,
     returnResults: returnResults,
-  }
-}
+  };
+};
 
 /**
 * @api {get} /event Get event
@@ -228,53 +236,66 @@ const getEventsPrepareQueryParams = async(req)=>{
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"_id":"2255","label":"Test event","description":"test event description","eventType":"293","createdBy":null,"createdAt":null,"updatedBy":"260","updatedAt":"2020-01-14T15:00:13.430Z","events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
 */
-const getEvent = async(req, resp) => {
+const getEvent = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id or a valid label to continue.",
+      msg: 'Please select a valid id or a valid label to continue.',
     });
     return false;
   }
   let _id = parameters._id;
   let session = driver.session();
-  let query = "MATCH (n:Event) WHERE id(n)="+_id+" AND n.status='public' return n";
-  let event = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    session.close();
-    let records = result.records;
-    if (records.length>0) {
-      let record = records[0].toObject();
-      let outputRecord = helpers.outputRecord(record.n);
-      return outputRecord;
-    }
-  }).catch((error) => {
-    console.log(error)
-  });
-  if(typeof event!=="undefined") {
-    let eventType = new TaxonomyTerm({"_id":event.eventType});
+  let query =
+    'MATCH (n:Event) WHERE id(n)=' + _id + " AND n.status='public' return n";
+  let event = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      session.close();
+      let records = result.records;
+      if (records.length > 0) {
+        let record = records[0].toObject();
+        let outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  if (typeof event !== 'undefined') {
+    let eventType = new TaxonomyTerm({ _id: event.eventType });
     await eventType.load();
     event.eventType = eventType;
-    let events = await helpers.loadRelations(_id, "Event", "Event", true);
-    let organisations = await helpers.loadRelations(_id, "Event", "Organisation", true);
-    let people = await helpers.loadRelations(_id, "Event", "Person", true, null, "rn.lastName");
-    let resources = await helpers.loadRelations(_id, "Event", "Resource", true);
-    let temporal = await helpers.loadRelations(_id, "Event", "Temporal", null);
-    let spatial = await helpers.loadRelations(_id, "Event", "Spatial", null);
+    let events = await helpers.loadRelations(_id, 'Event', 'Event', true);
+    let organisations = await helpers.loadRelations(
+      _id,
+      'Event',
+      'Organisation',
+      true
+    );
+    let people = await helpers.loadRelations(
+      _id,
+      'Event',
+      'Person',
+      true,
+      null,
+      'rn.lastName'
+    );
+    let resources = await helpers.loadRelations(_id, 'Event', 'Resource', true);
+    let temporal = await helpers.loadRelations(_id, 'Event', 'Temporal', null);
+    let spatial = await helpers.loadRelations(_id, 'Event', 'Spatial', null);
 
     // get classpiece resource type id
-    let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+    let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
     await classpieceSystemType.load();
     let classpieces = [];
     let systemType = classpieceSystemType._id;
     for (let i in resources) {
       let resource = resources[i];
-      if (resource.ref.systemType===systemType) {
+      if (resource.ref.systemType === systemType) {
         classpieces.push(resource);
         resources.splice(i, 1);
       }
@@ -291,36 +312,33 @@ const getEvent = async(req, resp) => {
       status: true,
       data: event,
       error: [],
-      msg: "Query results",
+      msg: 'Query results',
     });
-  }
-  else {
+  } else {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Event not available!",
+      msg: 'Event not available!',
     });
   }
-}
+};
 
-
-const getEventsActiveFilters = async(req, resp) => {
+const getEventsActiveFilters = async (req, resp) => {
   let parameters = req.body;
   let _ids = [];
-  if (typeof parameters._ids!=="undefined" && parameters._ids.length>0) {
+  if (typeof parameters._ids !== 'undefined' && parameters._ids.length > 0) {
     _ids = parameters._ids;
   }
   let query = `MATCH (e:Event)-->(n) WHERE e.status='public' AND id(e) IN [${_ids}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource OR n:Temporal OR n:Spatial) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels`;
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  });
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
 
-  let nodes = nodesPromise.map(record=> {
+  let nodes = nodesPromise.map((record) => {
     helpers.prepareOutput(record);
     let outputItem = record.toObject();
     outputItem.type = outputItem.labels[0];
@@ -333,28 +351,28 @@ const getEventsActiveFilters = async(req, resp) => {
   let resources = [];
   let temporal = [];
   let spatial = [];
-  let eventsFind = nodes.filter(n=>n.type==="Event");
-  if (eventsFind!=="undefined") {
+  let eventsFind = nodes.filter((n) => n.type === 'Event');
+  if (eventsFind !== 'undefined') {
     events = eventsFind;
   }
-  let organisationsFind = nodes.filter(n=>n.type==="Organisation");
-  if (organisationsFind!=="undefined") {
+  let organisationsFind = nodes.filter((n) => n.type === 'Organisation');
+  if (organisationsFind !== 'undefined') {
     organisations = organisationsFind;
   }
-  let peopleFind = nodes.filter(n=>n.type==="Person");
-  if (peopleFind!=="undefined") {
+  let peopleFind = nodes.filter((n) => n.type === 'Person');
+  if (peopleFind !== 'undefined') {
     people = peopleFind;
   }
-  let resourcesFind = nodes.filter(n=>n.type==="Resource");
-  if (resourcesFind!=="undefined") {
+  let resourcesFind = nodes.filter((n) => n.type === 'Resource');
+  if (resourcesFind !== 'undefined') {
     resources = resourcesFind;
   }
-  let temporalFind = nodes.filter(n=>n.type==="Temporal");
-  if (temporalFind!=="undefined") {
+  let temporalFind = nodes.filter((n) => n.type === 'Temporal');
+  if (temporalFind !== 'undefined') {
     temporal = temporalFind;
   }
-  let spatialFind = nodes.filter(n=>n.type==="Spatial");
-  if (spatialFind!=="undefined") {
+  let spatialFind = nodes.filter((n) => n.type === 'Spatial');
+  if (spatialFind !== 'undefined') {
     spatial = spatialFind;
   }
 
@@ -365,14 +383,14 @@ const getEventsActiveFilters = async(req, resp) => {
     resources: resources,
     temporal: temporal,
     spatial: spatial,
-  }
+  };
   resp.json({
     status: true,
     data: output,
     error: [],
-    msg: "Query results",
-  })
-}
+    msg: 'Query results',
+  });
+};
 
 module.exports = {
   getEvents: getEvents,

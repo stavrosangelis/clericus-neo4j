@@ -6,18 +6,21 @@
   "scripts": {
     "test": "NODE_ENV=development ava --verbose",
     "test:watch": "NODE_ENV=development ava --watch --verbose",
-    "start": "NODE_ENV=production pm2 start ./src/app.js --name clericus",
-    "dev": "NODE_ENV=development nodemon ./src/app.js",
-    "pm2-dev": "NODE_ENV=development pm2 start ./src/app.js --name clericus-dev",
-    "pm2-devserver": "NODE_ENV=devserver pm2 start ./src/app.js --name clericus-devserver",
+    "start": "NODE_ENV=production pm2 start babel-node ./src/app.js --name clericus",
+    "dev": "NODE_ENV=development nodemon --exec babel-node ./src/app.js",
+    "pm2-dev": "NODE_ENV=development pm2 start babel-node ./src/app.js --name clericus-dev",
+    "pm2-devserver": "NODE_ENV=devserver pm2 start babel-node ./src/app.js --name clericus-devserver",
     "cover": "NODE_ENV=development nyc npm run test",
-    "docs": "apidoc -f '.*\\.js$' -i src/ -o documentation/"
+    "docs": "apidoc -f '.*\\.js$' -i src/ -o documentation/",
+    "lint": "eslint --ext .js --ignore-path .eslintignore .",
+    "lint:fix": "eslint --fix --ext .js --ignore-path .eslintignore .",
+    "package": "NODE_ENV=production pkg ./src/app.js"
   },
   "author": "Stavros Angelis",
   "license": "ISC",
   "dependencies": {
     "argon2": "^0.24.1",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "bluebird": "^3.7.2",
     "body-parser": "^1.19.0",
     "canvas": "^2.6.1",
@@ -49,9 +52,17 @@
     "yargs": "^16.1.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.12.10",
+    "@babel/node": "^7.12.10",
+    "@babel/preset-env": "^7.12.11",
     "ava": "^3.13.0",
+    "eslint": "^7.18.0",
+    "eslint-config-prettier": "^7.2.0",
+    "eslint-config-strongloop": "^2.1.0",
+    "eslint-plugin-prettier": "^3.3.1",
     "minami": "^1.2.3",
     "nyc": "^15.1.0",
+    "prettier": "^2.2.1",
     "supertest": "^4.0.2"
   },
   "apidoc": {

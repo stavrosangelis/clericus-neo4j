@@ -1,9 +1,26 @@
-const driver = require("../config/db-driver");
-const helpers = require("../helpers");
+const driver = require('../config/db-driver');
+const helpers = require('../helpers');
 
 class Spatial {
-  constructor({_id=null,label=null,streetAddress=null,locality=null,region=null,postalCode=null,country=null,latitude=null,longitude=null,locationType=null,note=null,rawData=null,createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
-    if (_id!==null) {
+  constructor({
+    _id = null,
+    label = null,
+    streetAddress = null,
+    locality = null,
+    region = null,
+    postalCode = null,
+    country = null,
+    latitude = null,
+    longitude = null,
+    locationType = null,
+    note = null,
+    rawData = null,
+    createdBy = null,
+    createdAt = null,
+    updatedBy = null,
+    updatedAt = null,
+  }) {
+    if (_id !== null) {
       this._id = _id;
     }
     this.label = label;
@@ -26,73 +43,77 @@ class Spatial {
   validate() {
     let status = true;
     let errors = [];
-    if (this.label==="") {
+    if (this.label === '') {
       status = false;
-      errors.push({field: "label", msg: "The label must not be empty"});
+      errors.push({ field: 'label', msg: 'The label must not be empty' });
     }
-    let msg = "The record is valid";
+    let msg = 'The record is valid';
     if (!status) {
-      msg = "The record is not valid";
+      msg = 'The record is not valid';
     }
     let output = {
       status: status,
       msg: msg,
-      errors: errors
-    }
+      errors: errors,
+    };
     return output;
   }
 
   async load() {
-    if (this._id===null) {
+    if (this._id === null) {
       return false;
     }
-    let session = driver.session()
-    let query = "MATCH (n:Spatial) WHERE id(n)="+this._id+" return n";
-    let node = await session.writeTransaction(tx=>tx.run(query,{}))
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
-        return outputRecord;
-      }
-      else return {};
-    })
-    .catch((error) => {
-      console.log(error)
-    });
+    let session = driver.session();
+    let query = 'MATCH (n:Spatial) WHERE id(n)=' + this._id + ' return n';
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        } else return {};
+      })
+      .catch((error) => {
+        console.log(error);
+      });
     for (let key in node) {
       this[key] = node[key];
     }
     // relations
-    let events = await helpers.loadRelations(this._id, "Spatial", "Event");
-    let organisations = await helpers.loadRelations(this._id, "Spatial", "Organisation");
+    let events = await helpers.loadRelations(this._id, 'Spatial', 'Event');
+    let organisations = await helpers.loadRelations(
+      this._id,
+      'Spatial',
+      'Organisation'
+    );
     this.events = events;
     this.organisations = organisations;
   }
 
   async countRelations() {
-    if (this._id===null || this.label==="") {
+    if (this._id === null || this.label === '') {
       return false;
     }
     let session = driver.session();
-    let query = "MATCH (n)-[r]->() WHERE id(n)="+this._id+" RETURN count(*) AS c";
-    let count = await session.writeTransaction(tx=>
-      tx.run(query, {})
-    )
-    .then(result=> {
-      session.close()
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0];
-        let key = record.keys[0];
-        let output = record.toObject();
-        helpers.prepareOutput(output);
-        output = output[key];
-        return output;
-      }
-    });
+    let query =
+      'MATCH (n)-[r]->() WHERE id(n)=' + this._id + ' RETURN count(*) AS c';
+    let count = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let key = record.keys[0];
+          let output = record.toObject();
+          helpers.prepareOutput(output);
+          output = output[key];
+          return output;
+        }
+      });
     this.count = count;
   }
 
@@ -100,20 +121,18 @@ class Spatial {
     let validateSpatial = this.validate();
     if (!validateSpatial.status) {
       return validateSpatial;
-    }
-    else {
+    } else {
       let session = driver.session();
-      let query = "";
+      let query = '';
       let params = {};
 
       // timestamps
       let now = new Date().toISOString();
-      if (typeof this._id==="undefined" || this._id===null) {
+      if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
-      }
-      else {
-        let original = new Spatial({_id:this._id});
+      } else {
+        let original = new Spatial({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
@@ -121,48 +140,54 @@ class Spatial {
       this.updatedBy = userId;
       this.updatedAt = now;
 
-      if (typeof this._id==="undefined" || this._id===null) {
+      if (typeof this._id === 'undefined' || this._id === null) {
         let nodeProperties = helpers.prepareNodeProperties(this);
         params = helpers.prepareParams(this);
-        query = "CREATE (n:Spatial "+nodeProperties+") RETURN n";
-      }
-      else {
-        let update = "";
-        let i=0;
+        query = 'CREATE (n:Spatial ' + nodeProperties + ') RETURN n';
+      } else {
+        let update = '';
+        let i = 0;
         for (let key in this) {
-          if (i>0) {
-            update +=",";
+          if (i > 0) {
+            update += ',';
           }
-          if (typeof this[key]==="string") {
-            update += " n."+key+"='"+this[key]+"'";
-          }
-          else {
-            update += " n."+key+"="+this[key];
+          if (typeof this[key] === 'string') {
+            update += ' n.' + key + "='" + this[key] + "'";
+          } else {
+            update += ' n.' + key + '=' + this[key];
           }
           i++;
         }
-        query = "MATCH (n:Spatial) WHERE id(n)="+this._id+" SET "+update+" RETURN n";
+        query =
+          'MATCH (n:Spatial) WHERE id(n)=' +
+          this._id +
+          ' SET ' +
+          update +
+          ' RETURN n';
       }
-      let resultPromise = await session.run(
-        query,
-        params
-      ).then(result => {
-        session.close();
-        let records = result.records;
-        let output = {error: ["The record cannot be updated"], status: false, data: []};
-        if (records.length>0) {
-          let record = records[0];
-          let key = record.keys[0];
-          let resultRecord = record.toObject()[key];
-          resultRecord = helpers.outputRecord(resultRecord);
-          output = {error: [], status: true, data: resultRecord};
-        }
-        return output;
-      })
-      .catch((error) => {
-        let output = {error: error, status: false, data: []};
-        return output;
-      });
+      let resultPromise = await session
+        .run(query, params)
+        .then((result) => {
+          session.close();
+          let records = result.records;
+          let output = {
+            error: ['The record cannot be updated'],
+            status: false,
+            data: [],
+          };
+          if (records.length > 0) {
+            let record = records[0];
+            let key = record.keys[0];
+            let resultRecord = record.toObject()[key];
+            resultRecord = helpers.outputRecord(resultRecord);
+            output = { error: [], status: true, data: resultRecord };
+          }
+          return output;
+        })
+        .catch((error) => {
+          let output = { error: error, status: false, data: [] };
+          return output;
+        });
       return resultPromise;
     }
   }
@@ -170,20 +195,23 @@ class Spatial {
   async delete() {
     let session = driver.session();
     await this.countRelations();
-    if (parseInt(this.count,10)>0) {
-      let output = {error: ["You must remove the record's relations before deleting"], status: false, data: []};
+    if (parseInt(this.count, 10) > 0) {
+      let output = {
+        error: ["You must remove the record's relations before deleting"],
+        status: false,
+        data: [],
+      };
       return output;
     }
-    let query = "MATCH (n:Spatial) WHERE id(n)="+this._id+" DELETE n";
-    let deleteRecord = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    ).then(result => {
-      session.close();
-      return result;
-    });
+    let query = 'MATCH (n:Spatial) WHERE id(n)=' + this._id + ' DELETE n';
+    let deleteRecord = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        return result;
+      });
     return deleteRecord;
   }
-
 }
 /**
 * @api {get} /spatials Get spatials
@@ -204,52 +232,63 @@ http://localhost:5100/api/spatials?page=1&limit=25
 */
 const getSpatials = async (req, resp) => {
   let parameters = req.query;
-  let systemType = null;
+  let label = '';
   let page = 0;
-  let orderField = "label";
+  let orderField = 'label';
   let queryPage = 0;
-  let queryOrder = "";
+  let queryOrder = '';
   let limit = 25;
 
-  let query = "";
-  let queryParams = "";
+  let query = '';
+  let queryParams = '';
 
-  if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.label !== 'undefined') {
     label = parameters.label;
-    if (label!=="") {
-      queryParams +="toLower(n.label) =~ toLower('.*"+label+".*') ";
+    if (label !== '') {
+      queryParams += `toLower(n.label) =~ toLower('.*${label}.*') `;
     }
   }
-  if (typeof parameters.orderField!=="undefined") {
+  if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
   }
-  if (orderField!=="") {
-    queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
-      queryOrder += " DESC";
+  if (orderField !== '') {
+    queryOrder = 'ORDER BY n.' + orderField;
+    if (
+      typeof parameters.orderDesc !== 'undefined' &&
+      parameters.orderDesc === 'true'
+    ) {
+      queryOrder += ' DESC';
     }
   }
 
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
-    if (queryPage<0) {
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
+    queryPage = parseInt(parameters.page, 10) - 1;
+    if (queryPage < 0) {
       queryPage = 0;
     }
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
 
-  let skip = limit*queryPage;
-  if (queryParams!=="") {
-    queryParams = "WHERE "+queryParams;
+  let skip = limit * queryPage;
+  if (queryParams !== '') {
+    queryParams = 'WHERE ' + queryParams;
   }
-  query = "MATCH (n:Spatial) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+  query =
+    'MATCH (n:Spatial) ' +
+    queryParams +
+    ' RETURN n ' +
+    queryOrder +
+    ' SKIP ' +
+    skip +
+    ' LIMIT ' +
+    limit;
   let data = await getSpatialsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -257,52 +296,51 @@ const getSpatials = async (req, resp) => {
       data: [],
       error: data.error,
       msg: data.error.message,
-    })
-  }
-  else {
+    });
+  } else {
     let responseData = {
       currentPage: currentPage,
       data: data.nodes,
       totalItems: data.count,
       totalPages: data.totalPages,
-    }
+    };
     resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
-    })
+      msg: 'Query results',
+    });
   }
-}
+};
 
 const getSpatialsQuery = async (query, queryParams, limit) => {
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  })
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
   let nodes = helpers.normalizeRecordsOutput(nodesPromise);
-  let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Spatial) "+queryParams+" RETURN count(*)")
-  )
-  .then(result=> {
-    session.close();
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['count(*)'];
-    return output;
-  });
-  let totalPages = Math.ceil(count/limit);
+  let count = await session
+    .writeTransaction((tx) =>
+      tx.run('MATCH (n:Spatial) ' + queryParams + ' RETURN count(*)')
+    )
+    .then((result) => {
+      session.close();
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['count(*)'];
+      return output;
+    });
+  let totalPages = Math.ceil(count / limit);
   let result = {
     nodes: nodes,
     count: count,
-    totalPages: totalPages
-  }
+    totalPages: totalPages,
+  };
   return result;
-}
+};
 
 /**
 * @api {get} /spatial Get spatial
@@ -317,31 +355,31 @@ http://localhost:5100/api/spatial?_id=2514
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"_id":"2514","label":"test","streetAddress":"address","locality":"loc","region":"reg","postalCode":"pc","country":"count","latitude":"lat","longitude":"lon","locationType":"type","note":"note","createdBy":null,"createdAt":null,"updatedBy":"260","updatedAt":"2020-01-17T10:43:13.764Z","events":[]},"error":[],"msg":"Query results"}
 */
-const getSpatial = async(req, resp) => {
+const getSpatial = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
-  let _id=null;
-  if (typeof parameters._id!=="undefined" && parameters._id!=="") {
+  let _id = null;
+  if (typeof parameters._id !== 'undefined' && parameters._id !== '') {
     _id = parameters._id;
   }
-  let query = {_id: _id};
+  let query = { _id: _id };
   let spatial = new Spatial(query);
   await spatial.load();
   resp.json({
     status: true,
     data: spatial,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {put} /spatial Put spatial
@@ -369,14 +407,14 @@ const getSpatial = async(req, resp) => {
 {"error":[],"status":true,"data":{"note":"note","country":"count","updatedBy":"260","latitude":"lat","postalCode":"pc","locality":"loc","locationType":"type","label":"test","streetAddress":"address","_id":"2514","region":"reg","updatedAt":"2020-01-17T11:23:02.934Z","longitude":"lon"}}
 
 */
-const putSpatial = async(req, resp) => {
+const putSpatial = async (req, resp) => {
   let postData = req.body;
-  if (Object.keys(postData).length===0) {
+  if (Object.keys(postData).length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "The spatial must not be empty",
+      msg: 'The spatial must not be empty',
     });
     return false;
   }
@@ -384,7 +422,7 @@ const putSpatial = async(req, resp) => {
   let spatial = new Spatial(postData);
   let output = await spatial.save(userId);
   resp.json(output);
-}
+};
 
 /**
 * @api {delete} /spatial Delete spatial
@@ -400,27 +438,26 @@ http://localhost:5100/api/spatial?_id=2514
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Spatial) WHERE id(n)=2514 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":30,"high":0}}},"error":[],"msg":"Query results"}
 */
-const deleteSpatial = async(req, resp) => {
+const deleteSpatial = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
-  let spatial = new Spatial({_id: parameters._id});
+  let spatial = new Spatial({ _id: parameters._id });
   let data = await spatial.delete();
   resp.json({
     status: true,
     data: data,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
-
+};
 
 module.exports = {
   Spatial: Spatial,

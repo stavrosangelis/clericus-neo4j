@@ -1,25 +1,25 @@
 const User = require('../controllers/user.ctrl').User;
 const TaxonomyTerm = require('../controllers/taxonomyTerm.ctrl').TaxonomyTerm;
 const Usergroup = require('../controllers/usergroup.ctrl').Usergroup;
-const updateReference = require('../controllers/references.ctrl').updateReference;
+const updateReference = require('../controllers/references.ctrl')
+  .updateReference;
 const readJSONFile = require('../helpers').readJSONFile;
-const driver = require("../config/db-driver");
-const helpers = require("../helpers");
 const crypto = require('crypto-js');
 
-const seedUser = async(email, password) => {
+const seedUser = async (email, password) => {
   // 1. load default user data
-  const entries = await readJSONFile(process.env.ABSPATH+'src/seed/data/user.json');
+  const entries = await readJSONFile(
+    process.env.ABSPATH + 'src/seed/data/user.json'
+  );
   let defaultUser = entries.data;
 
   // 2. hash user password
-  if (email!==null) {
+  if (email !== null) {
     defaultUser.email = email;
   }
-  if (password!==null) {
+  if (password !== null) {
     defaultUser.password = password;
-  }
-  else {
+  } else {
     defaultUser.password = crypto.SHA1(defaultUser.password).toString();
   }
 
@@ -29,45 +29,44 @@ const seedUser = async(email, password) => {
   // 4. save new User
   let saveUser = await newUser.save();
 
-  //5. save user password
+  // 5. save user password
   newUser._id = saveUser.data._id;
   newUser.password = defaultUser.password;
 
   await newUser.updatePassword();
 
   let output = {
-    user: newUser
-  }
+    user: newUser,
+  };
   return output;
-}
+};
 
 const addUserToGroup = async (userId) => {
   // 6. link user to admin userGroup
   // 6.1. load taxonomy term
-  let taxTerm = new TaxonomyTerm({labelId: "belongsToUserGroup"});
+  let taxTerm = new TaxonomyTerm({ labelId: 'belongsToUserGroup' });
   await taxTerm.load();
 
   // 6.2. load admin usergroup
-  let adminUsergroup = new Usergroup({label: 'Administrator'});
+  let adminUsergroup = new Usergroup({ label: 'Administrator' });
   await adminUsergroup.load();
 
   // 6.3. add relation
   let ref = {
     items: [
-      {_id:userId, type: "User", role: ""},
-      {_id:adminUsergroup._id, type: "Usergroup", role: ""},
+      { _id: userId, type: 'User', role: '' },
+      { _id: adminUsergroup._id, type: 'Usergroup', role: '' },
     ],
-    taxonomyTermId: taxTerm._id
-  }
+    taxonomyTermId: taxTerm._id,
+  };
   let addReference = await updateReference(ref);
   let output = {
-    ref: addReference
-  }
+    ref: addReference,
+  };
   return output;
-}
-
+};
 
 module.exports = {
   seedUser: seedUser,
   addUserToGroup: addUserToGroup,
-}
+};

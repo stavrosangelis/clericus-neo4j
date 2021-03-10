@@ -1,19 +1,36 @@
-const driver = require("../config/db-driver");
-const helpers = require("../helpers");
+const driver = require('../config/db-driver');
+const helpers = require('../helpers');
 const Canvas = require('canvas');
 const fs = require('fs');
-const mimeType = require('mime-types')
-const {promisify} = require('util');
+const mimeType = require('mime-types');
+const { promisify } = require('util');
 const formidable = require('formidable');
-const personController = require("./person.ctrl");
+const personController = require('./person.ctrl');
 const TaxonomyTerm = require('./taxonomyTerm.ctrl').TaxonomyTerm;
-const referencesController = require('./references.ctrl')
+const referencesController = require('./references.ctrl');
 const archivePath = process.env.ARCHIVEPATH;
 
 class Resource {
-  constructor({_id=null,label=null,alternateLabels=[],description=null,fileName=null,metadata=[],originalLocation="",paths=[],resourceType=null,systemType=null,uploadedFile=null,status='private',createdBy=null,createdAt=null,updatedBy=null,updatedAt=null}) {
+  constructor({
+    _id = null,
+    label = null,
+    alternateLabels = [],
+    description = null,
+    fileName = null,
+    metadata = [],
+    originalLocation = '',
+    paths = [],
+    resourceType = null,
+    systemType = null,
+    uploadedFile = null,
+    status = 'private',
+    createdBy = null,
+    createdAt = null,
+    updatedBy = null,
+    updatedAt = null,
+  }) {
     this._id = null;
-    if (_id!==null) {
+    if (_id !== null) {
       this._id = _id;
     }
     this.label = label;
@@ -36,69 +53,78 @@ class Resource {
   validate() {
     let status = true;
     let errors = [];
-    if (this.label==="") {
+    if (this.label === '') {
       status = false;
-      errors.push({field: "label", msg: "The label must not be empty"});
+      errors.push({ field: 'label', msg: 'The label must not be empty' });
     }
-    if (this.fileName==="") {
+    if (this.fileName === '') {
       status = false;
-      errors.push({field: "fileName", msg: "The fileName must not be empty"});
+      errors.push({ field: 'fileName', msg: 'The fileName must not be empty' });
     }
-    if (this.paths.length>0) {
+    if (this.paths.length > 0) {
       let pI = 0;
       for (let key in this.paths) {
         let path = this.paths[key];
-        if (path.path==="") {
+        if (path.path === '') {
           status = false;
-          errors.push({field: "path", msg: "The path must not be empty for path "+pI});
+          errors.push({
+            field: 'path',
+            msg: 'The path must not be empty for path ' + pI,
+          });
         }
-        if (path.pathType==="") {
+        if (path.pathType === '') {
           status = false;
-          errors.push({field: "pathType", msg: "The pathType must not be empty for path "+pI});
+          errors.push({
+            field: 'pathType',
+            msg: 'The pathType must not be empty for path ' + pI,
+          });
         }
         pI++;
       }
-      if (this.resourceType==="") {
+      if (this.resourceType === '') {
         status = false;
-        errors.push({field: "resourceType", msg: "The resourceType must not be empty"});
+        errors.push({
+          field: 'resourceType',
+          msg: 'The resourceType must not be empty',
+        });
       }
     }
 
-    let msg = "The record is valid";
+    let msg = 'The record is valid';
     if (!status) {
-      msg = "The record is not valid";
+      msg = 'The record is not valid';
     }
     let output = {
       status: status,
       msg: msg,
-      errors: errors
-    }
+      errors: errors,
+    };
     return output;
   }
 
   async load() {
-    if (this._id===null) {
+    if (this._id === null) {
       return false;
     }
     let session = driver.session();
-    let query = "MATCH (n:Resource) WHERE id(n)="+this._id+" return n";
-    let node = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      if (records.length>0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
-        return outputRecord;
-      }
-    }).catch((error) => {
-      console.log(error)
-    });
+    let query = 'MATCH (n:Resource) WHERE id(n)=' + this._id + ' return n';
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+      })
+      .catch((error) => {
+        console.log(error);
+      });
     for (let key in node) {
       this[key] = node[key];
-      if (key==="paths" && node[key].length>0) {
+      if (key === 'paths' && node[key].length > 0) {
         let paths = [];
         for (let akey in node[key]) {
           let path = JSON.parse(node[key][akey]);
@@ -106,14 +132,14 @@ class Resource {
         }
         this[key] = paths;
       }
-      if (key==="metadata") {
+      if (key === 'metadata') {
         let metadata = JSON.parse(node[key]);
-        if (typeof metadata==="string") {
+        if (typeof metadata === 'string') {
           metadata = JSON.parse(metadata);
         }
         this.metadata = metadata;
       }
-      if (key==="alternateLabels"&& node[key].length>0) {
+      if (key === 'alternateLabels' && node[key].length > 0) {
         let newAlternateLabels = [];
         for (let akey in node[key]) {
           let alternateLabel = JSON.parse(node[key][akey]);
@@ -124,10 +150,18 @@ class Resource {
     }
 
     // relations
-    let events = await helpers.loadRelations(this._id, "Resource", "Event");
-    let organisations = await helpers.loadRelations(this._id, "Resource", "Organisation");
-    let people = await helpers.loadRelations(this._id, "Resource", "Person");
-    let resources = await helpers.loadRelations(this._id, "Resource", "Resource");
+    let events = await helpers.loadRelations(this._id, 'Resource', 'Event');
+    let organisations = await helpers.loadRelations(
+      this._id,
+      'Resource',
+      'Organisation'
+    );
+    let people = await helpers.loadRelations(this._id, 'Resource', 'Person');
+    let resources = await helpers.loadRelations(
+      this._id,
+      'Resource',
+      'Resource'
+    );
     this.events = events;
     this.organisations = organisations;
     this.people = people;
@@ -138,19 +172,18 @@ class Resource {
     let validateResource = this.validate();
     if (!validateResource.status) {
       return validateResource;
-    }
-    else {
+    } else {
       let session = driver.session();
       // turn json data to strings to store to the db
       let newPaths = [];
-      if (this.paths.length>0) {
+      if (this.paths.length > 0) {
         for (let key in this.paths) {
           let path = JSON.stringify(this.paths[key]);
           newPaths.push(path);
         }
       }
       let newAlternateLabels = [];
-      if (this.alternateLabels.length>0) {
+      if (this.alternateLabels.length > 0) {
         for (let key in this.alternateLabels) {
           let alternateLabel = JSON.stringify(this.alternateLabels[key]);
           newAlternateLabels.push(alternateLabel);
@@ -162,12 +195,11 @@ class Resource {
 
       // timestamps
       let now = new Date().toISOString();
-      if (typeof this._id==="undefined" || this._id===null) {
+      if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
-      }
-      else {
-        let original = new Resource({_id:this._id});
+      } else {
+        let original = new Resource({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
@@ -177,26 +209,31 @@ class Resource {
 
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
-      let query = "";
-      if (typeof this._id==="undefined" || this._id===null) {
-        query = "CREATE (n:Resource "+nodeProperties+") RETURN n";
+      let query = '';
+      if (typeof this._id === 'undefined' || this._id === null) {
+        query = 'CREATE (n:Resource ' + nodeProperties + ') RETURN n';
+      } else {
+        query =
+          'MATCH (n:Resource) WHERE id(n)=' +
+          this._id +
+          ' SET n=' +
+          nodeProperties +
+          ' RETURN n';
       }
-      else {
-        query = "MATCH (n:Resource) WHERE id(n)="+this._id+" SET n="+nodeProperties+" RETURN n";
-      }
-      let resultPromise = await session.run(
-        query,
-        params
-      ).then(result => {
+      let resultPromise = await session.run(query, params).then((result) => {
         session.close();
         let records = result.records;
-        let output = {error: ["The record cannot be updated"], status: false, data: []};
-        if (records.length>0) {
+        let output = {
+          error: ['The record cannot be updated'],
+          status: false,
+          data: [],
+        };
+        if (records.length > 0) {
           let record = records[0];
           let key = record.keys[0];
           let resultRecord = record.toObject()[key];
           resultRecord = helpers.outputRecord(resultRecord);
-          output = {error: [], status: true, data: resultRecord};
+          output = { error: [], status: true, data: resultRecord };
         }
         return output;
       });
@@ -205,64 +242,61 @@ class Resource {
   }
 
   async delete() {
-    let session = driver.session()
+    let session = driver.session();
     // 1. load file to get details
-    let resource = new Resource({_id: this._id});
+    let resource = new Resource({ _id: this._id });
     await resource.load();
 
     // 2. delete files from disk
     for (let key in resource.paths) {
-      let path = resource.paths[key];
-      let deleteFile = this.unlinkFile(archivePath+path.path);
+      const path = resource.paths[key];
+      this.unlinkFile(archivePath + path.path);
     }
 
     // 3. delete relations
-    let query1 = "MATCH (n:Resource)-[r]-() WHERE id(n)="+this._id+" DELETE r";
-    let deleteRel = await session.writeTransaction(tx=>
-      tx.run(query1,{})
-    )
-    .then(result => {
-      return result;
-    })
-    .catch((error) => {
-      console.log(error)
-    });
+    let query1 =
+      'MATCH (n:Resource)-[r]-() WHERE id(n)=' + this._id + ' DELETE r';
+    await session
+      .writeTransaction((tx) => tx.run(query1, {}))
+      .then((result) => {
+        return result;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
 
     // 4. delete record
-    let query = "MATCH (n:Resource) WHERE id(n)="+this._id+" DELETE n";
-    let deleteRecord = await session.writeTransaction(tx=>
-      tx.run(query,{})
-    )
-    .then(result => {
-      session.close();
-      return result;
-    })
-    .catch((error) => {
-      console.log(error)
-    });
+    let query = 'MATCH (n:Resource) WHERE id(n)=' + this._id + ' DELETE n';
+    let deleteRecord = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        return result;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
     return deleteRecord;
   }
 
   unlinkFile(path) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       fs.unlink(path, (err) => {
         let output = {};
         if (err) {
           output.error = err;
           output.status = false;
-        }
-        else {
+        } else {
           output.status = true;
-          output.message = "File \""+path+"\" deleted successfully";
+          output.message = 'File "' + path + '" deleted successfully';
         }
         resolve(output);
       });
-    })
-    .catch((error)=> {
+    }).catch((error) => {
       return error;
     });
   }
-};
+}
 
 /**
 * @api {get} /resources Get resources
@@ -291,82 +325,95 @@ class Resource {
 */
 const getResources = async (req, resp) => {
   let parameters = req.query;
-  let label = "";
-  let systemType = "";
-  let status = "";
-  let description = "";
+  let label = '';
+  let systemType = '';
+  let status = '';
+  let description = '';
   let page = 0;
-  let orderField = "label";
+  let orderField = 'label';
   let queryPage = 0;
-  let queryOrder = "";
+  let queryOrder = '';
   let limit = 25;
 
-  let query = "";
-  let queryParams = "";
+  let query = '';
+  let queryParams = '';
 
-  if (typeof parameters.label!=="undefined") {
+  if (typeof parameters.label !== 'undefined') {
     label = parameters.label;
-    if (label!=="") {
-      queryParams = "toLower(n.label) =~ toLower('.*"+label+".*') ";
+    if (label !== '') {
+      queryParams = "toLower(n.label) =~ toLower('.*" + label + ".*') ";
     }
   }
-  if (typeof parameters.systemType!=="undefined") {
+  if (typeof parameters.systemType !== 'undefined') {
     systemType = parameters.systemType;
-    if (systemType!=="") {
-      if (queryParams !=="") {
-        queryParams += " AND ";
+    if (systemType !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
-      queryParams +="toLower(n.systemType) =~ toLower('.*"+systemType+".*') ";
+      queryParams +=
+        "toLower(n.systemType) =~ toLower('.*" + systemType + ".*') ";
     }
   }
-  if (typeof parameters.description!=="undefined") {
+  if (typeof parameters.description !== 'undefined') {
     description = parameters.description;
-    if (description!=="") {
-      if (queryParams !=="") {
-        queryParams += " AND ";
+    if (description !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
-      queryParams +="toLower(n.description) =~ toLower('.*"+description+".*') ";
+      queryParams +=
+        "toLower(n.description) =~ toLower('.*" + description + ".*') ";
     }
   }
-  if (typeof parameters.status!=="undefined") {
+  if (typeof parameters.status !== 'undefined') {
     status = parameters.status;
-    if (status!=="") {
-      if (queryParams !=="") {
-        queryParams += " AND ";
+    if (status !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
-      queryParams +="toLower(n.status) =~ toLower('.*"+status+".*') ";
+      queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
     }
   }
-  if (typeof parameters.orderField!=="undefined") {
+  if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
   }
-  if (orderField!=="") {
-    queryOrder = "ORDER BY n."+orderField;
-    if (typeof parameters.orderDesc!=="undefined" && parameters.orderDesc==="true") {
-      queryOrder += " DESC";
+  if (orderField !== '') {
+    queryOrder = 'ORDER BY n.' + orderField;
+    if (
+      typeof parameters.orderDesc !== 'undefined' &&
+      parameters.orderDesc === 'true'
+    ) {
+      queryOrder += ' DESC';
     }
   }
 
-  if (typeof parameters.page!=="undefined") {
-    page = parseInt(parameters.page,10);
-    queryPage = parseInt(parameters.page,10)-1;
-    if (queryPage<0) {
+  if (typeof parameters.page !== 'undefined') {
+    page = parseInt(parameters.page, 10);
+    queryPage = parseInt(parameters.page, 10) - 1;
+    if (queryPage < 0) {
       queryPage = 0;
     }
   }
-  if (typeof parameters.limit!=="undefined") {
-    limit = parseInt(parameters.limit,10);
+  if (typeof parameters.limit !== 'undefined') {
+    limit = parseInt(parameters.limit, 10);
   }
   let currentPage = page;
-  if (page===0) {
+  if (page === 0) {
     currentPage = 1;
   }
 
-  let skip = limit*queryPage;
-  if (queryParams!=="") {
-    queryParams = "WHERE "+queryParams;
+  let skip = limit * queryPage;
+  if (queryParams !== '') {
+    queryParams = 'WHERE ' + queryParams;
   }
-  query = "MATCH (n:Resource) "+queryParams+" RETURN n "+queryOrder+" SKIP "+skip+" LIMIT "+limit;
+  query =
+    'MATCH (n:Resource) ' +
+    queryParams +
+    ' RETURN n ' +
+    queryOrder +
+    ' SKIP ' +
+    skip +
+    ' LIMIT ' +
+    limit;
   let data = await getResourcesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -374,40 +421,38 @@ const getResources = async (req, resp) => {
       data: [],
       error: data.error,
       msg: data.error.message,
-    })
-  }
-  else {
+    });
+  } else {
     let responseData = {
       currentPage: currentPage,
       data: data.nodes,
-      totalItems: parseInt(data.count,10),
+      totalItems: parseInt(data.count, 10),
       totalPages: data.totalPages,
-    }
+    };
     resp.json({
       status: true,
       data: responseData,
       error: [],
-      msg: "Query results",
-    })
+      msg: 'Query results',
+    });
   }
-}
+};
 
 const getResourcesQuery = async (query, queryParams, limit) => {
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  })
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise, "n");
-  let nodesOutput = nodes.map(node=> {
+  let nodes = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  let nodesOutput = nodes.map((node) => {
     let nodeOutput = {};
     for (let key in node) {
       nodeOutput[key] = node[key];
       let paths = [];
-      if (key==="paths" && node[key].length>0) {
+      if (key === 'paths' && node[key].length > 0) {
         for (let akey in node[key]) {
           let path = JSON.parse(node[key][akey]);
           paths.push(path);
@@ -418,25 +463,26 @@ const getResourcesQuery = async (query, queryParams, limit) => {
     return nodeOutput;
   });
 
-  let count = await session.writeTransaction(tx=>
-    tx.run("MATCH (n:Resource) "+queryParams+" RETURN count(*)")
-  )
-  .then(result=> {
-    session.close()
-    let resultRecord = result.records[0];
-    let countObj = resultRecord.toObject();
-    helpers.prepareOutput(countObj);
-    let output = countObj['count(*)'];
-    return output;
-  });
-  let totalPages = Math.ceil(count/limit)
+  let count = await session
+    .writeTransaction((tx) =>
+      tx.run('MATCH (n:Resource) ' + queryParams + ' RETURN count(*)')
+    )
+    .then((result) => {
+      session.close();
+      let resultRecord = result.records[0];
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      let output = countObj['count(*)'];
+      return output;
+    });
+  let totalPages = Math.ceil(count / limit);
   let result = {
     nodes: nodesOutput,
     count: count,
-    totalPages: totalPages
-  }
+    totalPages: totalPages,
+  };
   return result;
-}
+};
 
 /**
 * @api {get} /resource Get resource
@@ -471,28 +517,28 @@ const getResourcesQuery = async (query, queryParams, limit) => {
   "msg": "Query results"
 }
 */
-const getResource = async(req, resp) => {
+const getResource = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
 
   let _id = parameters._id;
-  let resource = new Resource({_id:_id});
+  let resource = new Resource({ _id: _id });
   await resource.load();
   resp.json({
     status: true,
     data: resource,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {put} /resource Put resource
@@ -513,14 +559,14 @@ const getResource = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"error":[],"status":true,"data":{"fileName":"logo-transparent.png","metadata":"{\"image\":{\"default\":{\"height\":275,\"width\":269,\"extension\":\"png\",\"x\":0,\"y\":0,\"rotate\":0}}}","updatedBy":"260","paths":["{\"path\":\"images/fullsize/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"source\"}","{\"path\":\"images/thumbnails/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"thumbnail\"}"],"systemType":"{\"ref\":\"295\"}","description":"","_id":"2069","label":"logo-transparent.png","updatedAt":"2020-01-14T16:30:00.338Z","resourceType":"image","status":false}},"error":[],"msg":"Query results"}
 */
-const putResource = async(req, resp) => {
+const putResource = async (req, resp) => {
   let postData = req.body;
-  if (postData===null || Object.keys(postData).length===0) {
+  if (postData === null || Object.keys(postData).length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "The resource must not be empty",
+      msg: 'The resource must not be empty',
     });
     return false;
   }
@@ -533,9 +579,9 @@ const putResource = async(req, resp) => {
     status: true,
     data: data,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {delete} /resource Delete resource
@@ -547,26 +593,26 @@ const putResource = async(req, resp) => {
 *
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":11,"high":0}}},"error":[],"msg":"Query results"}*/
-const deleteResource = async(req, resp) => {
+const deleteResource = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
-  let resource = new Resource({_id: parameters._id});
+  let resource = new Resource({ _id: parameters._id });
   let data = await resource.delete();
   resp.json({
     status: true,
     data: data,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {delete} /resources Delete resources
@@ -579,52 +625,57 @@ const deleteResource = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":[{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2404 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":5,"high":0}}}],"error":[],"msg":"Query results"}
 */
-const deleteResources = async(req, resp) => {
+const deleteResources = async (req, resp) => {
   let deleteData = req.body;
-  if (typeof deleteData._ids==="undefined" || deleteData._ids.length===0) {
+  if (typeof deleteData._ids === 'undefined' || deleteData._ids.length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select valid ids to continue.",
+      msg: 'Please select valid ids to continue.',
     });
     return false;
   }
   let responseData = [];
-  for (let i=0; i<deleteData._ids.length; i++) {
+  for (let i = 0; i < deleteData._ids.length; i++) {
     let _id = deleteData._ids[i];
-    let resource = new Resource({_id: _id});
+    let resource = new Resource({ _id: _id });
     responseData.push(await resource.delete());
   }
   resp.json({
     status: true,
     data: responseData,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
-const updateStatus = async(req, resp) => {
+const updateStatus = async (req, resp) => {
   let postData = req.body;
-  if (typeof postData._ids==="undefined" || postData._ids.length===0 || typeof postData.status==="undefined" || postData.status==="") {
+  if (
+    typeof postData._ids === 'undefined' ||
+    postData._ids.length === 0 ||
+    typeof postData.status === 'undefined' ||
+    postData.status === ''
+  ) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select valid ids and new status to continue.",
+      msg: 'Please select valid ids and new status to continue.',
     });
     return false;
   }
   let userId = req.decoded.id;
   let responseData = [];
   let session = driver.session();
-  for (let i=0; i<postData._ids.length; i++) {
+  for (let i = 0; i < postData._ids.length; i++) {
     let _id = postData._ids[i];
     let now = new Date().toISOString();
     let updatedBy = userId;
     let updatedAt = now;
     let query = `MATCH (n:Resource) WHERE id(n)=${_id} SET n.status="${postData.status}", n.updatedBy="${updatedBy}", n.updatedAt="${updatedAt}"`;
-    let update = await session.run(query,{}).then(result => {
+    let update = await session.run(query, {}).then((result) => {
       return result;
     });
     responseData.push(update);
@@ -634,9 +685,9 @@ const updateStatus = async(req, resp) => {
     status: true,
     data: responseData,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {post} /upload-resource Upload resource
@@ -652,14 +703,14 @@ const updateStatus = async(req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"fileName":"logo-transparent.png","metadata":"{\"image\":{\"default\":{\"height\":275,\"width\":269,\"extension\":\"png\",\"x\":0,\"y\":0,\"rotate\":0}}}","paths":["{\"path\":\"images/fullsize/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"source\"}","{\"path\":\"images/thumbnails/9e57922b92487c30424595d16df57b8f.png\",\"pathType\":\"thumbnail\"}"],"systemType":"{\"ref\":\"295\"}","label":"logo-transparent.png","resourceType":"image","status":false,"_id":"2069"},"error":[],"msg":""}
 */
-const uploadResource = async(req, resp) => {
+const uploadResource = async (req, resp) => {
   let data = await parseFormDataPromise(req);
-  if (Object.keys(data.file).length===0) {
+  if (Object.keys(data.file).length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "The uploaded file must not be empty",
+      msg: 'The uploaded file must not be empty',
     });
     return false;
   }
@@ -668,21 +719,21 @@ const uploadResource = async(req, resp) => {
   let newId = null;
   let newLabel = uploadedFile.name;
   let systemType = null;
-  if (typeof fields._id!=="undefined" && fields._id!==null) {
+  if (typeof fields._id !== 'undefined' && fields._id !== null) {
     newId = fields._id;
   }
-  if (typeof fields.label!=="undefined" && fields.label!==null) {
+  if (typeof fields.label !== 'undefined' && fields.label !== null) {
     newLabel = fields.label;
   }
-  if (typeof fields.systemType!=="undefined" && fields.systemType!==null) {
+  if (typeof fields.systemType !== 'undefined' && fields.systemType !== null) {
     systemType = fields.systemType;
   }
   let extension = mimeType.extension(uploadedFile.type);
-  if (extension==="jpeg") {
-    extension = "jpg";
+  if (extension === 'jpeg') {
+    extension = 'jpg';
   }
-  let allowedExtensions = ["jpg", "png", "gif", "pdf"];
-  if (allowedExtensions.indexOf(extension)===-1) {
+  let allowedExtensions = ['jpg', 'png', 'gif', 'pdf'];
+  if (allowedExtensions.indexOf(extension) === -1) {
     resp.json({
       status: false,
       data: [],
@@ -691,130 +742,160 @@ const uploadResource = async(req, resp) => {
     });
     return false;
   }
-  let hashedName = helpers.hashFileName(uploadedFile.name)+"."+extension;
+  let hashedName = helpers.hashFileName(uploadedFile.name) + '.' + extension;
 
   // 1. upload file
-  let newUploadFile = await uploadFile(uploadedFile,hashedName,extension);
+  let newUploadFile = await uploadFile(uploadedFile, hashedName, extension);
   // 2. if image create thumbnail
-  let fileType0 = uploadedFile.type.split("/")[0];
-  let fileType1 = uploadedFile.type.split("/")[1];
+  let fileType0 = uploadedFile.type.split('/')[0];
+  let fileType1 = uploadedFile.type.split('/')[1];
   let thumbnailPath = '';
-  if (fileType0==="image" && newUploadFile.status) {
+  if (fileType0 === 'image' && newUploadFile.status) {
     let newWidth = null;
     let newHeight = null;
     let newDimensions = null;
-    if (newDimensions!==null) {
-      if (typeof newDimensions.width!=="undefined" && newDimensions.width!=="") {
+    if (newDimensions !== null) {
+      if (
+        typeof newDimensions.width !== 'undefined' &&
+        newDimensions.width !== ''
+      ) {
         newWidth = newDimensions.width;
       }
-      if (typeof newDimensions.height!=="undefined" && newDimensions.height!=="") {
+      if (
+        typeof newDimensions.height !== 'undefined' &&
+        newDimensions.height !== ''
+      ) {
         newHeight = newDimensions.height;
       }
     }
-    let fileName = uploadedFile.fileName;
     let srcPath = newUploadFile.path;
-    thumbnailPath = archivePath+"images/thumbnails/"+hashedName;
+    thumbnailPath = archivePath + 'images/thumbnails/' + hashedName;
 
-    createThumb = await createThumbnail(srcPath, thumbnailPath, hashedName, newWidth, newHeight);
+    await createThumbnail(
+      srcPath,
+      thumbnailPath,
+      hashedName,
+      newWidth,
+      newHeight
+    );
   }
   // 3. insert/update resource
-  let parseResourceDetailsPromise = await parseResourceDetails(fileType0, fileType1, uploadedFile, newUploadFile, hashedName);
+  let parseResourceDetailsPromise = await parseResourceDetails(
+    fileType0,
+    fileType1,
+    uploadedFile,
+    newUploadFile,
+    hashedName
+  );
   let newResourceData = {};
-  if (newId!==null) {
+  if (newId !== null) {
     newResourceData._id = newId;
   }
-  if (systemType!==null) {
+  if (systemType !== null) {
     newResourceData.systemType = systemType;
   }
   for (var key in parseResourceDetailsPromise) {
-    if (parseResourceDetailsPromise[key]!==null) {
+    if (parseResourceDetailsPromise[key] !== null) {
       newResourceData[key] = parseResourceDetailsPromise[key];
     }
   }
-  if (newLabel!==null) {
+  if (newLabel !== null) {
     newResourceData.label = newLabel;
   }
   let userId = req.decoded.id;
   let newResource = new Resource(newResourceData);
   let updateResource = await newResource.save(userId);
   let status = true;
-  if (typeof updateResource.status!=="undefined" && updateResource.status===false) {
+  if (
+    typeof updateResource.status !== 'undefined' &&
+    updateResource.status === false
+  ) {
     // if file save failed delete uploaded file and thumbnail
     newResource.unlinkFile(newUploadFile.path);
     newResource.unlinkFile(thumbnailPath);
     status = false;
   }
   let error = [];
-  if (typeof updateResource.error!=="undefined") {
+  if (typeof updateResource.error !== 'undefined') {
     error = updateResource.error;
   }
   let output = {
     status: status,
     data: updateResource.data,
     error: error,
-    msg: "",
-  }
+    msg: '',
+  };
   resp.json(output);
-}
+};
 
 const parseFormDataPromise = (req) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     new formidable.IncomingForm().parse(req, (err, fields, files) => {
       if (err) {
-        console.error('Error', err)
-        throw err
+        console.error('Error', err);
+        throw err;
       }
       let output = {};
       output.fields = fields;
       output.file = files;
       resolve(output);
-    })
+    });
   });
-}
+};
 
-const uploadFile = async(uploadedFile=null, hashedName="", extension=null) => {
-  if (uploadedFile===null || hashedName==="" && extension!==null) {
+const uploadFile = async (
+  uploadedFile = null,
+  hashedName = '',
+  extension = null
+) => {
+  if (uploadedFile === null || (hashedName === '' && extension !== null)) {
     return false;
   }
   // patch for the case when the archive path is in a different drive
-  let tempPath = archivePath+'temp/'+hashedName;
-  let movFile = await fs.copyFileSync(uploadedFile.path, tempPath);
+  let tempPath = archivePath + 'temp/' + hashedName;
+  await fs.copyFileSync(uploadedFile.path, tempPath);
   uploadedFile.path = tempPath;
 
   let sourcePath = uploadedFile.path;
-  let targetPath = "";
-  if (extension!=="pdf") {
-    targetPath = archivePath+"images/fullsize/"+hashedName;
+  let targetPath = '';
+  if (extension !== 'pdf') {
+    targetPath = archivePath + 'images/fullsize/' + hashedName;
+  } else {
+    targetPath = archivePath + 'documents/' + hashedName;
   }
-  else {
-    targetPath = archivePath+"documents/"+hashedName;
-  }
-  let uploadFilePromise = await new Promise((resolve, reject) => {
+  let uploadFilePromise = await new Promise((resolve) => {
     fs.rename(sourcePath, targetPath, function (error) {
-        let output = {};
-        if (error) {
-          output.status = false;
-          output.msg = error;
-        }
-        else {
-          output.status = true;
-          output.msg = "File "+uploadedFile.name+" uploaded successfully";
-          output.path = targetPath;
-          output.fileName = hashedName;
-        }
-        resolve(output)
-      });
+      let output = {};
+      if (error) {
+        output.status = false;
+        output.msg = error;
+      } else {
+        output.status = true;
+        output.msg = 'File ' + uploadedFile.name + ' uploaded successfully';
+        output.path = targetPath;
+        output.fileName = hashedName;
+      }
+      resolve(output);
+    });
   });
   return uploadFilePromise;
-}
+};
 
-const createThumbnail = async(srcPath=null,targetPath=null,fileName=null,customWidth=null,customHeight=null) => {
-  if (srcPath===null || targetPath===null) {
+const createThumbnail = async (
+  srcPath = null,
+  targetPath = null,
+  fileName = null,
+  customWidth = null,
+  customHeight = null
+) => {
+  if (srcPath === null || targetPath === null) {
     return false;
   }
   const readFile = promisify(fs.readFile);
-  const imageSrc = await readFile(srcPath).catch(error=>{console.log(error)});
-  const newThumbnail = new Promise((resolve, reject) => {
+  const imageSrc = await readFile(srcPath).catch((error) => {
+    console.log(error);
+  });
+  await new Promise((resolve) => {
     const Image = Canvas.Image;
     const img = new Image();
     let output = {};
@@ -823,83 +904,85 @@ const createThumbnail = async(srcPath=null,targetPath=null,fileName=null,customW
 
     img.onerror = function (err) {
       errors.push(err);
-    }
+    };
     // calculate new dimensions
     let oldWidth = img.width;
     let oldHeight = img.height;
     let aspectRatio = oldWidth / oldHeight;
-    let newWidth = 600, newHeight = 600;
+    let newWidth = 600;
+    let newHeight = 600;
     if (oldWidth > oldHeight) {
       newHeight = newWidth / aspectRatio;
-    }
-    else {
+    } else {
       newWidth = newHeight * aspectRatio;
     }
 
-    if (customWidth!==null) {
+    if (customWidth !== null) {
       newWidth = customWidth;
       newHeight = newWidth / aspectRatio;
-    }
-    else if (customHeight!==null) {
+    } else if (customHeight !== null) {
       newHeight = customHeight;
       newWidth = newHeight * aspectRatio;
     }
 
-    newWidth = parseInt(newWidth,10);
-    newHeight = parseInt(newHeight,10);
+    newWidth = parseInt(newWidth, 10);
+    newHeight = parseInt(newHeight, 10);
 
-    if (newWidth>0 && newHeight>0) {
+    if (newWidth > 0 && newHeight > 0) {
       var canvas = Canvas.createCanvas(newWidth, newHeight);
       var ctx = canvas.getContext('2d');
-      //ctx.imageSmoothingEnabled = true;
+      // ctx.imageSmoothingEnabled = true;
       ctx.drawImage(img, 0, 0, newWidth, newHeight);
 
       var out = fs.createWriteStream(targetPath);
       var stream = canvas.createJPEGStream({
         bufsize: 2048,
-        quality: 80
+        quality: 80,
       });
 
       stream.pipe(out);
       out.on('finish', function () {
         output.status = true;
-        output.msg = fileName+" resized successfully";
+        output.msg = fileName + ' resized successfully';
         output.errors = errors;
         resolve(output);
       });
-    }
-    else {
+    } else {
       output.status = false;
-      output.msg = fileName+" failed to resize";
+      output.msg = fileName + ' failed to resize';
       output.errors = errors;
       resolve(output);
     }
-  })
-  .catch(function (error) {
-    console.log(error)
-  });;
-}
+  }).catch(function (error) {
+    console.log(error);
+  });
+};
 
-const parseResourceDetails = async(fileType0, fileType1, uploadedFile, newUploadFile, hashedName) => {
+const parseResourceDetails = async (
+  fileType0,
+  fileType1,
+  uploadedFile,
+  newUploadFile,
+  hashedName
+) => {
   let newResourceData = {};
-  if (fileType0==="image") {
+  if (fileType0 === 'image') {
     let newFilePath = newUploadFile.path;
     let imageDefault = await helpers.imgDimensions(newFilePath);
-    imageDefault.x=0;
-    imageDefault.y=0;
-    imageDefault.rotate=0;
+    imageDefault.x = 0;
+    imageDefault.y = 0;
+    imageDefault.rotate = 0;
     let imageExif = await helpers.imageExif(newFilePath);
     let imageIptc = await helpers.imageIptc(newFilePath);
-    let newLabel = uploadedFile.name.replace(/\.[^/.]+$/, "");
-    let resourceType = uploadedFile.type.split("/")[0];
-    let newResourceImageMetadata = {}
-    if (imageDefault!==null) {
+    let newLabel = uploadedFile.name.replace(/\.[^/.]+$/, '');
+    let newResourceImageMetadata = {};
+    if (imageDefault !== null) {
       newResourceImageMetadata.default = imageDefault;
     }
-    if (imageExif!==null) {
+    if (imageExif !== null) {
       newResourceImageMetadata.exif = JSON.stringify(imageExif);
     }
-    if (imageIptc!==null && imageIptc.length>0 && imageIptc[0]!==false) {
+    if (imageIptc !== null && imageIptc.length > 0 && imageIptc[0] !== false) {
       newResourceImageMetadata.iptc = JSON.stringify(imageIptc);
     }
     newResourceData = {
@@ -907,30 +990,27 @@ const parseResourceDetails = async(fileType0, fileType1, uploadedFile, newUpload
       fileName: uploadedFile.name,
       hashedName: hashedName,
       metadata: {
-        image: newResourceImageMetadata
+        image: newResourceImageMetadata,
       },
       paths: [
-        {path: "images/fullsize/"+hashedName, pathType: 'source'},
-        {path: "images/thumbnails/"+hashedName, pathType: 'thumbnail'},
+        { path: 'images/fullsize/' + hashedName, pathType: 'source' },
+        { path: 'images/thumbnails/' + hashedName, pathType: 'thumbnail' },
       ],
-      resourceType: 'image'
+      resourceType: 'image',
     };
-  }
-  else if (fileType1==="pdf") {
-    let newLabel = uploadedFile.name.replace(/\.[^/.]+$/, "");
+  } else if (fileType1 === 'pdf') {
+    let newLabel = uploadedFile.name.replace(/\.[^/.]+$/, '');
     newResourceData = {
       label: newLabel,
       fileName: uploadedFile.name,
       hashedName: hashedName,
       metadata: null,
-      paths: [
-        {path: "documents/"+hashedName, pathType: 'source'},
-      ],
-      resourceType: 'document'
+      paths: [{ path: 'documents/' + hashedName, pathType: 'source' }],
+      resourceType: 'document',
     };
   }
   return newResourceData;
-}
+};
 
 /**
 * @api {delete} /resource Delete classpiece
@@ -942,63 +1022,69 @@ const parseResourceDetails = async(fileType0, fileType1, uploadedFile, newUpload
 *
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":11,"high":0}}},"error":[],"msg":"Query results"}*/
-const deleteClasspiece = async(req, resp) => {
+const deleteClasspiece = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id==="undefined" || parameters._id==="") {
+  if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: "Please select a valid id to continue.",
+      msg: 'Please select a valid id to continue.',
     });
     return false;
   }
   let _id = parameters._id;
 
-
   // 1. load classpiece and all related people and thumbnails
-  let resource = new Resource({_id: _id});
+  let resource = new Resource({ _id: _id });
   await resource.load();
   // 2. delete related people
   let peopleResponse = [];
   let people = resource.people;
   let peopleLength = people.length;
-  for (let p=0;p<peopleLength;p++) {
+  for (let p = 0; p < peopleLength; p++) {
     let person = people[p];
     let personId = person.ref._id;
-    let newPerson = new personController.Person({_id: personId});
+    let newPerson = new personController.Person({ _id: personId });
     let deletePerson = await newPerson.delete();
     let deleteSuccess = deletePerson.summary.counters._stats.nodesDeleted;
-    if (deleteSuccess===1) {
-      peopleResponse.push(`Person with _id "${newPerson._id}" deleted successfully.`);
-    }
-    else {
-      peopleResponse.push(`Person with _id "${newPerson._id}" failed to delete.`);
+    if (deleteSuccess === 1) {
+      peopleResponse.push(
+        `Person with _id "${newPerson._id}" deleted successfully.`
+      );
+    } else {
+      peopleResponse.push(
+        `Person with _id "${newPerson._id}" failed to delete.`
+      );
     }
   }
   // 3. delete related thumbnails
   let thumbnailsResponse = [];
   let thumbnails = resource.resources;
   let thumbnailsLength = thumbnails.length;
-  for (let t=0;t<thumbnailsLength;t++) {
+  for (let t = 0; t < thumbnailsLength; t++) {
     let thumbnail = thumbnails[t];
     let thumbnailId = thumbnail.ref._id;
-    let newThumbnail = new Resource({_id: thumbnailId});
+    let newThumbnail = new Resource({ _id: thumbnailId });
     let deleteThumbnail = await newThumbnail.delete();
     let deleteSuccess = deleteThumbnail.summary.counters._stats.nodesDeleted;
-    if (deleteSuccess===1) {
-      thumbnailsResponse.push(`Resource with _id "${newThumbnail._id}" deleted successfully.`);
-    }
-    else {
-      thumbnailsResponse.push(`Resource with _id "${newThumbnail._id}" failed to delete.`);
+    if (deleteSuccess === 1) {
+      thumbnailsResponse.push(
+        `Resource with _id "${newThumbnail._id}" deleted successfully.`
+      );
+    } else {
+      thumbnailsResponse.push(
+        `Resource with _id "${newThumbnail._id}" failed to delete.`
+      );
     }
   }
   // 4. delete classpiece
   let deleteResource = await resource.delete();
-  let deleteResourceSuccess = deleteResource.summary.counters._stats.nodesDeleted;
-  let deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" deleted successfully.`
-  if (deleteResourceSuccess!==1) {
-    deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" failed to delete.`
+  let deleteResourceSuccess =
+    deleteResource.summary.counters._stats.nodesDeleted;
+  let deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" deleted successfully.`;
+  if (deleteResourceSuccess !== 1) {
+    deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" failed to delete.`;
   }
   let data = {
     classpiece: deleteResourceResponse,
@@ -1009,17 +1095,18 @@ const deleteClasspiece = async(req, resp) => {
     status: true,
     data: data,
     error: [],
-    msg: "Query results",
-  });}
+    msg: 'Query results',
+  });
+};
 
-const updateAnnotationImage = async(req, resp) => {
+const updateAnnotationImage = async (req, resp) => {
   let postData = req.body;
-  if (Object.keys(postData).length===0) {
+  if (Object.keys(postData).length === 0) {
     resp.json({
       status: false,
       data: [],
       error: true,
-      msg: ["Please provide the appropriate post data"],
+      msg: ['Please provide the appropriate post data'],
     });
     return false;
   }
@@ -1027,7 +1114,7 @@ const updateAnnotationImage = async(req, resp) => {
   let sourceId = postData.sourceId;
 
   // resource
-  let resource = new Resource({_id:resourceId});
+  let resource = new Resource({ _id: resourceId });
   await resource.load();
   let resourceMeta = resource.metadata.image.default;
   let width = resourceMeta.width;
@@ -1037,264 +1124,287 @@ const updateAnnotationImage = async(req, resp) => {
   let y = resourceMeta.y;
   let rotate = resourceMeta.rotate;
   let resourcePaths = resource.paths;
-  let resourceThumbnailPath = "";
-  let resourceImagePath = "";
-  let hashedName = "";
+  let resourceThumbnailPath = '';
+  let resourceImagePath = '';
+  let hashedName = '';
 
-  if (typeof resource.paths!=="undefined" && resource.paths.length>0) {
-    let resourcePath = resourcePaths.find(p=>{
+  if (typeof resource.paths !== 'undefined' && resource.paths.length > 0) {
+    let resourcePath = resourcePaths.find((p) => {
       let path = p;
-      if (typeof p==="string") {
+      if (typeof p === 'string') {
         path = JSON.parse(path);
       }
-      if (typeof path==="string") {
+      if (typeof path === 'string') {
         path = JSON.parse(path);
       }
-      if (path.pathType==="source") {
+      if (path.pathType === 'source') {
         return true;
       }
     });
-    if (typeof resourcePath==="string") {
+    if (typeof resourcePath === 'string') {
       resourcePath = JSON.parse(resourcePath);
     }
-    if (typeof resourcePath==="string") {
+    if (typeof resourcePath === 'string') {
       resourcePath = JSON.parse(resourcePath);
     }
     resourceImagePath = resourcePath.path;
-    let resourceThumbPath = resourcePaths.find(p=>{
+    let resourceThumbPath = resourcePaths.find((p) => {
       let path = p;
-      if (typeof p==="string") {
+      if (typeof p === 'string') {
         path = JSON.parse(path);
       }
-      if (typeof path==="string") {
+      if (typeof path === 'string') {
         path = JSON.parse(path);
       }
-      if (path.pathType==="thumbnail") {
+      if (path.pathType === 'thumbnail') {
         return true;
       }
     });
-    if (typeof resourceThumbPath==="string") {
+    if (typeof resourceThumbPath === 'string') {
       resourceThumbPath = JSON.parse(resourceThumbPath);
     }
-    if (typeof resourceThumbPath==="string") {
+    if (typeof resourceThumbPath === 'string') {
       resourceThumbPath = JSON.parse(resourceThumbPath);
     }
     resourceThumbnailPath = resourceThumbPath.path;
-  }
-  else {
-    hashedName = helpers.hashFileName(resource.label)+"."+extension;
+  } else {
+    hashedName = helpers.hashFileName(resource.label) + '.' + extension;
     resourceThumbnailPath = `images/thumbnails/${hashedName}`;
     resourceImagePath = `images/fullsize/${hashedName}`;
   }
   // source
-  let source = new Resource({_id:sourceId});
+  let source = new Resource({ _id: sourceId });
   await source.load();
   let sourcePaths = source.paths;
-  let sourcePath = sourcePaths.find(p=>{
+  let sourcePath = sourcePaths.find((p) => {
     let path = p;
-    if (typeof p==="string") {
+    if (typeof p === 'string') {
       path = JSON.parse(path);
     }
-    if (typeof path==="string") {
+    if (typeof path === 'string') {
       path = JSON.parse(path);
     }
-    if (path.pathType==="source") {
+    if (path.pathType === 'source') {
       return true;
     }
   });
-  if (typeof sourcePath==="string") {
+  if (typeof sourcePath === 'string') {
     sourcePath = JSON.parse(sourcePath);
   }
-  if (typeof sourcePath==="string") {
+  if (typeof sourcePath === 'string') {
     sourcePath = JSON.parse(sourcePath);
   }
-  /// create/update cropped image
+  // / create/update cropped image
   const readFile = promisify(fs.readFile);
-  const image = await readFile(archivePath+sourcePath.path);
-  let outputDir = archivePath+resourceImagePath;
-  const cropImg = await new Promise((resolve,reject)=> {
+  const image = await readFile(archivePath + sourcePath.path);
+  let outputDir = archivePath + resourceImagePath;
+  await new Promise((resolve) => {
     const Image = Canvas.Image;
     // Open the original image into a canvas
     const img = new Image();
     img.src = image;
-    if (width<0) {
+    if (width < 0) {
       width = Math.abs(width);
     }
-    if (height<0) {
+    if (height < 0) {
       height = Math.abs(height);
     }
     var canvas = Canvas.createCanvas(width, height);
-    var ctx = canvas.getContext('2d')
-    if (rotate!==0) {
+    var ctx = canvas.getContext('2d');
+    if (rotate !== 0) {
       let rotateDegrees = rotate;
       let radians = degreesToRadians(rotateDegrees);
-      let imageWidth = image.width;
-      let imageHeight = image.height;
-
-      let cx = x + (width*0.5);
-      let cy = y + (height*0.5);
-      let newCoordinates = rotateCoordinates(cx,cy,x,y,radians,width,height,rotateDegrees);
+      let cx = x + width * 0.5;
+      let cy = y + height * 0.5;
+      let newCoordinates = rotateCoordinates(
+        cx,
+        cy,
+        x,
+        y,
+        radians,
+        width,
+        height,
+        rotateDegrees
+      );
       let newX = newCoordinates.x;
       let newY = newCoordinates.y;
 
       let newWidth = newCoordinates.width;
       let newHeight = newCoordinates.height;
 
-      canvas.width=width;
-      canvas.height=height;
+      canvas.width = width;
+      canvas.height = height;
 
-      let left = (width - newWidth)-12;
-      let top = (width - newWidth)-5;
-      if (rotateDegrees<180) {
+      let left = width - newWidth - 12;
+      let top = width - newWidth - 5;
+      if (rotateDegrees < 180) {
         top = 0;
-      }
-      else {
+      } else {
         left = 0;
       }
       ctx.rotate(radians);
-      ctx.drawImage(img, newX, newY, newWidth, newHeight, left, top, newWidth, newHeight);
-    }
-    else {
+      ctx.drawImage(
+        img,
+        newX,
+        newY,
+        newWidth,
+        newHeight,
+        left,
+        top,
+        newWidth,
+        newHeight
+      );
+    } else {
       ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
     }
     var out = fs.createWriteStream(outputDir);
     var stream = canvas.createJPEGStream({
       bufsize: 2048,
-      quality: 90
+      quality: 90,
     });
     stream.pipe(out);
     out.on('finish', () => {
-      //console.log('File created successfully');
-      resolve("success");
+      // console.log('File created successfully');
+      resolve('success');
     });
-  })
-  .catch(function (error) {
-    console.log(error)
+  }).catch(function (error) {
+    console.log(error);
   });
   // update thumbnail
-  let createThumb = await createThumbnail(outputDir, archivePath+resourceThumbnailPath, hashedName, width, height);
+  await createThumbnail(
+    outputDir,
+    archivePath + resourceThumbnailPath,
+    hashedName,
+    width,
+    height
+  );
   // add paths to resource
-  if (typeof resource.paths==="undefined" || resource.paths.length===0) {
+  if (typeof resource.paths === 'undefined' || resource.paths.length === 0) {
     resource.paths = [
-      {path: resourceImagePath, pathType:"source"},
-      {path: resourceThumbnailPath, pathType:"thumbnail"},
+      { path: resourceImagePath, pathType: 'source' },
+      { path: resourceThumbnailPath, pathType: 'thumbnail' },
     ];
     let userId = req.decoded.id;
     await resource.save(userId);
   }
 
-  let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({labelId: "hasPart"});
+  let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({
+    labelId: 'hasPart',
+  });
   await classpieceThumbnailTaxonomyTerm.load();
 
   let classpieceThumbnailReference = {
     items: [
-      {_id: sourceId, type: "Resource"},
-      {_id: resourceId, type: "Resource"}
+      { _id: sourceId, type: 'Resource' },
+      { _id: resourceId, type: 'Resource' },
     ],
     taxonomyTermId: classpieceThumbnailTaxonomyTerm._id,
-  }
+  };
 
-  let insertClasspieceThumbnailReference = await referencesController.updateReference(classpieceThumbnailReference);
+  await referencesController.updateReference(classpieceThumbnailReference);
 
   resp.json({
     status: true,
     data: resource,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 const degreesToRadians = (degrees) => {
-	let radians = 0;
-	if (degrees>0) {
-		radians = degrees * Math.PI / 180;
-	}
-	else {
-		radians = degrees * Math.PI /  180;
-	}
-	return -radians;
-}
+  let radians = 0;
+  if (degrees > 0) {
+    radians = (degrees * Math.PI) / 180;
+  } else {
+    radians = (degrees * Math.PI) / 180;
+  }
+  return -radians;
+};
 
-const rotateCoordinates = (cx,cy,x,y,radians, width, height,rotateDegrees) => {
-    let cos = Math.cos(radians);
-    let sin = Math.sin(radians);
-    let newCoordinates = {};
-    let nx = (cos * (x - cx)) + (sin * (y - cy)) + cx;
-    let ny = (cos * (y - cy)) + (sin * (x - cx)) + cy;
-    let newWidth = height * sin + width * cos;
-    let newHeight = height * cos + width * sin ;
-    if (rotateDegrees<180) {
-    	nx = (cos * (x - cx)) - (sin * (y - cy)) + cx;
-    	ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
-    	newWidth = height * sin - width * cos;
-    	newHeight = height * cos - width * sin ;
-    }
-    newCoordinates.width = Math.abs(newWidth);
-    newCoordinates.height = Math.abs(newHeight);
-    newCoordinates.x = nx;
-    newCoordinates.y = ny;
-    return newCoordinates;
-}
+const rotateCoordinates = (
+  cx,
+  cy,
+  x,
+  y,
+  radians,
+  width,
+  height,
+  rotateDegrees
+) => {
+  let cos = Math.cos(radians);
+  let sin = Math.sin(radians);
+  let newCoordinates = {};
+  let nx = cos * (x - cx) + sin * (y - cy) + cx;
+  let ny = cos * (y - cy) + sin * (x - cx) + cy;
+  let newWidth = height * sin + width * cos;
+  let newHeight = height * cos + width * sin;
+  if (rotateDegrees < 180) {
+    nx = cos * (x - cx) - sin * (y - cy) + cx;
+    ny = cos * (y - cy) - sin * (x - cx) + cy;
+    newWidth = height * sin - width * cos;
+    newHeight = height * cos - width * sin;
+  }
+  newCoordinates.width = Math.abs(newWidth);
+  newCoordinates.height = Math.abs(newHeight);
+  newCoordinates.x = nx;
+  newCoordinates.y = ny;
+  return newCoordinates;
+};
 
-const classpieceCompiledEvent = async(req, resp) => {
+const classpieceCompiledEvent = async (req, resp) => {
   let userId = req.decoded.id;
-  let classpieceSystemType = new TaxonomyTerm({"labelId":"Classpiece"});
+  let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
   await classpieceSystemType.load();
 
   let systemType = classpieceSystemType._id;
   let query = `MATCH (n:Resource) WHERE n.systemType="${systemType}"  RETURN n ORDER BY n.label`;
   let session = driver.session();
-  let nodesPromise = await session.writeTransaction(tx=>
-    tx.run(query,{})
-  )
-  .then(result=> {
-    return result.records;
-  });
+  let nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      return result.records;
+    });
 
-  let wasCompiledTerm = new TaxonomyTerm({labelId:"wasCompiled"});
+  let wasCompiledTerm = new TaxonomyTerm({ labelId: 'wasCompiled' });
   await wasCompiledTerm.load();
-  let hasTimeTerm = new TaxonomyTerm({labelId:"hasTime"});
+  let hasTimeTerm = new TaxonomyTerm({ labelId: 'hasTime' });
   await hasTimeTerm.load();
-  let compilationTerm = new TaxonomyTerm({labelId:"Compilation"});
+  let compilationTerm = new TaxonomyTerm({ labelId: 'Compilation' });
   await compilationTerm.load();
 
   const parseLabelStart = (value) => {
-    let output = "01-01-"+value;
+    let output = '01-01-' + value;
     return output;
-  }
-  const parseLabelEnd = (start, value=null) => {
-    if (value!==null && value.length<4) {
-      let end = 4-value.length;
-      let pre = start.substring(0,end);
-      value = pre+value;
-    }
-    else if (value!==null && value.length===4) {
-      value = value;
-    }
-    else {
+  };
+  const parseLabelEnd = (start, value = null) => {
+    if (value !== null && value.length < 4) {
+      let end = 4 - value.length;
+      let pre = start.substring(0, end);
+      value = pre + value;
+    } else if (value !== null && value.length > 4) {
       value = start;
     }
-    let output = "31-12-"+value;
+    let output = '31-12-' + value;
     return output;
-  }
+  };
 
   const parseLabel = (label) => {
-    let labelStart = "", labelEnd = "";
-    if (label.includes("-")) {
-      let newLabel = label.replace(/\(.\)/g,'');
-      let labelArr = newLabel.split("-");
+    let labelStart = '';
+    let labelEnd = '';
+    if (label.includes('-')) {
+      let newLabel = label.replace(/\(.\)/g, '');
+      let labelArr = newLabel.split('-');
       labelStart = parseLabelStart(labelArr[0]);
-      labelEnd = parseLabelEnd(labelArr[0],labelArr[1]);
-    }
-    else {
+      labelEnd = parseLabelEnd(labelArr[0], labelArr[1]);
+    } else {
       labelStart = parseLabelStart(label);
       labelEnd = parseLabelEnd(label);
     }
-    let dateRange = {start: labelStart, end: labelEnd};
+    let dateRange = { start: labelStart, end: labelEnd };
     return dateRange;
-  }
+  };
 
-  const addNewEvent = async(label, type, userId) => {
+  const addNewEvent = async (label, type, userId) => {
     let session = driver.session();
     let now = new Date().toISOString();
     let eventData = {
@@ -1305,46 +1415,50 @@ const classpieceCompiledEvent = async(req, resp) => {
       createdAt: now,
       updatedBy: userId,
       updatedAt: now,
-    }
+    };
     let nodeProperties = helpers.prepareNodeProperties(eventData);
     let params = helpers.prepareParams(eventData);
     let query = `CREATE (n:Event ${nodeProperties}) RETURN n`;
-    let item = await session.writeTransaction(tx=>tx.run(query,params))
-    .then(result=> {
-      session.close();
-      let records = result.records;
-      let outputRecord = null;
-      if (records.length>0) {
-        let record = records[0].toObject();
-        outputRecord = helpers.outputRecord(record.n);
-      }
-      return outputRecord;
-    }).catch((error) => {
-      console.log(error)
-    });
+    let item = await session
+      .writeTransaction((tx) => tx.run(query, params))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        let outputRecord = null;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          outputRecord = helpers.outputRecord(record.n);
+        }
+        return outputRecord;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
     return item;
-  }
+  };
 
-  const addDate = async(startDate, endDate, userId) => {
+  const addDate = async (startDate, endDate, userId) => {
     let session = driver.session();
     let query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" AND n.endDate="${endDate}" RETURN n`;
-    let temporal = await session.writeTransaction(tx=>tx.run(query,{}))
-    .then(result=> {
-      let records = result.records;
-      let outputRecord = null;
-      if (records.length>0) {
-        let record = records[0].toObject();
-        outputRecord = helpers.outputRecord(record.n);
-      }
-      return outputRecord;
-    }).catch((error) => {
-      console.log(error)
-    });
-    if (temporal===null) {
+    let temporal = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        let records = result.records;
+        let outputRecord = null;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          outputRecord = helpers.outputRecord(record.n);
+        }
+        return outputRecord;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    if (temporal === null) {
       let now = new Date().toISOString();
       let label = startDate;
-      if (endDate!==null) {
-        label +=  ` - ${endDate}`;
+      if (endDate !== null) {
+        label += ` - ${endDate}`;
       }
       let newItem = {
         label: label,
@@ -1354,50 +1468,55 @@ const classpieceCompiledEvent = async(req, resp) => {
         createdAt: now,
         updatedBy: userId,
         updatedAt: now,
-      }
+      };
       let nodeProperties = helpers.prepareNodeProperties(newItem);
       let params = helpers.prepareParams(newItem);
       let query = `CREATE (n:Temporal ${nodeProperties}) RETURN n`;
-      temporal = await session.writeTransaction(tx=>tx.run(query,params))
-      .then(result=> {
-        session.close();
-        let records = result.records;
-        let outputRecord = null;
-        if (records.length>0) {
-          let record = records[0].toObject();
-          outputRecord = helpers.outputRecord(record.n);
-        }
-        return outputRecord;
-      }).catch((error) => {
-        console.log(error)
-      });
-    }
-    else {
+      temporal = await session
+        .writeTransaction((tx) => tx.run(query, params))
+        .then((result) => {
+          session.close();
+          let records = result.records;
+          let outputRecord = null;
+          if (records.length > 0) {
+            let record = records[0].toObject();
+            outputRecord = helpers.outputRecord(record.n);
+          }
+          return outputRecord;
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+    } else {
       session.close();
     }
     return temporal;
-  }
+  };
 
   let output = [];
-  let classpieces = helpers.normalizeRecordsOutput(nodesPromise, "n");
-  for (let i=0;i<classpieces.length; i++) {
+  let classpieces = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  for (let i = 0; i < classpieces.length; i++) {
     let classpiece = classpieces[i];
     let dateRange = parseLabel(classpiece.label);
-    let compilationEvent = await addNewEvent(`Classpiece ${classpiece.label} compilation`,compilationTerm._id,userId);
+    let compilationEvent = await addNewEvent(
+      `Classpiece ${classpiece.label} compilation`,
+      compilationTerm._id,
+      userId
+    );
     let compilationReference = {
       items: [
-        {_id: compilationEvent._id, type: "Event"},
-        {_id: classpiece._id, type: "Resource"}
+        { _id: compilationEvent._id, type: 'Event' },
+        { _id: classpiece._id, type: 'Resource' },
       ],
       taxonomyTermId: wasCompiledTerm._id,
     };
     await referencesController.updateReference(compilationReference);
 
-    let compilationDate = await addDate(dateRange.start,dateRange.end,userId);
+    let compilationDate = await addDate(dateRange.start, dateRange.end, userId);
     let compilationEventDateReference = {
       items: [
-        {_id: compilationEvent._id, type: "Event"},
-        {_id: compilationDate._id, type: "Temporal"}
+        { _id: compilationEvent._id, type: 'Event' },
+        { _id: compilationDate._id, type: 'Temporal' },
       ],
       taxonomyTermId: hasTimeTerm._id,
     };
@@ -1408,7 +1527,7 @@ const classpieceCompiledEvent = async(req, resp) => {
       event: compilationEvent,
       eventReference: compilationReference,
       compilationDate: compilationDate,
-      compilationEventDateReference: compilationEventDateReference
+      compilationEventDateReference: compilationEventDateReference,
     });
   }
 
@@ -1418,7 +1537,7 @@ const classpieceCompiledEvent = async(req, resp) => {
     error: false,
     msg: [],
   });
-}
+};
 
 module.exports = {
   Resource: Resource,

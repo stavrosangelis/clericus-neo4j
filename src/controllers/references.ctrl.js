@@ -1,5 +1,5 @@
-const driver = require("../config/db-driver");
-const helpers = require("../helpers");
+const driver = require('../config/db-driver');
+const helpers = require('../helpers');
 
 const TaxonomyTerm = require('./taxonomyTerm.ctrl').TaxonomyTerm;
 
@@ -49,7 +49,7 @@ const putReference = async (req, resp) => {
       status: false,
       data: [],
       error: true,
-      msg: "The reference must not be empty",
+      msg: 'The reference must not be empty',
     });
     return false;
   }
@@ -58,9 +58,9 @@ const putReference = async (req, resp) => {
     status: true,
     data: newReference,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 /**
 * @api {put} /references Put references
@@ -105,7 +105,7 @@ const putReferences = async (req, resp) => {
       status: false,
       data: [],
       error: true,
-      msg: "The references must not be empty",
+      msg: 'The references must not be empty',
     });
     return false;
   }
@@ -116,7 +116,7 @@ const putReferences = async (req, resp) => {
     promises.push(addReference);
   }
 
-  let data = await Promise.all(promises).then(data => {
+  let data = await Promise.all(promises).then((data) => {
     return data;
   });
   let error = [];
@@ -126,70 +126,107 @@ const putReferences = async (req, resp) => {
     data: data,
     error: error,
     msg: [],
-  })
-}
+  });
+};
 
 const updateReference = async (reference) => {
   let session = driver.session();
   let srcItem = reference.items[0];
   let targetItem = reference.items[1];
-  let taxonomyTermQuery = "";
-  if (typeof reference.taxonomyTermId !== "undefined") {
+  let taxonomyTermQuery = '';
+  if (typeof reference.taxonomyTermId !== 'undefined') {
     taxonomyTermQuery = {
-      _id: reference.taxonomyTermId
-    }
+      _id: reference.taxonomyTermId,
+    };
   }
-  if (typeof reference.taxonomyTermLabel !== "undefined") {
+  if (typeof reference.taxonomyTermLabel !== 'undefined') {
     taxonomyTermQuery = {
-      labelId: reference.taxonomyTermLabel
-    }
+      labelId: reference.taxonomyTermLabel,
+    };
   }
   let taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
   await taxonomyTerm.load();
-  let direction = "from";
+  let direction = 'from';
   if (taxonomyTerm._id === null) {
     taxonomyTermQuery = {
-      inverseLabelId: reference.taxonomyTermLabel
+      inverseLabelId: reference.taxonomyTermLabel,
     };
     taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
     await taxonomyTerm.load();
-    direction = "to";
-  };
+    direction = 'to';
+  }
   if (taxonomyTerm._id === null) {
     return false;
   }
-  let props = {};
-  let srcRole = "";
-  let targetRole = "";
+  let srcRole = '';
+  let targetRole = '';
   if (
-    (typeof srcItem.role !== "undefined" && srcItem.role !== "" && srcItem.role !== null) ||
-    (typeof targetItem.role !== "undefined" && targetItem.role !== "" && targetItem.role !== null)
+    (typeof srcItem.role !== 'undefined' &&
+      srcItem.role !== '' &&
+      srcItem.role !== null) ||
+    (typeof targetItem.role !== 'undefined' &&
+      targetItem.role !== '' &&
+      targetItem.role !== null)
   ) {
-    if (srcItem.role !== "" && (targetItem.role === "" || targetItem.role === "null" || targetItem.role === null)) {
+    if (
+      srcItem.role !== '' &&
+      (targetItem.role === '' ||
+        targetItem.role === 'null' ||
+        targetItem.role === null)
+    ) {
       targetItem.role = srcItem.role;
-    } else if (targetItem.role !== "" && (srcItem.role === "" || srcItem.role === "null" || srcItem.role === null)) {
+    } else if (
+      targetItem.role !== '' &&
+      (srcItem.role === '' || srcItem.role === 'null' || srcItem.role === null)
+    ) {
       srcItem.role = targetItem.role;
     }
     srcRole = " SET r1={role:'" + srcItem.role + "'}";
     targetRole = " SET r2={role:'" + targetItem.role + "'}";
-    if (direction === "to") {
+    if (direction === 'to') {
       srcRole = " SET r1={role:'" + targetItem.role + "'}";
       targetRole = " SET r2={role:'" + srcItem.role + "'}";
     }
   }
-  let query = "MATCH (n1:" + srcItem.type + ") WHERE id(n1)=" + srcItem._id +
-    " MATCH (n2:" + targetItem.type + ") WHERE id(n2)=" + targetItem._id +
-    " MERGE (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" + srcRole +
-    " MERGE (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" + targetRole;
-  if (direction === "to") {
-    query = "MATCH (n1:" + targetItem.type + ") WHERE id(n1)=" + targetItem._id +
-      " MATCH (n2:" + srcItem.type + ") WHERE id(n2)=" + srcItem._id +
-      " MERGE (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" + srcRole +
-      " MERGE (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" + targetRole;
+  let query =
+    'MATCH (n1:' +
+    srcItem.type +
+    ') WHERE id(n1)=' +
+    srcItem._id +
+    ' MATCH (n2:' +
+    targetItem.type +
+    ') WHERE id(n2)=' +
+    targetItem._id +
+    ' MERGE (n1)-[r1:' +
+    taxonomyTerm.labelId +
+    ']->(n2)' +
+    srcRole +
+    ' MERGE (n2)-[r2:' +
+    taxonomyTerm.inverseLabelId +
+    ']->(n1)' +
+    targetRole;
+  if (direction === 'to') {
+    query =
+      'MATCH (n1:' +
+      targetItem.type +
+      ') WHERE id(n1)=' +
+      targetItem._id +
+      ' MATCH (n2:' +
+      srcItem.type +
+      ') WHERE id(n2)=' +
+      srcItem._id +
+      ' MERGE (n1)-[r1:' +
+      taxonomyTerm.labelId +
+      ']->(n2)' +
+      srcRole +
+      ' MERGE (n2)-[r2:' +
+      taxonomyTerm.inverseLabelId +
+      ']->(n1)' +
+      targetRole;
   }
-  let resultExec = await session.writeTransaction(tx =>
-      tx.run(query, {})
-    ).then(result => {
+  let resultExec = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
       session.close();
       return result.summary.counters._stats;
     })
@@ -197,7 +234,7 @@ const updateReference = async (reference) => {
       console.log(error);
     });
   return resultExec;
-}
+};
 
 /**
 * @api {delete} /reference Delete reference
@@ -233,7 +270,7 @@ const deleteReference = async (req, resp) => {
       status: false,
       data: [],
       error: true,
-      msg: "The reference must not be empty",
+      msg: 'The reference must not be empty',
     });
     return false;
   }
@@ -242,68 +279,89 @@ const deleteReference = async (req, resp) => {
     status: true,
     data: delReference,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 const removeReference = async (reference) => {
   let session = driver.session();
   let srcItem = reference.items[0];
   let targetItem = reference.items[1];
-  let taxonomyTermQuery = "";
-  if (typeof reference.taxonomyTermId !== "undefined") {
+  let taxonomyTermQuery = '';
+  if (typeof reference.taxonomyTermId !== 'undefined') {
     taxonomyTermQuery = {
-      _id: reference.taxonomyTermId
-    }
+      _id: reference.taxonomyTermId,
+    };
   }
-  if (typeof reference.taxonomyTermLabel !== "undefined") {
+  if (typeof reference.taxonomyTermLabel !== 'undefined') {
     taxonomyTermQuery = {
-      labelId: reference.taxonomyTermLabel
-    }
+      labelId: reference.taxonomyTermLabel,
+    };
   }
   let taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
   await taxonomyTerm.load();
-  let direction = "from";
+  let direction = 'from';
   if (taxonomyTerm._id === null) {
     taxonomyTermQuery = {
-      inverseLabelId: reference.taxonomyTermLabel
+      inverseLabelId: reference.taxonomyTermLabel,
     };
     taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
     await taxonomyTerm.load();
-    direction = "to";
-  };
+    direction = 'to';
+  }
   if (taxonomyTerm._id === null) {
     return false;
   }
-  let query = "MATCH (n1:" + srcItem.type + ") WHERE id(n1)=" + srcItem._id +
-    " MATCH (n2:" + targetItem.type + ") WHERE id(n2)=" + targetItem._id +
-    " MATCH (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" +
-    " MATCH (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" +
-    " DELETE r1 " +
-    " DELETE r2";
-  if (direction === "to") {
-    query = "MATCH (n1:" + targetItem.type + ") WHERE id(n1)=" + targetItem._id +
-      " MATCH (n2:" + srcItem.type + ") WHERE id(n2)=" + srcItem._id +
-      " MATCH (n1)-[r1:" + taxonomyTerm.labelId + "]->(n2)" +
-      " MATCH (n2)-[r2:" + taxonomyTerm.inverseLabelId + "]->(n1)" +
-      " DELETE r1 " +
-      " DELETE r2";
+  let query =
+    'MATCH (n1:' +
+    srcItem.type +
+    ') WHERE id(n1)=' +
+    srcItem._id +
+    ' MATCH (n2:' +
+    targetItem.type +
+    ') WHERE id(n2)=' +
+    targetItem._id +
+    ' MATCH (n1)-[r1:' +
+    taxonomyTerm.labelId +
+    ']->(n2)' +
+    ' MATCH (n2)-[r2:' +
+    taxonomyTerm.inverseLabelId +
+    ']->(n1)' +
+    ' DELETE r1 ' +
+    ' DELETE r2';
+  if (direction === 'to') {
+    query =
+      'MATCH (n1:' +
+      targetItem.type +
+      ') WHERE id(n1)=' +
+      targetItem._id +
+      ' MATCH (n2:' +
+      srcItem.type +
+      ') WHERE id(n2)=' +
+      srcItem._id +
+      ' MATCH (n1)-[r1:' +
+      taxonomyTerm.labelId +
+      ']->(n2)' +
+      ' MATCH (n2)-[r2:' +
+      taxonomyTerm.inverseLabelId +
+      ']->(n1)' +
+      ' DELETE r1 ' +
+      ' DELETE r2';
   }
   let params = {};
-  const resultPromise = await new Promise((resolve, reject) => {
-    let result = session.run(
-        query,
-        params
-      ).then(result => {
+  const resultPromise = await new Promise((resolve) => {
+    session
+      .run(query, params)
+      .then((result) => {
         session.close();
         resolve(result.summary.counters._stats);
       })
       .catch((error) => {
         console.log(error);
-      });;
-  })
+      });
+  });
   return resultPromise;
-}
+};
 
 /**
 * @api {get} /references Get references
@@ -316,18 +374,18 @@ const removeReference = async (reference) => {
 {"status":true,"data":[{"lastName":"Alamain","firstName":"Colm","honorificPrefix":[""],"middleName":"","label":"Colm  Alamain","alternateAppelations":[],"status":false,"_id":"45","systemLabels":["Person"]},{"firstName":"Tomas","lastName":"O Hogain","honorificPrefix":[""],"middleName":"","label":"Tomas  O Hogain","alternateAppelations":[],"status":false,"_id":"187","systemLabels":["Person"]}],"error":[],"msg":"Query results"}*/
 const getReferences = async (req, resp) => {
   let parameters = req.query;
-  if (typeof parameters._id === "undefined") {
+  if (typeof parameters._id === 'undefined') {
     resp.json({
       status: false,
       data: [],
-      error: "Please provide a valid node id to continue",
-      msg: "Query results",
+      error: 'Please provide a valid node id to continue',
+      msg: 'Query results',
     });
     return false;
   }
   let _id = parameters._id;
   let steps = 0;
-  if (typeof parameters.steps !== "undefined") {
+  if (typeof parameters.steps !== 'undefined') {
     steps = parseInt(parameters.steps, 10);
     if (steps > 6) {
       steps = 6;
@@ -335,15 +393,26 @@ const getReferences = async (req, resp) => {
   }
 
   // 1. query for node
-  let session = driver.session()
-  let query = "MATCH p=(n)-[r]->(rn) WHERE id(n)=" + _id + " AND NOT id(rn)=" + _id + " return collect(distinct p) as p";
+  let session = driver.session();
+  let query =
+    'MATCH p=(n)-[r]->(rn) WHERE id(n)=' +
+    _id +
+    ' AND NOT id(rn)=' +
+    _id +
+    ' return collect(distinct p) as p';
   if (steps > 1) {
-    query = "MATCH p=(n)-[r*.." + steps + "]->(rn)  WHERE id(n)=" + _id + " AND NOT id(rn)=" + _id + " return collect(distinct p) as p";
+    query =
+      'MATCH p=(n)-[r*..' +
+      steps +
+      ']->(rn)  WHERE id(n)=' +
+      _id +
+      ' AND NOT id(rn)=' +
+      _id +
+      ' return collect(distinct p) as p';
   }
-  let results = await session.writeTransaction(tx =>
-      tx.run(query, {})
-    )
-    .then(result => {
+  let results = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
       session.close();
       let records = result.records;
       let output = [];
@@ -361,9 +430,9 @@ const getReferences = async (req, resp) => {
     status: true,
     data: results,
     error: [],
-    msg: "Query results",
+    msg: 'Query results',
   });
-}
+};
 
 module.exports = {
   getReferences: getReferences,
@@ -372,4 +441,4 @@ module.exports = {
   updateReference: updateReference,
   deleteReference: deleteReference,
   removeReference: removeReference,
-}
+};
