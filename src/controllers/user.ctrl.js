@@ -4,7 +4,8 @@ const helpers = require('../helpers');
 const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const privateKey = fs.readFileSync('./src/config/.private.key', 'utf8');
-const referencesController = require('../controllers/references.ctrl');
+const referencesController = require('./references.ctrl');
+const Usergroup = require('./usergroup.ctrl').Usergroup;
 
 class User {
   constructor({
@@ -300,7 +301,9 @@ class User {
   generateJWT() {
     let today = new Date();
     const expirationDate = new Date();
+    console.log(expirationDate);
     expirationDate.setDate(today.getDate() + 1);
+    console.log(expirationDate);
     let signOptions = {
       issuer: 'Clericus app',
       email: this.email,
@@ -319,23 +322,34 @@ class User {
 * @apiGroup Users
 * @apiPermission admin
 *
+* @apiParam {string} [label] A string to match against the users' first and last name.
 * @apiParam {string} [orderField=firstName] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
+* @apiParam {usergroup} [string] A string with the label of the corresponding usergroup
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"currentPage":1,"data":[{"firstName":"Admin","lastName":"","email":"admin@test.com","_id":"260","systemLabels":["User"]}],"totalItems":1,"totalPages":1},"error":[],"msg":"Query results"}
 */
 const getUsers = async (req, resp) => {
   let parameters = req.query;
+  let label = '';
   let page = 0;
   let orderField = 'firstName';
   let queryPage = 0;
   let queryOrder = '';
   let limit = 25;
+  let usergroup = '';
 
   let query = {};
+  let queryParams = '';
 
+  if (typeof parameters.label !== 'undefined') {
+    label = helpers.addslashes(parameters.label);
+    if (label !== '') {
+      queryParams += `(toLower(n.firstName) =~ toLower('.*${label}.*') OR toLower(n.lastName) =~ toLower('.*${label}.*'))`;
+    }
+  }
   if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
   }
@@ -361,13 +375,20 @@ const getUsers = async (req, resp) => {
   }
 
   let skip = limit * queryPage;
-  query =
-    'MATCH (n:User) RETURN n ' +
-    queryOrder +
-    ' SKIP ' +
-    skip +
-    ' LIMIT ' +
-    limit;
+  let where = '';
+  if (queryParams !== '') {
+    where = `WHERE ${queryParams}`;
+  }
+  query = `MATCH (n:User) ${where} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+  if (typeof parameters.usergroup !== 'undefined') {
+    usergroup = parameters.usergroup;
+    const newUsergroup = new Usergroup({ label: usergroup });
+    await newUsergroup.load();
+    if (queryParams !== '') {
+      where = `AND ${queryParams}`;
+    }
+    query = `MATCH (n:User)-[:belongsToUserGroup]->(ug) WHERE id(ug)=${newUsergroup._id} ${where} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+  }
   let data = await getUsersQuery(query, limit);
   if (data.error) {
     resp.json({

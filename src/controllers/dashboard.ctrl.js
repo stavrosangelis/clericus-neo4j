@@ -124,7 +124,7 @@ const getMonthlyStats = async (req, resp) => {
         });
         return records;
       }
-      return result;
+      return [];
     });
   let responseData = {
     year: year,

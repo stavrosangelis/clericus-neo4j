@@ -17,7 +17,7 @@ class Resource {
     alternateLabels = [],
     description = null,
     fileName = null,
-    metadata = [],
+    metadata = {},
     originalLocation = '',
     paths = [],
     resourceType = null,
@@ -350,8 +350,7 @@ const getResources = async (req, resp) => {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams +=
-        "toLower(n.systemType) =~ toLower('.*" + systemType + ".*') ";
+      queryParams += `n.systemType = '${systemType}' `;
     }
   }
   if (typeof parameters.description !== 'undefined') {
@@ -532,6 +531,7 @@ const getResource = async (req, resp) => {
   let _id = parameters._id;
   let resource = new Resource({ _id: _id });
   await resource.load();
+
   resp.json({
     status: true,
     data: resource,
@@ -719,7 +719,11 @@ const uploadResource = async (req, resp) => {
   let newId = null;
   let newLabel = uploadedFile.name;
   let systemType = null;
-  if (typeof fields._id !== 'undefined' && fields._id !== null) {
+  if (
+    typeof fields._id !== 'undefined' &&
+    fields._id !== null &&
+    fields._id !== 'null'
+  ) {
     newId = fields._id;
   }
   if (typeof fields.label !== 'undefined' && fields.label !== null) {
@@ -815,15 +819,20 @@ const uploadResource = async (req, resp) => {
     newResource.unlinkFile(thumbnailPath);
     status = false;
   }
-  let error = [];
-  if (typeof updateResource.error !== 'undefined') {
-    error = updateResource.error;
+  let error = false;
+  let msg = [];
+  if (
+    typeof updateResource.error !== 'undefined' &&
+    updateResource.error.length > 0
+  ) {
+    msg.push(updateResource.error);
+    error = true;
   }
   let output = {
     status: status,
     data: updateResource.data,
     error: error,
-    msg: '',
+    msg: msg,
   };
   resp.json(output);
 };

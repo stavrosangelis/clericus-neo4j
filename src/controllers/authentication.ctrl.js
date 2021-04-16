@@ -3,6 +3,7 @@ const LocalStrategy = require('passport-local').Strategy;
 const driver = require('../config/db-driver');
 const helpers = require('../helpers');
 const User = require('./user.ctrl').User;
+const adminActiveToken = require('../routes/auth').adminActiveToken;
 
 // set passport strategy
 const passportLocal = new LocalStrategy(
@@ -58,11 +59,10 @@ const passportAdmin = new LocalStrategy(
     passwordField: 'password',
   },
   async function (username, password, done) {
-    let session = driver.session();
-    let query = `MATCH (u:User)-[:belongsToUserGroup]->(ug) WHERE u.email="${username}" RETURN u,ug`;
-    let params = {};
-    let user = await session
-      .writeTransaction((tx) => tx.run(query, params))
+    const session = driver.session();
+    const query = `MATCH (u:User)-[:belongsToUserGroup]->(ug) WHERE u.email="${username}" RETURN u,ug`;
+    const user = await session
+      .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
         let outputRecord = null;
@@ -308,8 +308,10 @@ const registerUser = async (req, resp) => {
 }
 */
 const activeSession = async (req, resp) => {
-  let parameters = req.body;
-  if (typeof parameters.token === 'undefined' || parameters.token === '') {
+  const parameters = req.body;
+  const token = parameters.token || null;
+  const active = adminActiveToken(token);
+  if (!active) {
     resp.json({
       status: false,
       data: [],
@@ -317,7 +319,6 @@ const activeSession = async (req, resp) => {
       msg: 'Please provide a valid token to continue',
     });
   } else {
-    let token = parameters.token;
     resp.json({
       status: true,
       data: token,

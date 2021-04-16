@@ -160,7 +160,6 @@ class Entity {
       }
       this.updatedBy = userId;
       this.updatedAt = now;
-
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
 
@@ -427,8 +426,8 @@ const putEntity = async (req, resp) => {
     return false;
   }
   let userId = req.decoded.id;
-  let entity = new Entity(userId);
-  let output = await entity.save();
+  let entity = new Entity(postData);
+  let output = await entity.save(userId);
   resp.json({
     status: output.status,
     data: output.data,

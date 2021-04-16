@@ -19,6 +19,7 @@ const menuController = require('../controllers/menu.ctrl');
 const menuItemController = require('../controllers/menuItem.ctrl');
 const organisationController = require('../controllers/organisation.ctrl');
 const personController = require('../controllers/person.ctrl');
+const queryBuilderController = require('../controllers/queryBuilder.ctrl');
 const resourceController = require('../controllers/resource.ctrl');
 const referencesController = require('../controllers/references.ctrl');
 const seedController = require('../seed/');
@@ -285,6 +286,13 @@ server.post(
 );
 // server.get('/fix-labels', auth.checkAdminToken, personController.fixLabels);
 // server.get('/patch-unknown', auth.checkAdminToken, personController.patchUnknown);
+
+// query-builder
+server.post(
+  '/query-builder',
+  auth.checkAdminToken,
+  queryBuilderController.queryBuild
+);
 
 // resources
 server.put('/resource', auth.checkAdminToken, resourceController.putResource);

@@ -19,7 +19,7 @@ class ArticleCategory {
     }
     this.label = label;
     this.permalink = permalink;
-    this.parentId = Number(parentId);
+    this.parentId = parseInt(parentId, 10);
     this.status = status;
     this.createdBy = createdBy;
     this.createdAt = createdAt;

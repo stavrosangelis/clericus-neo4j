@@ -126,7 +126,8 @@ class UploadedFile {
         session.close();
         let records = result.records;
         let output = {
-          error: ['The record cannot be updated'],
+          error: true,
+          msg: ['The record cannot be updated'],
           status: false,
           data: [],
         };
@@ -147,7 +148,7 @@ class UploadedFile {
             },
           ];
           resultRecord.paths = paths;
-          output = { error: [], status: true, data: resultRecord };
+          output = { error: false, status: true, data: resultRecord, msg: [] };
         }
         return output;
       });
@@ -184,7 +185,8 @@ class UploadedFile {
     await this.countRelations();
     if (parseInt(this.count, 10) > 0) {
       let output = {
-        error: ["You must remove the record's relations before deleting"],
+        error: true,
+        msg: ["You must remove the record's relations before deleting"],
         status: false,
         data: [],
       };
@@ -308,7 +310,7 @@ const getUploadedFiles = async (req, resp) => {
     resp.json({
       status: true,
       data: responseData,
-      error: [],
+      error: false,
       msg: 'Query results',
     });
   }
@@ -392,7 +394,7 @@ const getUploadedFile = async (req, resp) => {
   resp.json({
     status: true,
     data: content,
-    error: [],
+    error: false,
     msg: 'Query results',
   });
 };
@@ -417,7 +419,7 @@ const postUploadedFile = async (req, resp) => {
       status: false,
       data: [],
       error: true,
-      msg: 'The uploaded file must not be empty',
+      msg: ['The uploaded file must not be empty'],
     });
     return false;
   }
@@ -432,7 +434,9 @@ const postUploadedFile = async (req, resp) => {
       status: false,
       data: [],
       error: true,
-      msg: `The file extension "${extension}" is not allowed. Please provide a valid image file.`,
+      msg: [
+        `The file extension "${extension}" is not allowed. Please provide a valid image file.`,
+      ],
     };
     return resp.json(output);
   }
@@ -513,7 +517,7 @@ const deleteUploadedFile = async (req, resp) => {
   resp.json({
     status: true,
     data: data,
-    error: [],
+    error: false,
     msg: 'Query results',
   });
 };

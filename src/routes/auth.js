@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const privateKey = fs.readFileSync('./src/config/.private.key', 'utf8');
 
-let activeToken = (token) => {
+const activeToken = (token) => {
   let active = false;
   if (token !== null) {
     jwt.verify(token, privateKey, (error) => {
@@ -14,7 +14,7 @@ let activeToken = (token) => {
   return active;
 };
 
-let checkToken = (req, resp, next) => {
+const checkToken = (req, resp, next) => {
   let token = null;
   if (
     req.headers.authorization &&
@@ -48,7 +48,7 @@ let checkToken = (req, resp, next) => {
   }
 };
 
-let checkAdminToken = (req, resp, next) => {
+const checkAdminToken = (req, resp, next) => {
   let token = null;
   if (
     req.headers.authorization &&
@@ -93,8 +93,26 @@ let checkAdminToken = (req, resp, next) => {
   }
 };
 
+const adminActiveToken = (token) => {
+  let active = false;
+  if (token !== null) {
+    jwt.verify(token, privateKey, (error, decoded) => {
+      // check if token has expired
+      if (typeof decoded !== 'undefined') {
+        const today = new Date();
+        const expiresIn = new Date(decoded.expiresIn);
+        if (today <= expiresIn && decoded.isAdmin) {
+          active = true;
+        }
+      }
+    });
+  }
+  return active;
+};
+
 module.exports = {
   activeToken: activeToken,
   checkToken: checkToken,
   checkAdminToken: checkAdminToken,
+  adminActiveToken: adminActiveToken,
 };
