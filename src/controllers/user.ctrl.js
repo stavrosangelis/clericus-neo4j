@@ -301,9 +301,7 @@ class User {
   generateJWT() {
     let today = new Date();
     const expirationDate = new Date();
-    console.log(expirationDate);
     expirationDate.setDate(today.getDate() + 1);
-    console.log(expirationDate);
     let signOptions = {
       issuer: 'Clericus app',
       email: this.email,

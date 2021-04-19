@@ -110,7 +110,7 @@ const parseParams = async (req) => {
   }
 
   let eventsQuery = mainQueryBuilder(events, 'e');
-  if (eventsQuery !== '' || eventIds.length > 0) {
+  if (eventsQuery !== '' || (eventIds.length > 0 && entityType !== 'Event')) {
     let queryText = '';
     if (eventsQuery !== '') {
       queryText += eventsQuery;
@@ -123,9 +123,22 @@ const parseParams = async (req) => {
     }
     eventsQuery = `\n MATCH (n)-[r1]->(e) WHERE ${queryText}`;
   }
+  if (entityType === 'Event') {
+    let queryText = '';
+    if (!mainQuery.includes('WHERE')) {
+      queryText += ' WHERE ';
+    } else {
+      queryText += ' AND ';
+    }
+    queryText += ` id(n) IN [${eventIds}]`;
+    mainQuery += queryText;
+  }
 
   let organisationsQuery = mainQueryBuilder(organisations, 'o');
-  if (organisationsQuery !== '' || organisationIds.length > 0) {
+  if (
+    organisationsQuery !== '' ||
+    (organisationIds.length > 0 && entityType !== 'Organisation')
+  ) {
     let queryText = '';
     if (organisationsQuery !== '') {
       queryText += organisationsQuery;
@@ -137,6 +150,16 @@ const parseParams = async (req) => {
       queryText += `id(o) IN [${organisationIds}]`;
     }
     organisationsQuery = `\n MATCH (n)-[r2]->(o) WHERE ${queryText}`;
+  }
+  if (entityType === 'Organisation') {
+    let queryText = '';
+    if (!mainQuery.includes('WHERE')) {
+      queryText += ' WHERE ';
+    } else {
+      queryText += ' AND ';
+    }
+    queryText += ` id(n) IN [${eventIds}]`;
+    mainQuery += queryText;
   }
 
   let peopleQuery = mainQueryBuilder(people, 'p');
