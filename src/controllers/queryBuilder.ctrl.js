@@ -1,7 +1,7 @@
 const driver = require('../config/db-driver');
 const helpers = require('../helpers');
 
-export const jsonStringToObject = (data) => {
+const jsonStringToObject = (data) => {
   let output = null;
   if (typeof data === 'string') {
     output = JSON.parse(data);

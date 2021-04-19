@@ -4232,9 +4232,9 @@ const ingest1704 = async () => {
     let dateOfOrdination = row[masterKeys[14]].trim() || '';
     let placeOfOrdination = row[masterKeys[15]].trim() || '';
     // let ordinationBishop = row[masterKeys[17]].trim() || '';
-    let updatedOrdinationBishop = row[masterKeys[18]].trim() || '';
-    let dioceseOfOrdination = row[masterKeys[19]].trim() || '';
-    let laySureties = row[masterKeys[20]].trim() || '';
+    // let updatedOrdinationBishop = row[masterKeys[18]].trim() || '';
+    // let dioceseOfOrdination = row[masterKeys[19]].trim() || '';
+    // let laySureties = row[masterKeys[20]].trim() || '';
     let countyOfAbode = row[masterKeys[21]].trim() || '';
     let dbID = row[masterKeys[24]].trim() || '';
 
