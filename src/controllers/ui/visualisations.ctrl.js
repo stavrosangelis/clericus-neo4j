@@ -923,8 +923,8 @@ const getItemTimeline = async (req, resp) => {
   }
   let _id = params._id;
   let session = driver.session();
-  let query = `MATCH (p)-->(e:Event) WHERE id(p)=${_id} AND p.status='public' AND e.status='public'
-  OPTIONAL MATCH (e)-->(t:Temporal) RETURN distinct t,e ORDER BY date(datetime({epochmillis: apoc.date.parse(t.startDate,"ms","dd-MM-yyyy")}))`;
+  let query = `MATCH (p)-->(e:Event) WHERE p.status="public" AND id(p)=${_id}
+  MATCH (e)-->(t:Temporal) WHERE exists(t.startDate) AND NOT t.startDate="" RETURN distinct t, e ORDER BY date(datetime({epochmillis: apoc.date.parse(t.startDate,"ms","dd-MM-yyyy")}))`;
   let results = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {

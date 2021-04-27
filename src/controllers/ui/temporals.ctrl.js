@@ -213,7 +213,7 @@ const getTemporal = async (req, resp) => {
       console.log(error);
     });
   if (typeof temporal !== 'undefined') {
-    let events = await helpers.loadRelations(_id, 'Temporal', 'Event', false);
+    let events = await helpers.loadRelations(_id, 'Temporal', 'Event', true);
     let organisations = await helpers.loadRelations(
       _id,
       'Event',
@@ -224,7 +224,7 @@ const getTemporal = async (req, resp) => {
       _id,
       'Temporal',
       'Person',
-      false,
+      true,
       null,
       'rn.lastName'
     );
@@ -232,7 +232,7 @@ const getTemporal = async (req, resp) => {
       _id,
       'Temporal',
       'Resource',
-      false
+      true
     );
 
     // get classpiece resource type id
