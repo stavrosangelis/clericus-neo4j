@@ -4034,12 +4034,6 @@ const ingest1704 = async () => {
       to: 'Organisation',
     },
     {
-      label: 'was residing at',
-      inverseLabel: 'had resident',
-      from: 'Person',
-      to: 'Event',
-    },
-    {
       label: 'maintained',
       inverseLabel: 'was maintained by',
       from: 'Person',
@@ -4053,7 +4047,7 @@ const ingest1704 = async () => {
   await addNewEventTypes(newEventTypes);
 
   // add missing organisation types
-  await syncOrganisationTypes();
+  // await syncOrganisationTypes();
 
   // load locations
   const locationsCsvPath = `${archivePath}documents/1704/locations.csv`;
@@ -4099,7 +4093,11 @@ const ingest1704 = async () => {
   const masterKeys = Object.keys(masterCsv['0']);
 
   const addOrganisation = async (data) => {
-    const searchQ = `MATCH (n:Organisation {label: "${data.label}"}) RETURN n`;
+    if (typeof data.label === 'undefined') {
+      return { _id: null };
+    }
+    const label = data.label;
+    const searchQ = `MATCH (n:Organisation {label: "${label}"}) RETURN n`;
     let organisation = await session
       .writeTransaction((tx) => tx.run(searchQ, {}))
       .then((result) => {
@@ -4117,7 +4115,8 @@ const ingest1704 = async () => {
       });
     if (organisation === null) {
       const newOrg = new Organisation(data);
-      organisation = await newOrg.save(userId).data;
+      const saveData = await newOrg.save(userId);
+      organisation = saveData.data;
     }
     return organisation;
   };
@@ -4149,7 +4148,7 @@ const ingest1704 = async () => {
       let now = new Date().toISOString();
       let newLabel = startDate;
       if (endDate !== null) {
-        label += ` - ${endDate}`;
+        newLabel += ` - ${endDate}`;
       }
       if (label !== null) {
         newLabel = label;
@@ -4215,94 +4214,198 @@ const ingest1704 = async () => {
     return newEvent;
   };
 
-  for (let i = 0; i < masterCsv.length; i += 1) {
-    let row = masterCsv[i];
-    let lastName = row[masterKeys[0]].trim() || '';
-    let firstName = row[masterKeys[1]].trim() || '';
-    let updatedLastName = row[masterKeys[3]].trim() || '';
-    let updatedFirstName = row[masterKeys[5]].trim() || '';
-    let placeOfAbode = row[masterKeys[6]].trim() || '';
-    let updatedPlaceOfAbode = row[masterKeys[7]].trim() || '';
-    let placeOfAbodeType = row[masterKeys[8]].trim() || '';
-    let age = row[masterKeys[9]].trim() || '';
-    let parish = row[masterKeys[10]].trim() || '';
-    let updatedParish = row[masterKeys[11]].trim() || '';
-    let diocese = row[masterKeys[12]].trim() || '';
-    let dateInfoRecorded = row[masterKeys[13]].trim() || '';
-    let dateOfOrdination = row[masterKeys[14]].trim() || '';
-    let placeOfOrdination = row[masterKeys[15]].trim() || '';
-    // let ordinationBishop = row[masterKeys[17]].trim() || '';
-    // let updatedOrdinationBishop = row[masterKeys[18]].trim() || '';
-    // let dioceseOfOrdination = row[masterKeys[19]].trim() || '';
-    // let laySureties = row[masterKeys[20]].trim() || '';
-    let countyOfAbode = row[masterKeys[21]].trim() || '';
-    let dbID = row[masterKeys[24]].trim() || '';
+  const addTaxonomyTerm = async (term, systemType) => {
+    const relationsTypes = new Taxonomy({
+      systemType,
+    });
+    await relationsTypes.load();
+    let nt = new TaxonomyTerm({
+      label: term.label,
+      inverseLabel: term.inverseLabel,
+    });
+    if (typeof term.labelId !== 'undefined' && term.labelId !== '') {
+      nt.labelId = term.labelId;
+    } else {
+      nt.labelId = helpers.normalizeLabelId(term.label);
+    }
+    if (
+      typeof term.inverseLabelId !== 'undefined' &&
+      term.inverseLabelId !== ''
+    ) {
+      nt.inverseLabelId = term.inverseLabelId;
+    } else {
+      nt.inverseLabelId = helpers.normalizeLabelId(term.inverseLabel);
+    }
+    await nt.load();
+    if (nt._id === null) {
+      const savedTerm = await nt.save(userId);
+      nt = savedTerm.data;
+      const ref = {
+        items: [
+          { _id: savedTerm.data._id, type: 'TaxonomyTerm', role: '' },
+          { _id: relationsTypes._id, type: 'Taxonomy', role: '' },
+        ],
+        taxonomyTermLabel: 'isChildOf',
+      };
+      await updateReference(ref);
+    }
+    return nt;
+  };
 
+  const wasResidentOfData = {
+    label: 'was resident of',
+    inverseLabel: 'was residence of',
+  };
+  await addTaxonomyTerm(wasResidentOfData, 'relationsTypes');
+
+  const receivedOrdersData = {
+    label: 'received holy orders from',
+    inverseLabel: 'performed ordination of',
+  };
+  await addTaxonomyTerm(receivedOrdersData, 'relationsTypes');
+
+  const ordainingBishopData = {
+    label: 'ordaining bishop',
+    inverseLabel: 'ordaining bishop',
+  };
+  await addTaxonomyTerm(ordainingBishopData, 'peopleRoles');
+
+  const addPerson = async (
+    firstNameParam,
+    lastNameParam,
+    updatedLastNameParam,
+    updatedFirstNameParam,
+    dbIDParam
+  ) => {
+    const firstName = helpers.addslashes(firstNameParam);
+    const lastName = helpers.addslashes(lastNameParam);
+    const dbID = dbIDParam.trim();
+    // rule 1
     let person = {
-      firstName: firstName,
-      lastName: lastName,
+      firstName,
+      lastName,
     };
+
+    // rule 3
     let alternateAppelation = null;
-    if (updatedLastName !== '') {
+    if (updatedLastNameParam !== '') {
+      const updatedLastName = helpers.addslashes(updatedLastNameParam);
       person.lastName = updatedLastName;
       alternateAppelation = {
-        firstName: firstName,
-        lastName: lastName,
+        firstName,
+        lastName,
       };
     }
-    if (updatedFirstName !== '') {
+
+    // rule 5
+    if (updatedFirstNameParam !== '') {
+      const updatedFirstName = helpers.addslashes(updatedFirstNameParam);
       person.firstName = updatedFirstName;
       alternateAppelation = {
-        firstName: firstName,
+        firstName,
       };
       if (alternateAppelation.lastName === '') {
         alternateAppelation.lastName = lastName;
       }
     }
 
+    // rule 3, 5, 6
     if (alternateAppelation !== null) {
       alternateAppelation.label = `${alternateAppelation.firstName} ${alternateAppelation.lastName}`;
     }
 
-    // 1. new person entry
-    if (dbID.trim() === '') {
-      const personData = {
+    // update data
+    let personData = {};
+    if (dbID === '') {
+      personData = {
         status: 'private',
-        firstName: person.firstName,
-        lastName: person.lastName,
+        firstName,
+        lastName,
         personType: 'Clergy',
       };
-      if (person.firstName !== '') {
-        personData.fnameSoundex = helpers.soundex(person.firstName);
+      if (firstName !== '') {
+        personData.fnameSoundex = helpers.soundex(firstName);
       }
-      if (person.lastName !== '') {
-        personData.lnameSoundex = helpers.soundex(person.lastName);
+      if (lastName !== '') {
+        personData.lnameSoundex = helpers.soundex(lastName);
       }
       if (alternateAppelation !== null) {
         personData.alternateAppelations = [alternateAppelation];
       }
-      const newPerson = new Person(personData);
-      const personSave = await newPerson.save(userId);
-      person = personSave.data;
-      dbID = person._id;
+    } else {
+      const dbPerson = new Person({ _id: dbID });
+      await dbPerson.load();
+      personData = {
+        _id: dbID,
+        honorificPrefix: dbPerson.honorificPrefix,
+        firstName,
+        middleName: dbPerson.middleName,
+        lastName,
+        alternateAppelations: [alternateAppelation],
+        description: dbPerson.description,
+        personType: dbPerson.personType,
+        status: dbPerson.status,
+      };
+      if (firstName !== '') {
+        personData.fnameSoundex = helpers.soundex(firstName);
+      }
+      if (lastName !== '') {
+        personData.lnameSoundex = helpers.soundex(lastName);
+      }
     }
+    const newPerson = new Person(personData);
+    const personSave = await newPerson.save(userId);
+    person = personSave.data;
+    return person;
+  };
 
-    // 2. person placeOfAbode
-    let abode = null;
+  const personPlaceOfAbode = async (
+    person,
+    placeOfAbodeParam,
+    placeOfAbodeTypeParam,
+    updatedPlaceOfAbodeParam,
+    dioceseParam,
+    countyOfAbodeParam,
+    dateInfoRecordedParam
+  ) => {
+    const placeOfAbode = placeOfAbodeParam.trim();
+    const placeOfAbodeType = placeOfAbodeTypeParam.trim();
+    const updatedPlaceOfAbode = updatedPlaceOfAbodeParam.trim();
+    const diocese = dioceseParam.trim();
+    const countyOfAbode = countyOfAbodeParam.trim();
+    const dateInfoRecorded = dateInfoRecordedParam.trim();
+
+    // rule 7a 1
+    let abode = {};
     if (placeOfAbode !== '') {
-      abode.label = placeOfAbode;
+      abode.label = helpers.addslashes(placeOfAbode);
       if (placeOfAbodeType !== '') {
         abode.organisationType = placeOfAbodeType;
       }
     }
     if (updatedPlaceOfAbode !== '') {
-      abode.label = updatedPlaceOfAbode;
+      abode.label = helpers.addslashes(updatedPlaceOfAbode);
       abode.alternateAppelations = [{ label: placeOfAbode }];
     }
     const abodeOrganisation = await addOrganisation(abode);
 
-    // 3. add event
-    let newEvent = null;
+    // rule 7a 2.1
+    // link place of abode with person
+    if (abodeOrganisation._id !== null) {
+      const abodeRefLabel = helpers.normalizeLabelId('was resident of');
+      const abodeRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: abodeOrganisation._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: abodeRefLabel,
+      };
+      await updateReference(abodeRef);
+    }
+
+    // rule 7b
+    // add residence event
+    let residenceEvent = null;
     if (abodeOrganisation._id !== null) {
       const abodeOrganisationLabel = helpers.normalizeLabelId('habitation');
       const abodeOrganisationType = new TaxonomyTerm({
@@ -4310,13 +4413,13 @@ const ingest1704 = async () => {
       });
       await abodeOrganisationType.load();
       const eventTypeId = abodeOrganisationType._id.toString();
-      newEvent = await addEvent('residence', eventTypeId);
+      residenceEvent = await addEvent('residence', eventTypeId);
       // link event with person
       const eventRefLabel = helpers.normalizeLabelId('maintained');
       const eventRef = {
         items: [
-          { _id: dbID, type: 'Person', role: '' },
-          { _id: newEvent._id, type: 'Event', role: '' },
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: residenceEvent._id, type: 'Event', role: '' },
         ],
         taxonomyTermLabel: eventRefLabel,
       };
@@ -4325,28 +4428,19 @@ const ingest1704 = async () => {
       const eventDioceseRef = {
         items: [
           { _id: abodeOrganisation._id, type: 'Organisation', role: '' },
-          { _id: newEvent._id, type: 'Event', role: '' },
+          { _id: residenceEvent._id, type: 'Event', role: '' },
         ],
         taxonomyTermLabel: 'hasRelation',
       };
       await updateReference(eventDioceseRef);
     }
 
-    // 4. link place of abode with person
-    const abodeRefLabel = helpers.normalizeLabelId('was resident of');
-    const abodeRef = {
-      items: [
-        { _id: dbID, type: 'Person', role: '' },
-        { _id: abodeOrganisation._id, type: 'Organisation', role: '' },
-      ],
-      taxonomyTermLabel: abodeRefLabel,
-    };
-    await updateReference(abodeRef);
-
-    // 5. link place of abode with its episcopal see in
+    // rule 7a 2.2
+    // link place of abode with its episcopal see in
     let dioceseOrganisation = null;
     if (diocese !== '') {
-      const oQuery = `MATCH (n:Organisation {label: "${diocese}"}) RETURN n`;
+      const dioceseLabel = helpers.addslashes(diocese);
+      const oQuery = `MATCH (n:Organisation {label: "${dioceseLabel}"}) RETURN n`;
       dioceseOrganisation = await session
         .writeTransaction((tx) => tx.run(oQuery, {}))
         .then((result) => {
@@ -4371,27 +4465,39 @@ const ingest1704 = async () => {
           let episcopalSeeInRef = {
             items: [
               { _id: abodeOrganisation._id, type: 'Organisation', role: '' },
-              { _id: hasItsEpiscopalSeeIn._id, type: 'Spatial', role: '' },
+              { _id: hasItsEpiscopalSeeIn.ref._id, type: 'Spatial', role: '' },
             ],
             taxonomyTermLabel: `hasItsEpiscopalSeeIn`,
           };
           await updateReference(episcopalSeeInRef);
-          if (newEvent !== null) {
+          // link episcopal see in with residence event
+          if (residenceEvent !== null) {
             let episcopalSeeInEventRef = {
               items: [
-                { _id: newEvent._id, type: 'Event', role: '' },
-                { _id: hasItsEpiscopalSeeIn._id, type: 'Spatial', role: '' },
+                { _id: residenceEvent._id, type: 'Event', role: '' },
+                {
+                  _id: hasItsEpiscopalSeeIn.ref._id,
+                  type: 'Spatial',
+                  role: '',
+                },
               ],
-              taxonomyTermLabel: `hasLocation`,
+              taxonomyTermLabel: `hasItsEpiscopalSeeIn`,
             };
             await updateReference(episcopalSeeInEventRef);
           }
         }
       }
     }
-    // 6. link place of abode with its location
+
+    // link place of abode with its location
     if (countyOfAbode !== '') {
-      const cQuery = `MATCH (n:Spatial {label: "${countyOfAbode}"}) RETURN n`;
+      // rule 13
+      const countyOrganisation = await addOrganisation({
+        label: countyOfAbode,
+        organisationType: 'County',
+      });
+      const countyOfAbodeLabel = helpers.addslashes(countyOfAbode);
+      const cQuery = `MATCH (n:Spatial {label: "${countyOfAbodeLabel}"}) RETURN n`;
       const countyOfAbodeSpatial = await session
         .writeTransaction((tx) => tx.run(cQuery, {}))
         .then((result) => {
@@ -4412,20 +4518,42 @@ const ingest1704 = async () => {
           taxonomyTermLabel: `hasLocation`,
         };
         await updateReference(hasLocationRef);
-        if (newEvent !== null) {
+        // link county of abode with residence event
+        if (residenceEvent !== null) {
           const hasLocationEventRef = {
             items: [
-              { _id: newEvent._id, type: 'Event', role: '' },
+              { _id: residenceEvent._id, type: 'Event', role: '' },
               { _id: countyOfAbodeSpatial._id, type: 'Spatial', role: '' },
             ],
             taxonomyTermLabel: `hasLocation`,
           };
           await updateReference(hasLocationEventRef);
         }
+
+        // rule 13
+        const abodeRefLabel = helpers.normalizeLabelId('was resident of');
+        const countyPersonRef = {
+          items: [
+            { _id: person._id, type: 'Person', role: '' },
+            { _id: countyOrganisation._id, type: 'Organisation', role: '' },
+          ],
+          taxonomyTermLabel: abodeRefLabel,
+        };
+        await updateReference(countyPersonRef);
+        const countyLocationRef = {
+          items: [
+            { _id: countyOrganisation._id, type: 'Organisation', role: '' },
+            { _id: countyOfAbodeSpatial._id, type: 'Spatial', role: '' },
+          ],
+          taxonomyTermLabel: `hasLocation`,
+        };
+        await updateReference(countyLocationRef);
       }
     }
-    // 7. add temporal
-    if (newEvent !== null && dateInfoRecorded !== '') {
+
+    // rule 7b
+    // add temporal
+    if (residenceEvent !== null && dateInfoRecorded !== '') {
       let newDate = dateInfoRecorded.split('-');
       let d = newDate[2],
         m = newDate[1],
@@ -4436,20 +4564,25 @@ const ingest1704 = async () => {
         startDate = `01-${m}-${y}`;
         endDate = `31-${m}-${y}`;
       }
-      const newTemporal = await addDate(startDate, endDate, userId);
+      const newTemporal = await addDate(startDate, endDate);
       const hasTimeEventRef = {
         items: [
-          { _id: newEvent._id, type: 'Event', role: '' },
+          { _id: residenceEvent._id, type: 'Event', role: '' },
           { _id: newTemporal._id, type: 'Temporal', role: '' },
         ],
         taxonomyTermLabel: `hasTime`,
       };
       await updateReference(hasTimeEventRef);
     }
-    // 8. add birth event
+    return residenceEvent;
+  };
+
+  // rule 8
+  const addBirthEvent = async (person, ageParam) => {
+    let age = ageParam.trim();
     let birthEvent = null;
     if (age !== '') {
-      const birthLabel = helpers.normalizeLabelId('birth');
+      const birthLabel = helpers.normalizeLabelId('Birth');
       const birthType = new TaxonomyTerm({
         labelId: birthLabel,
       });
@@ -4460,7 +4593,7 @@ const ingest1704 = async () => {
       const birthRefLabel = helpers.normalizeLabelId('was recorded as');
       const birthRef = {
         items: [
-          { _id: dbID, type: 'Person', role: '' },
+          { _id: person._id, type: 'Person', role: '' },
           { _id: birthEvent._id, type: 'Event', role: '' },
         ],
         taxonomyTermLabel: birthRefLabel,
@@ -4496,7 +4629,39 @@ const ingest1704 = async () => {
       };
       await updateReference(birthDateEventRef);
     }
-    // 9. add parishes
+    return birthEvent;
+  };
+
+  // rule 9
+  const addDiocese = async (person, dioceseParam) => {
+    if (dioceseParam !== '') {
+      const diocese = helpers.addslashes(dioceseParam).trim();
+      const dioceseOrganisation = await addOrganisation({
+        label: diocese,
+        organisationType: 'Diocese',
+      });
+      const ref = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: dioceseOrganisation._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: `hasAffiliation`,
+      };
+      await updateReference(ref);
+    }
+  };
+
+  // rule 10
+  const addParishes = async (
+    person,
+    parishParam,
+    updatedParishParam,
+    dateInfoRecordedParam
+  ) => {
+    const parish = parishParam.trim();
+    const updatedParish = updatedParishParam.trim();
+    const dateInfoRecorded = dateInfoRecordedParam.trim();
+
     if (parish !== '') {
       // wasServingAs
       let parishNames = parish.split(';');
@@ -4504,8 +4669,8 @@ const ingest1704 = async () => {
       for (let i = 0; i < parishNames.length; i += 1) {
         let parishName = parishNames[i];
         let updatedParishName = updatedParishNames[i] || null;
-        let parishLabel = parishName,
-          parishAltLabel = '';
+        let parishLabel = parishName;
+        let parishAltLabel = '';
         if (updatedParishName !== null) {
           parishLabel = updatedParishName;
           parishAltLabel = parishName;
@@ -4514,18 +4679,19 @@ const ingest1704 = async () => {
             parishAltLabel = '';
           }
           const newParishData = {
-            label: parishLabel,
+            label: parishLabel.trim(),
             organisationType: 'Parish',
           };
           if (parishAltLabel !== '') {
-            newParishData.alternateAppelations = [{ label: parishAltLabel }];
+            newParishData.alternateAppelations = [
+              { label: parishAltLabel.trim() },
+            ];
           }
           const newParish = await addOrganisation(newParishData);
 
           // new parish event
-          const parishTypeLabel = helpers.normalizeLabelId('was serving as');
           const parishType = new TaxonomyTerm({
-            labelId: parishTypeLabel,
+            labelId: 'wasServingAs',
           });
           await parishType.load();
           const parishTypeId = parishType._id.toString();
@@ -4533,7 +4699,7 @@ const ingest1704 = async () => {
           const newParishEvent = await addEvent('parish priest', parishTypeId);
           const eventRef = {
             items: [
-              { _id: dbID, type: 'Person', role: '' },
+              { _id: person._id, type: 'Person', role: '' },
               { _id: newParishEvent._id, type: 'Event', role: '' },
             ],
             taxonomyTermId: parishTypeId,
@@ -4546,32 +4712,38 @@ const ingest1704 = async () => {
               'Organisation',
               'Spatial'
             );
-            const hasItsEpiscopalSeeIn =
-              spatial.find((s) => s.term.label === `hasItsEpiscopalSeeIn`) ||
-              null;
-            if (hasItsEpiscopalSeeIn !== null) {
-              // add episcopal see in ref
-              let episcopalSeeInRef = {
-                items: [
-                  { _id: newParish._id, type: 'Organisation', role: '' },
-                  { _id: hasItsEpiscopalSeeIn._id, type: 'Spatial', role: '' },
-                ],
-                taxonomyTermLabel: `hasItsEpiscopalSeeIn`,
-              };
-              await updateReference(episcopalSeeInRef);
-              if (newParishEvent !== null) {
-                let episcopalSeeInEventRef = {
+            if (spatial.length > 0) {
+              const hasItsEpiscopalSeeIn =
+                spatial.find((s) => s.term.label === `hasItsEpiscopalSeeIn`) ||
+                null;
+              if (hasItsEpiscopalSeeIn !== null) {
+                // add episcopal see in ref
+                let episcopalSeeInRef = {
                   items: [
-                    { _id: newParishEvent._id, type: 'Event', role: '' },
+                    { _id: newParish._id, type: 'Organisation', role: '' },
                     {
-                      _id: hasItsEpiscopalSeeIn._id,
+                      _id: hasItsEpiscopalSeeIn.ref._id,
                       type: 'Spatial',
                       role: '',
                     },
                   ],
-                  taxonomyTermLabel: `hasLocation`,
+                  taxonomyTermLabel: `hasItsEpiscopalSeeIn`,
                 };
-                await updateReference(episcopalSeeInEventRef);
+                await updateReference(episcopalSeeInRef);
+                if (newParishEvent !== null) {
+                  let episcopalSeeInEventRef = {
+                    items: [
+                      { _id: newParishEvent._id, type: 'Event', role: '' },
+                      {
+                        _id: hasItsEpiscopalSeeIn.ref._id,
+                        type: 'Spatial',
+                        role: '',
+                      },
+                    ],
+                    taxonomyTermLabel: `hasLocation`,
+                  };
+                  await updateReference(episcopalSeeInEventRef);
+                }
               }
             }
           }
@@ -4586,7 +4758,7 @@ const ingest1704 = async () => {
               startDate = `01-${m}-${y}`;
               endDate = `31-${m}-${y}`;
             }
-            const newTemporal = await addDate(startDate, endDate, userId);
+            const newTemporal = await addDate(startDate, endDate);
             const hasTimeEventRef = {
               items: [
                 { _id: newParishEvent._id, type: 'Event', role: '' },
@@ -4599,22 +4771,32 @@ const ingest1704 = async () => {
         }
       }
     }
-    // 10. ordination
+  };
+
+  const addOrdination = async (
+    person,
+    dateOfOrdinationParam,
+    placeOfOrdinationParam,
+    updatedOrdinationBishopParam
+  ) => {
+    const dateOfOrdination = dateOfOrdinationParam.trim();
+    const placeOfOrdination = placeOfOrdinationParam.trim();
+    const updatedOrdinationBishop = updatedOrdinationBishopParam.trim();
+
     if (dateOfOrdination !== '') {
       // add the ordination event
-      const ordinationTypeLabel = helpers.normalizeLabelId('participated in');
       const ordinationType = new TaxonomyTerm({
-        labelId: ordinationTypeLabel,
+        labelId: 'hasParticipant',
       });
       await ordinationType.load();
       const ordinationTypeId = ordinationType._id.toString();
       const ordinationEvent = await addEvent('ordination', ordinationTypeId);
       const ordinationEventRef = {
         items: [
-          { _id: dbID, type: 'Person', role: '' },
           { _id: ordinationEvent._id, type: 'Event', role: '' },
+          { _id: person._id, type: 'Person', role: '' },
         ],
-        taxonomyTermId: ordinationTypeId,
+        taxonomyTermLabel: 'hasParticipant',
       };
       await updateReference(ordinationEventRef);
 
@@ -4669,7 +4851,11 @@ const ingest1704 = async () => {
               let episcopalSeeInRef = {
                 items: [
                   { _id: ordinationEvent._id, type: 'Event', role: '' },
-                  { _id: hasItsEpiscopalSeeIn._id, type: 'Spatial', role: '' },
+                  {
+                    _id: hasItsEpiscopalSeeIn.ref._id,
+                    type: 'Spatial',
+                    role: '',
+                  },
                 ],
                 taxonomyTermLabel: `hasItsEpiscopalSeeIn`,
               };
@@ -4701,20 +4887,217 @@ const ingest1704 = async () => {
         }
       }
 
-      // link to person
-      const eventPersonRef = {
-        items: [
-          { _id: ordinationEvent._id, type: 'Event', role: '' },
-          { _id: dbID, type: 'Person', role: '' },
-        ],
-        taxonomyTermLabel: 'hasParticipant',
-      };
-      await updateReference(eventPersonRef);
+      // add bishop
+      if (updatedOrdinationBishop !== '') {
+        const bishop = await addBishop(updatedOrdinationBishop);
+        if (bishop !== null) {
+          let bishopTitle = '';
+          if (updatedOrdinationBishop.includes('(')) {
+            bishopTitle = updatedOrdinationBishop.match(/\(([^)]+)\)/)[1];
+            if (bishopTitle !== '') {
+              bishopTitle = bishopTitle.trim();
+            }
+          }
 
-      // link ordination bishop
+          // add orders relation
+          const addOrdersRefLabel = helpers.normalizeLabelId(
+            'received holy orders from'
+          );
+          const addOrdersRef = {
+            items: [
+              { _id: person._id, type: 'Person', role: '' },
+              { _id: bishop._id, type: 'Person', role: '' },
+            ],
+            taxonomyTermLabel: addOrdersRefLabel,
+          };
+          await updateReference(addOrdersRef);
+
+          // add orders in event
+          const ordainingBishop = helpers.normalizeLabelId('ordaining bishop');
+          const ordainingBishopType = new TaxonomyTerm({
+            labelId: ordainingBishop,
+          });
+          await ordainingBishopType.load();
+          const ordinationOrdersEventRef = {
+            items: [
+              { _id: ordinationEvent._id, type: 'Event', role: '' },
+              {
+                _id: bishop._id,
+                type: 'Person',
+                role: ordainingBishopType._id,
+              },
+            ],
+            taxonomyTermLabel: `hasParticipant`,
+          };
+          await updateReference(ordinationOrdersEventRef);
+        }
+      }
     }
+  };
+
+  const addBishop = async (bishopLabel) => {
+    let bishopTitle = '';
+    let bishopFullTitle = '';
+    let bishopPrefix = '';
+    let bishopFirstName = '';
+    let bishopLastName = '';
+    if (bishopLabel.includes('(')) {
+      bishopFullTitle = bishopLabel.match(/\(([^)]+)\)/)[0];
+      bishopTitle = bishopLabel.match(/\(([^)]+)\)/)[1];
+      bishopLabel = bishopLabel.replace(bishopFullTitle, '');
+    }
+    if (bishopLabel.includes('Dr')) {
+      bishopPrefix = 'Dr';
+      bishopLabel = bishopLabel.replace(bishopPrefix, '');
+      bishopLabel = bishopLabel.trim();
+    }
+    let parts = bishopLabel.split(' ');
+    bishopFirstName = parts[0];
+    if (parts.length > 0) {
+      for (let p = 0; p < parts.length; p += 1) {
+        if (p > 0) {
+          if (p > 1) {
+            bishopLastName += ' ';
+          }
+          bishopLastName += parts[p].trim();
+        }
+      }
+    }
+    let honorificPrefix = [];
+    if (bishopPrefix !== '') {
+      honorificPrefix.push(bishopPrefix);
+    }
+    if (bishopTitle !== '') {
+      honorificPrefix.push(helpers.addslashes(bishopTitle));
+    }
+    bishopFirstName = bishopFirstName.trim();
+    bishopLastName = bishopLastName.trim();
+    if (bishopFirstName === '' && bishopLastName === '') {
+      return null;
+    }
+    let bishop = {
+      firstName: helpers.addslashes(bishopFirstName),
+      lastName: helpers.addslashes(bishopLastName),
+      status: 'private',
+      personType: 'Clergy',
+      honorificPrefix: honorificPrefix,
+    };
+    if (bishop.firstName !== '') {
+      bishop.fnameSoundex = helpers.soundex(bishop.firstName);
+    }
+    if (bishop.lastName !== '') {
+      bishop.lnameSoundex = helpers.soundex(bishop.lastName);
+    }
+    // check if bishop exists
+    const todayDate = new Date();
+    const dd = String(todayDate.getDate()).padStart(2, '0');
+    const mm = String(todayDate.getMonth() + 1).padStart(2, '0'); //January is 0!
+    const yyyy = todayDate.getFullYear();
+
+    const today = `${yyyy}-${mm}-${dd}`;
+    const query = `MATCH (n:Person) WHERE toLower(n.firstName)='${bishop.firstName.toLowerCase()}'
+    AND toLower(n.lastName)='${helpers.addslashes(
+      bishop.lastName.toLowerCase()
+    )}'
+    AND date(datetime({epochmillis: apoc.date.parse(n.createdAt,"ms","yyyy-MM-dd")}))=date(datetime({epochmillis: apoc.date.parse('${today}',"ms","yyyy-MM-dd")})) RETURN n ORDER BY n.createdAt DESC LIMIT 25 `;
+    let newBishop = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    if (newBishop !== null) {
+      bishop._id = newBishop._id;
+      if (bishop.honorificPrefix.length > 0) {
+        let dbPrefixes = newBishop.honorificPrefix;
+        for (let i = 0; i < bishop.honorificPrefix.length; i += 1) {
+          const prefix = bishop.honorificPrefix[i];
+          if (dbPrefixes.indexOf(prefix) === -1) {
+            dbPrefixes.push(prefix);
+          }
+        }
+        bishop.honorificPrefix = dbPrefixes;
+      }
+    }
+    newBishop = new Person(bishop);
+    const bishopSave = await newBishop.save(userId);
+    bishop = bishopSave.data;
+    return bishop;
+  };
+
+  for (let i = 0; i < masterCsv.length; i += 1) {
+    let row = masterCsv[i];
+    let lastName = row[masterKeys[0]].trim() || '';
+    let firstName = row[masterKeys[1]].trim() || '';
+    let updatedLastName = row[masterKeys[3]].trim() || '';
+    let updatedFirstName = row[masterKeys[5]].trim() || '';
+    let placeOfAbode = row[masterKeys[6]].trim() || '';
+    let updatedPlaceOfAbode = row[masterKeys[7]].trim() || '';
+    let placeOfAbodeType = row[masterKeys[8]].trim() || '';
+    let age = row[masterKeys[9]].trim() || '';
+    let parish = row[masterKeys[10]].trim() || '';
+    let updatedParish = row[masterKeys[11]].trim() || '';
+    let diocese = row[masterKeys[12]].trim() || '';
+    let dateInfoRecorded = row[masterKeys[13]].trim() || '';
+    let dateOfOrdination = row[masterKeys[14]].trim() || '';
+    let placeOfOrdination = row[masterKeys[15]].trim() || '';
+    // let ordinationBishop = row[masterKeys[17]].trim() || '';
+    let updatedOrdinationBishop = row[masterKeys[18]].trim() || '';
+    // let dioceseOfOrdination = row[masterKeys[19]].trim() || '';
+    // let laySureties = row[masterKeys[20]].trim() || '';
+    let countyOfAbode = row[masterKeys[21]].trim() || '';
+    let dbID = row[masterKeys[24]] || '';
+    if (typeof dbID !== 'undefined' && dbID !== '') {
+      dbID = dbID.trim();
+    }
+
+    // rule 1, 2 skip, 3
+    const person = await addPerson(
+      firstName,
+      lastName,
+      updatedLastName,
+      updatedFirstName,
+      dbID
+    );
+
+    // 2. person placeOfAbode
+    await personPlaceOfAbode(
+      person,
+      placeOfAbode,
+      placeOfAbodeType,
+      updatedPlaceOfAbode,
+      diocese,
+      countyOfAbode,
+      dateInfoRecorded
+    );
+
+    // 8. add birth event
+    await addBirthEvent(person, age);
+
+    // 9. add diocese
+    await addDiocese(person, diocese);
+
+    // 10. add parishes
+    await addParishes(person, parish, updatedParish, dateInfoRecorded);
+
+    // 10. ordination
+    await addOrdination(
+      person,
+      dateOfOrdination,
+      placeOfOrdination,
+      updatedOrdinationBishop
+    );
   }
 
+  console.log('ingestion complete');
   session.close();
   // stop executing
   process.exit();
