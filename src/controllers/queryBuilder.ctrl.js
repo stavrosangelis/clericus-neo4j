@@ -340,6 +340,11 @@ const getNodes = async (params) => {
   if (params.type === 'Person') {
     for (let i = 0; i < nodes.length; i += 1) {
       const node = nodes[i];
+      node.label = helpers.stripslashes(node.label);
+      node.firstName = helpers.stripslashes(node.firstName);
+      node.middleName = helpers.stripslashes(node.middleName);
+      node.lastName = helpers.stripslashes(node.lastName);
+      node.description = helpers.stripslashes(node.description);
       const relatedResources =
         (await helpers.loadRelations(node._id, 'Person', 'Resource', true)) ||
         null;

@@ -4273,13 +4273,15 @@ const ingest1704 = async () => {
   const addPerson = async (
     firstNameParam,
     lastNameParam,
-    updatedLastNameParam,
     updatedFirstNameParam,
+    updatedLastNameParam,
     dbIDParam
   ) => {
     const firstName = helpers.addslashes(firstNameParam);
     const lastName = helpers.addslashes(lastNameParam);
-    const dbID = dbIDParam.trim();
+    let updatedFirstName = updatedFirstNameParam.trim();
+    let updatedLastName = updatedLastNameParam.trim();
+    let dbID = dbIDParam.trim();
     // rule 1
     let person = {
       firstName,
@@ -4288,8 +4290,8 @@ const ingest1704 = async () => {
 
     // rule 3
     let alternateAppelation = null;
-    if (updatedLastNameParam !== '') {
-      const updatedLastName = helpers.addslashes(updatedLastNameParam);
+    if (updatedLastName !== '') {
+      updatedLastName = helpers.addslashes(updatedLastName);
       person.lastName = updatedLastName;
       alternateAppelation = {
         firstName,
@@ -4298,8 +4300,8 @@ const ingest1704 = async () => {
     }
 
     // rule 5
-    if (updatedFirstNameParam !== '') {
-      const updatedFirstName = helpers.addslashes(updatedFirstNameParam);
+    if (updatedFirstName !== '') {
+      updatedFirstName = helpers.addslashes(updatedFirstName);
       person.firstName = updatedFirstName;
       alternateAppelation = {
         firstName,
@@ -4319,38 +4321,39 @@ const ingest1704 = async () => {
     if (dbID === '') {
       personData = {
         status: 'private',
-        firstName,
-        lastName,
+        firstName: person.firstName,
+        lastName: person.lastName,
         personType: 'Clergy',
       };
-      if (firstName !== '') {
-        personData.fnameSoundex = helpers.soundex(firstName);
+      if (person.firstName !== '') {
+        personData.fnameSoundex = helpers.soundex(person.firstName);
       }
-      if (lastName !== '') {
-        personData.lnameSoundex = helpers.soundex(lastName);
+      if (person.lastName !== '') {
+        personData.lnameSoundex = helpers.soundex(person.lastName);
       }
       if (alternateAppelation !== null) {
         personData.alternateAppelations = [alternateAppelation];
       }
     } else {
+      dbID = Number(dbID);
       const dbPerson = new Person({ _id: dbID });
       await dbPerson.load();
       personData = {
         _id: dbID,
         honorificPrefix: dbPerson.honorificPrefix,
-        firstName,
+        firstName: person.firstName,
         middleName: dbPerson.middleName,
-        lastName,
+        lastName: person.lastName,
         alternateAppelations: [alternateAppelation],
         description: dbPerson.description,
         personType: dbPerson.personType,
         status: dbPerson.status,
       };
-      if (firstName !== '') {
-        personData.fnameSoundex = helpers.soundex(firstName);
+      if (person.firstName !== '') {
+        personData.fnameSoundex = helpers.soundex(person.firstName);
       }
-      if (lastName !== '') {
-        personData.lnameSoundex = helpers.soundex(lastName);
+      if (person.lastName !== '') {
+        personData.lnameSoundex = helpers.soundex(person.lastName);
       }
     }
     const newPerson = new Person(personData);
@@ -4496,6 +4499,16 @@ const ingest1704 = async () => {
         label: countyOfAbode,
         organisationType: 'County',
       });
+      const abodeRefLabel = helpers.normalizeLabelId('was resident of');
+      const countyPersonRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: countyOrganisation._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: abodeRefLabel,
+      };
+      await updateReference(countyPersonRef);
+
       const countyOfAbodeLabel = helpers.addslashes(countyOfAbode);
       const cQuery = `MATCH (n:Spatial {label: "${countyOfAbodeLabel}"}) RETURN n`;
       const countyOfAbodeSpatial = await session
@@ -4530,16 +4543,6 @@ const ingest1704 = async () => {
           await updateReference(hasLocationEventRef);
         }
 
-        // rule 13
-        const abodeRefLabel = helpers.normalizeLabelId('was resident of');
-        const countyPersonRef = {
-          items: [
-            { _id: person._id, type: 'Person', role: '' },
-            { _id: countyOrganisation._id, type: 'Organisation', role: '' },
-          ],
-          taxonomyTermLabel: abodeRefLabel,
-        };
-        await updateReference(countyPersonRef);
         const countyLocationRef = {
           items: [
             { _id: countyOrganisation._id, type: 'Organisation', role: '' },
@@ -4707,6 +4710,22 @@ const ingest1704 = async () => {
           await updateReference(eventRef);
 
           if (newParish !== null) {
+            if (newParishEvent !== null) {
+              // link parish organisation to event
+              let newParishOrgRef = {
+                items: [
+                  { _id: newParishEvent._id, type: 'Event', role: '' },
+                  {
+                    _id: newParish._id,
+                    type: 'Organisation',
+                    role: '',
+                  },
+                ],
+                taxonomyTermLabel: `hasRelation`,
+              };
+              await updateReference(newParishOrgRef);
+            }
+            // link spatial locations
             const spatial = await helpers.loadRelations(
               newParish._id,
               'Organisation',
@@ -4745,6 +4764,37 @@ const ingest1704 = async () => {
                   await updateReference(episcopalSeeInEventRef);
                 }
               }
+              const hasLocation =
+                spatial.find((s) => s.term.label === `hasLocation`) || null;
+              if (hasLocation !== null) {
+                // add episcopal see in ref
+                let hasLocationRef = {
+                  items: [
+                    { _id: newParish._id, type: 'Organisation', role: '' },
+                    {
+                      _id: hasLocation.ref._id,
+                      type: 'Spatial',
+                      role: '',
+                    },
+                  ],
+                  taxonomyTermLabel: `hasLocation`,
+                };
+                await updateReference(hasLocationRef);
+                if (newParishEvent !== null) {
+                  let hasLocationEventRef = {
+                    items: [
+                      { _id: newParishEvent._id, type: 'Event', role: '' },
+                      {
+                        _id: hasLocation.ref._id,
+                        type: 'Spatial',
+                        role: '',
+                      },
+                    ],
+                    taxonomyTermLabel: `hasLocation`,
+                  };
+                  await updateReference(hasLocationEventRef);
+                }
+              }
             }
           }
           if (newParishEvent !== null && dateInfoRecorded !== '') {
@@ -4777,11 +4827,13 @@ const ingest1704 = async () => {
     person,
     dateOfOrdinationParam,
     placeOfOrdinationParam,
-    updatedOrdinationBishopParam
+    updatedOrdinationBishopParam,
+    dioceseOfOrdinationParam
   ) => {
     const dateOfOrdination = dateOfOrdinationParam.trim();
     const placeOfOrdination = placeOfOrdinationParam.trim();
     const updatedOrdinationBishop = updatedOrdinationBishopParam.trim();
+    const dioceseOfOrdination = dioceseOfOrdinationParam.trim();
 
     if (dateOfOrdination !== '') {
       // add the ordination event
@@ -4823,9 +4875,11 @@ const ingest1704 = async () => {
       // add ordination spatial
       if (placeOfOrdination !== '') {
         let location =
-          locations.find((l) => l.name === placeOfOrdination) || null;
+          locations.find(
+            (l) => l.name.toLowerCase() === placeOfOrdination.toLowerCase()
+          ) || null;
         if (location !== null) {
-          const dQuery = `MATCH (n:Organisation {label: "${placeOfOrdination.diocese}"}) RETURN n`;
+          const dQuery = `MATCH (n:Organisation) WHERE n.label="${location.nameUpdated}" AND ( n.organisationType="${location.type}" OR n.organisationType="" ) RETURN n`;
           const ordinationDiocese = await session
             .writeTransaction((tx) => tx.run(dQuery, {}))
             .then((result) => {
@@ -4838,6 +4892,20 @@ const ingest1704 = async () => {
               return null;
             });
           if (ordinationDiocese !== null) {
+            // link ordination diocese with event
+            let ordinationDioceseRef = {
+              items: [
+                { _id: ordinationEvent._id, type: 'Event', role: '' },
+                {
+                  _id: ordinationDiocese._id,
+                  type: 'Organisation',
+                  role: '',
+                },
+              ],
+              taxonomyTermLabel: `hasRelation`,
+            };
+            await updateReference(ordinationDioceseRef);
+            // link spatial locations
             const spatial = await helpers.loadRelations(
               ordinationDiocese._id,
               'Organisation',
@@ -4891,6 +4959,9 @@ const ingest1704 = async () => {
       if (updatedOrdinationBishop !== '') {
         const bishop = await addBishop(updatedOrdinationBishop);
         if (bishop !== null) {
+          // add bishop diocese
+          await addDiocese(bishop, dioceseOfOrdination);
+
           let bishopTitle = '';
           if (updatedOrdinationBishop.includes('(')) {
             bishopTitle = updatedOrdinationBishop.match(/\(([^)]+)\)/)[1];
@@ -5051,7 +5122,7 @@ const ingest1704 = async () => {
     let placeOfOrdination = row[masterKeys[15]].trim() || '';
     // let ordinationBishop = row[masterKeys[17]].trim() || '';
     let updatedOrdinationBishop = row[masterKeys[18]].trim() || '';
-    // let dioceseOfOrdination = row[masterKeys[19]].trim() || '';
+    let dioceseOfOrdination = row[masterKeys[19]].trim() || '';
     // let laySureties = row[masterKeys[20]].trim() || '';
     let countyOfAbode = row[masterKeys[21]].trim() || '';
     let dbID = row[masterKeys[24]] || '';
@@ -5063,8 +5134,8 @@ const ingest1704 = async () => {
     const person = await addPerson(
       firstName,
       lastName,
-      updatedLastName,
       updatedFirstName,
+      updatedLastName,
       dbID
     );
 
@@ -5078,6 +5149,9 @@ const ingest1704 = async () => {
       countyOfAbode,
       dateInfoRecorded
     );
+
+    // link dioceseOfOrdination with person
+    await addDiocese(person, dioceseOfOrdination);
 
     // 8. add birth event
     await addBirthEvent(person, age);
@@ -5093,7 +5167,8 @@ const ingest1704 = async () => {
       person,
       dateOfOrdination,
       placeOfOrdination,
-      updatedOrdinationBishop
+      updatedOrdinationBishop,
+      dioceseOfOrdination
     );
   }
 

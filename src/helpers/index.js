@@ -394,6 +394,21 @@ const addslashes = (str) => {
   return str.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 };
 
+const stripslashes = (str) => {
+  return (str + '').replace(/\\(.?)/g, (s, n1) => {
+    switch (n1) {
+      case '\\':
+        return '\\';
+      case '0':
+        return '\u0000';
+      case '':
+        return '';
+      default:
+        return n1;
+    }
+  });
+};
+
 const temporalEvents = async (props, eventTypes) => {
   let dateType = props.dateType;
   let startDate = props.startDate;
@@ -514,6 +529,7 @@ module.exports = {
   escapeRegExp: escapeRegExp,
   prepareRelation: prepareRelation,
   addslashes: addslashes,
+  stripslashes: stripslashes,
   temporalEvents: temporalEvents,
   eventsFromTypes: eventsFromTypes,
 };

@@ -61,14 +61,18 @@ const checkAdminToken = (req, resp, next) => {
   if (token !== null && token !== 'null') {
     jwt.verify(token, privateKey, (error, decoded) => {
       // check if token has expired
-      let today = new Date();
-      let expiresIn = new Date(decoded.expiresIn);
-      if (today > expiresIn) {
-        error = 'Session expired. Please login again to continue.';
-      }
-      if (typeof decoded !== 'undefined') {
-        if (decoded.isAdmin === false) {
-          error = 'Unauthorised access!';
+      if (typeof decoded === 'undefined') {
+        error = '';
+      } else {
+        let today = new Date();
+        let expiresIn = new Date(decoded.expiresIn);
+        if (today > expiresIn) {
+          error = 'Session expired. Please login again to continue.';
+        }
+        if (typeof decoded !== 'undefined') {
+          if (decoded.isAdmin === false) {
+            error = 'Unauthorised access!';
+          }
         }
       }
       if (error) {
