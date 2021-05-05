@@ -4331,9 +4331,6 @@ const ingest1704 = async () => {
       if (person.lastName !== '') {
         personData.lnameSoundex = helpers.soundex(person.lastName);
       }
-      if (alternateAppelation !== null) {
-        personData.alternateAppelations = [alternateAppelation];
-      }
     } else {
       dbID = Number(dbID);
       const dbPerson = new Person({ _id: dbID });
@@ -4344,11 +4341,16 @@ const ingest1704 = async () => {
         firstName: person.firstName,
         middleName: dbPerson.middleName,
         lastName: person.lastName,
-        alternateAppelations: [alternateAppelation],
         description: dbPerson.description,
         personType: dbPerson.personType,
         status: dbPerson.status,
       };
+      if (alternateAppelation !== null) {
+        personData.alternateAppelations = [
+          ...dbPerson.alternateAppelations,
+          ...alternateAppelation,
+        ];
+      }
       if (person.firstName !== '') {
         personData.fnameSoundex = helpers.soundex(person.firstName);
       }
@@ -5129,6 +5131,7 @@ const ingest1704 = async () => {
     if (typeof dbID !== 'undefined' && dbID !== '') {
       dbID = dbID.trim();
     }
+    console.log(`now processing row: ${i + 1}`);
 
     // rule 1, 2 skip, 3
     const person = await addPerson(
