@@ -4346,10 +4346,16 @@ const ingest1704 = async () => {
         status: dbPerson.status,
       };
       if (alternateAppelation !== null) {
-        personData.alternateAppelations = [
-          ...dbPerson.alternateAppelations,
-          ...alternateAppelation,
-        ];
+        let newAlternateAppelations = [];
+        if (
+          typeof dbPerson.alternateAppelations === 'object' &&
+          dbPerson.alternateAppelations.length > 0
+        ) {
+          for (let aa = 0; aa < dbPerson.alternateAppelations.length; aa += 1) {
+            newAlternateAppelations.push(dbPerson.alternateAppelations[aa]);
+          }
+        }
+        newAlternateAppelations.push(alternateAppelation);
       }
       if (person.firstName !== '') {
         personData.fnameSoundex = helpers.soundex(person.firstName);
