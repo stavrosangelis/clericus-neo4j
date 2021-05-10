@@ -11,6 +11,7 @@ const fs = require('fs');
 const archivePath = process.env.ARCHIVEPATH;
 const Person = require('../person.ctrl').Person;
 const Organisation = require('../organisation.ctrl').Organisation;
+const Spatial = require('../spatial.ctrl').Spatial;
 const Taxonomy = require('../taxonomy.ctrl').Taxonomy;
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 const updateReference = require('../references.ctrl').updateReference;
@@ -43,6 +44,7 @@ const argv = yargs
     'Add a relationship to all items related with one or more ICP references to the main ICP reference'
   )
   .command('expOT', 'Export 1704 organisation types')
+  .command('ingest1704Parishes', 'Ingest 1704 parishes')
   .command('ingest1704', 'Ingest 1704 iptcData')
   .command('checkSpatial', '1704 dataset check if spatials are in the database')
   .command('check1704Locations', '1704 dataset check locations csv')
@@ -4023,8 +4025,202 @@ const ingestBishops = async () => {
   process.exit();
 };
 
+const ingest1704Parishes = async () => {
+  const session = driver.session();
+  const userId = await getAdminId();
+  const path = `${archivePath}documents/1704/parishes.csv`;
+  const csv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(path)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const keys = Object.keys(csv['0']);
+
+  const addSpatial = async (label) => {
+    if (typeof label === 'undefined' || label === '') {
+      return { _id: null };
+    }
+    const searchQ = `MATCH (n:Spatial {label: "${label}"}) RETURN n`;
+    let spatial = await session
+      .writeTransaction((tx) => tx.run(searchQ, {}))
+      .then((result) => {
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let orgRecord = record.toObject().n;
+          let org = helpers.outputRecord(orgRecord);
+          return org;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    if (spatial === null) {
+      const newSpatial = new Spatial({ label });
+      const saveData = await newSpatial.save(userId);
+      spatial = saveData.data;
+    }
+    return spatial;
+  };
+
+  const addDiocese = async (label) => {
+    if (typeof label === 'undefined' || label === '') {
+      return { _id: null };
+    }
+    const type = 'Diocese';
+
+    const searchQ = `MATCH (n:Organisation {label: "${label}", organisationType:"${type}"}) RETURN n`;
+    let organisation = await session
+      .writeTransaction((tx) => tx.run(searchQ, {}))
+      .then((result) => {
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let orgRecord = record.toObject().n;
+          let org = helpers.outputRecord(orgRecord);
+          return org;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    if (organisation === null) {
+      const newOrg = new Organisation({ label });
+      const saveData = await newOrg.save(userId);
+      organisation = saveData.data;
+    }
+    if (organisation !== null) {
+      const orgSpatial = await helpers.loadRelations(
+        organisation._id,
+        'Organisation',
+        'Spatial'
+      );
+      organisation.spatial = orgSpatial;
+    }
+
+    return organisation;
+  };
+
+  const addParish = async (data) => {
+    if (typeof data.label === 'undefined' || data.label === '') {
+      return { _id: null };
+    }
+    const label = data.label;
+    const type = 'Parish';
+    console.log(label);
+
+    const searchQ = `MATCH (n:Organisation {label: "${label}", organisationType:"${type}"}) RETURN n`;
+    let parish = await session
+      .writeTransaction((tx) => tx.run(searchQ, {}))
+      .then((result) => {
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0];
+          let orgRecord = record.toObject().n;
+          let org = helpers.outputRecord(orgRecord);
+          return org;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    if (parish === null) {
+      const newData = { label: data.label, organisationType: type };
+      if (data.alternateAppelation.length > 1) {
+        newData.alternateAppelations = [{ label: data.alternateAppelation }];
+      }
+      const newOrg = new Organisation(newData);
+      const saveData = await newOrg.save(userId);
+      parish = saveData.data;
+    }
+    if (parish !== null) {
+      // 1. add alternate appellation
+      const appellations = [];
+      if (
+        typeof parish.alternateAppelations !== 'undefined' &&
+        parish.alternateAppelations.length > 0
+      ) {
+        for (let aa = 0; aa < parish.alternateAppelations.length; aa += 1) {
+          const paa = parish.alternateAppelations[aa];
+          appellations.push(JSON.parse(paa));
+        }
+      }
+      const aaExists =
+        appellations.find((aa) => aa.label === data.alternateAppelation) ||
+        false;
+      if (!aaExists && data.alternateAppelation.length > 1) {
+        appellations.push({ label: data.alternateAppelation });
+        parish.alternateAppelations = appellations;
+        const tempParish = new Organisation(parish);
+        await tempParish.save(userId);
+      }
+
+      // 2. add has episcopalSeeIn
+      // load spatial
+      const parishSpatial = await helpers.loadRelations(
+        parish._id,
+        'Organisation',
+        'Spatial'
+      );
+      const hasItsEpiscopalSeeIn =
+        parishSpatial.find((s) => s.term.label === `hasItsEpiscopalSeeIn`) ||
+        null;
+      if (
+        hasItsEpiscopalSeeIn === null &&
+        data.episcopalSeeInSpatial._id !== null
+      ) {
+        const episcopalSeeInRef = {
+          items: [
+            { _id: parish._id, type: 'Organisation', role: '' },
+            {
+              _id: data.episcopalSeeInSpatial._id,
+              type: 'Spatial',
+              role: '',
+            },
+          ],
+          taxonomyTermLabel: `hasItsEpiscopalSeeIn`,
+        };
+        await updateReference(episcopalSeeInRef);
+      }
+    }
+
+    return parish;
+  };
+
+  for (let i = 0; i < csv.length; i += 1) {
+    const row = csv[i];
+    const originalName = row[keys[0]].trim() || '';
+    const normalisedName = row[keys[1]].trim() || '';
+    const diocese = row[keys[2]].trim() || '';
+    const dioceseOrganisation = await addDiocese(diocese);
+
+    const episcopalSeeIn = row[keys[3]].trim() || '';
+    const episcopalSeeInSpatial = await addSpatial(episcopalSeeIn);
+
+    const data = {
+      alternateAppelation: originalName,
+      label: normalisedName,
+      dioceseOrganisation,
+      episcopalSeeInSpatial,
+    };
+    await addParish(data);
+  }
+  session.close();
+};
+
 const ingest1704 = async () => {
   const session = driver.session();
+
+  // ingest parish data first
+  await ingest1704Parishes();
+
   // add new relations types
   const newRelationsTypes = [
     {
@@ -5261,6 +5457,9 @@ if (argv._.includes('cob')) {
 }
 if (argv._.includes('ib')) {
   ingestBishops();
+}
+if (argv._.includes('ingest1704Parishes')) {
+  ingest1704Parishes();
 }
 if (argv._.includes('ingest1704')) {
   ingest1704();
