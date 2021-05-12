@@ -4250,7 +4250,7 @@ const ingest1704 = async () => {
   const userId = await getAdminId();
 
   // ingest parish data first
-  // await ingest1704Parishes();
+  await ingest1704Parishes();
 
   // add new relations types
   const newRelationsTypes = [
