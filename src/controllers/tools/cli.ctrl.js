@@ -4,6 +4,8 @@ if (process.env.NODE_ENV === 'production') {
   require('dotenv').config({ path: '../../../.env.development' });
 }
 const yargs = require('yargs');
+const { performance } = require('perf_hooks');
+
 const helpers = require('../../helpers');
 const csvParser = require('csv-parser');
 const driver = require('../../config/db-driver');
@@ -4248,6 +4250,7 @@ const ingest1704Parishes = async () => {
 const ingest1704 = async () => {
   const session = driver.session();
   const userId = await getAdminId();
+  const t0 = performance.now();
 
   // ingest parish data first
   await ingest1704Parishes();
@@ -5196,8 +5199,18 @@ const ingest1704 = async () => {
               return null;
             });
           if (ordinationDiocese !== null) {
+            // link ordination diocese with person
+            const ordinationDiocesePersonRef = {
+              items: [
+                { _id: person._id, type: 'Person', role: '' },
+                { _id: ordinationDiocese._id, type: 'Organisation', role: '' },
+              ],
+              taxonomyTermLabel: helpers.normalizeLabelId('was ordained in'),
+            };
+            await updateReference(ordinationDiocesePersonRef);
+
             // link ordination diocese with event
-            let ordinationDioceseRef = {
+            const ordinationDioceseRef = {
               items: [
                 { _id: ordinationEvent._id, type: 'Event', role: '' },
                 {
@@ -5476,7 +5489,7 @@ const ingest1704 = async () => {
     await addBirthEvent(person, age);
 
     // 9. add diocese
-    await addDiocese(person, diocese, 'was ordained in');
+    await addDiocese(person, diocese, 'hasAffiliation');
 
     // 10. add parishes
     await addParishes(person, parish, updatedParish, dateInfoRecorded, diocese);
@@ -5491,7 +5504,9 @@ const ingest1704 = async () => {
     );
   }
 
-  console.log('ingestion complete');
+  const t1 = performance.now();
+  const elapsed = helpers.msToTime(t1 - t0);
+  console.log(`ingestion completed in ${elapsed}`);
   session.close();
   // stop executing
   process.exit();
