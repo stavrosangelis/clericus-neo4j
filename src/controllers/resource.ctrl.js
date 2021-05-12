@@ -57,10 +57,10 @@ class Resource {
       status = false;
       errors.push({ field: 'label', msg: 'The label must not be empty' });
     }
-    if (this.fileName === '') {
+    /* if (this.fileName === '') {
       status = false;
       errors.push({ field: 'fileName', msg: 'The fileName must not be empty' });
-    }
+    } */
     if (this.paths.length > 0) {
       let pI = 0;
       for (let key in this.paths) {

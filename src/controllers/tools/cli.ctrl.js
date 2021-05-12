@@ -11,6 +11,7 @@ const fs = require('fs');
 const archivePath = process.env.ARCHIVEPATH;
 const Person = require('../person.ctrl').Person;
 const Organisation = require('../organisation.ctrl').Organisation;
+const Resource = require('../resource.ctrl').Resource;
 const Spatial = require('../spatial.ctrl').Spatial;
 const Taxonomy = require('../taxonomy.ctrl').Taxonomy;
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
@@ -4115,22 +4116,28 @@ const ingest1704Parishes = async () => {
     const type = 'Parish';
     console.log(label);
 
-    const searchQ = `MATCH (n:Organisation {label: "${label}", organisationType:"${type}"}) RETURN n`;
-    let parish = await session
+    const searchQ = `MATCH (n:Organisation {label: "${label}", organisationType:"${type}"})
+    OPTIONAL MATCH (n)-[r]->(d:Organisation {label:"${data.dioceseOrganisation.label}", organisationType:"Diocese"})
+    RETURN n, d`;
+    const resultData = await session
       .writeTransaction((tx) => tx.run(searchQ, {}))
       .then((result) => {
-        let records = result.records;
+        const records = result.records;
         if (records.length > 0) {
-          let record = records[0];
-          let orgRecord = record.toObject().n;
-          let org = helpers.outputRecord(orgRecord);
-          return org;
+          const record = records[0];
+          const record1 = record.toObject().n || null;
+          const n = record1 !== null ? helpers.outputRecord(record1) : null;
+          const record2 = record.toObject().d || null;
+          const d = record2 !== null ? helpers.outputRecord(record2) : null;
+          return { n, d };
         }
-        return null;
+        return { n: null, d: null };
       })
       .catch((error) => {
         console.log(error);
       });
+    let parish = resultData.n;
+    const diocese = resultData.d;
     if (parish === null) {
       const newData = { label: data.label, organisationType: type };
       if (data.alternateAppelation.length > 1) {
@@ -4139,6 +4146,29 @@ const ingest1704Parishes = async () => {
       const newOrg = new Organisation(newData);
       const saveData = await newOrg.save(userId);
       parish = saveData.data;
+      if (diocese !== null) {
+        const ref = {
+          items: [
+            { _id: diocese._id, type: 'Organisation', role: '' },
+            { _id: parish._id, type: 'Organisation', role: '' },
+          ],
+          taxonomyTermLabel: 'hasPart',
+        };
+        await updateReference(ref);
+      } else if (data.dioceseOrganisation !== null) {
+        const ref = {
+          items: [
+            {
+              _id: data.dioceseOrganisation._id,
+              type: 'Organisation',
+              role: '',
+            },
+            { _id: parish._id, type: 'Organisation', role: '' },
+          ],
+          taxonomyTermLabel: 'hasPart',
+        };
+        await updateReference(ref);
+      }
     }
     if (parish !== null) {
       // 1. add alternate appellation
@@ -4217,9 +4247,10 @@ const ingest1704Parishes = async () => {
 
 const ingest1704 = async () => {
   const session = driver.session();
+  const userId = await getAdminId();
 
   // ingest parish data first
-  await ingest1704Parishes();
+  // await ingest1704Parishes();
 
   // add new relations types
   const newRelationsTypes = [
@@ -4235,6 +4266,18 @@ const ingest1704 = async () => {
       from: 'Person',
       to: 'Event',
     },
+    {
+      label: 'was ordained in',
+      inverseLabel: 'was place of ordination of',
+      from: 'Person',
+      to: 'Organisation',
+    },
+    {
+      label: 'is part of',
+      inverseLabel: 'has part',
+      from: 'Organisation',
+      to: 'Organisation',
+    },
   ];
   await addNewRelationsTypes(newRelationsTypes);
 
@@ -4242,8 +4285,21 @@ const ingest1704 = async () => {
   const newEventTypes = [{ label: 'habitation', inverseLabel: 'habitation' }];
   await addNewEventTypes(newEventTypes);
 
-  // add missing organisation types
-  // await syncOrganisationTypes();
+  //add new reference resource
+  const resourceSystemType = new TaxonomyTerm({
+    labelId: 'Document',
+  });
+  await resourceSystemType.load();
+
+  const resourceData = {
+    label:
+      'A List of the Names of the Popish Parish Priests Throughout the Several Counties in the Kingdom of Ireland (Dublin, 1705)',
+    resourceType: 'document',
+    systemType: resourceSystemType._id,
+  };
+  const newResource = new Resource(resourceData);
+  const newResourceSaveData = await newResource.save(userId);
+  const refResource = newResourceSaveData.data;
 
   // load locations
   const locationsCsvPath = `${archivePath}documents/1704/locations.csv`;
@@ -4274,7 +4330,6 @@ const ingest1704 = async () => {
     }
   }
 
-  const userId = await getAdminId();
   const masterCsvPath = `${archivePath}documents/1704/1704-master.csv`;
 
   const masterCsv = await new Promise((resolve) => {
@@ -4288,12 +4343,18 @@ const ingest1704 = async () => {
   });
   const masterKeys = Object.keys(masterCsv['0']);
 
-  const addOrganisation = async (data) => {
+  const addOrganisation = async (data, relLabel = null, relType = null) => {
     if (typeof data.label === 'undefined') {
       return { _id: null };
     }
     const label = data.label;
-    const searchQ = `MATCH (n:Organisation {label: "${label}"}) RETURN n`;
+    let searchQ = `MATCH (n:Organisation {label: "${label}"}) RETURN n`;
+    if (
+      typeof data.organisationType !== 'undefined' &&
+      data.organisationType !== ''
+    ) {
+      searchQ = `MATCH (n:Organisation {label: "${label}", organisationType: "${data.organisationType}"}) RETURN n`;
+    }
     let organisation = await session
       .writeTransaction((tx) => tx.run(searchQ, {}))
       .then((result) => {
@@ -4309,10 +4370,40 @@ const ingest1704 = async () => {
       .catch((error) => {
         console.log(error);
       });
+    if (relLabel !== null && organisation !== null) {
+      const organisations = await helpers.loadRelations(
+        organisation._id,
+        'Organisation',
+        'Organisation'
+      );
+      const hasRel =
+        organisations.find((o) => o.ref.label === relLabel) || false;
+      if (!hasRel) {
+        organisation = null;
+      }
+    }
     if (organisation === null) {
       const newOrg = new Organisation(data);
       const saveData = await newOrg.save(userId);
       organisation = saveData.data;
+
+      // load related organisation
+      if (relLabel !== null) {
+        const relOrg = await addOrganisation({
+          label: relLabel,
+          organisationType: relType,
+        });
+        // add reference with related organisation
+        const refLabel = helpers.normalizeLabelId('is part of');
+        const relOrgRef = {
+          items: [
+            { _id: organisation._id, type: 'Organisation', role: '' },
+            { _id: relOrg._id, type: 'Organisation', role: '' },
+          ],
+          taxonomyTermLabel: refLabel,
+        };
+        await updateReference(relOrgRef);
+      }
     }
     return organisation;
   };
@@ -4840,19 +4931,23 @@ const ingest1704 = async () => {
   };
 
   // rule 9
-  const addDiocese = async (person, dioceseParam) => {
+  const addDiocese = async (person, dioceseParam, relLabel = null) => {
     if (dioceseParam !== '') {
       const diocese = helpers.addslashes(dioceseParam).trim();
       const dioceseOrganisation = await addOrganisation({
         label: diocese,
         organisationType: 'Diocese',
       });
+      const taxonomyTermLabel =
+        relLabel === null
+          ? 'hasAffiliation'
+          : helpers.normalizeLabelId(relLabel);
       const ref = {
         items: [
           { _id: person._id, type: 'Person', role: '' },
           { _id: dioceseOrganisation._id, type: 'Organisation', role: '' },
         ],
-        taxonomyTermLabel: `hasAffiliation`,
+        taxonomyTermLabel: taxonomyTermLabel,
       };
       await updateReference(ref);
     }
@@ -4863,7 +4958,8 @@ const ingest1704 = async () => {
     person,
     parishParam,
     updatedParishParam,
-    dateInfoRecordedParam
+    dateInfoRecordedParam,
+    dioceseParam
   ) => {
     const parish = parishParam.trim();
     const updatedParish = updatedParishParam.trim();
@@ -4894,7 +4990,11 @@ const ingest1704 = async () => {
               { label: parishAltLabel.trim() },
             ];
           }
-          const newParish = await addOrganisation(newParishData);
+          const newParish = await addOrganisation(
+            newParishData,
+            dioceseParam,
+            'Diocese'
+          );
 
           // new parish event
           const parishType = new TaxonomyTerm({
@@ -5344,6 +5444,20 @@ const ingest1704 = async () => {
       dbID
     );
 
+    // link person with reference resource
+    const newResourceRef = {
+      items: [
+        { _id: person._id, type: 'Person', role: '' },
+        {
+          _id: refResource._id,
+          type: 'Resource',
+          role: '',
+        },
+      ],
+      taxonomyTermLabel: `isReferencedIn`,
+    };
+    await updateReference(newResourceRef);
+
     // 2. person placeOfAbode
     await personPlaceOfAbode(
       person,
@@ -5356,16 +5470,16 @@ const ingest1704 = async () => {
     );
 
     // link dioceseOfOrdination with person
-    await addDiocese(person, dioceseOfOrdination);
+    // await addDiocese(person, diocese, 'was ordained in');
 
     // 8. add birth event
     await addBirthEvent(person, age);
 
     // 9. add diocese
-    await addDiocese(person, diocese);
+    await addDiocese(person, diocese, 'was ordained in');
 
     // 10. add parishes
-    await addParishes(person, parish, updatedParish, dateInfoRecorded);
+    await addParishes(person, parish, updatedParish, dateInfoRecorded, diocese);
 
     // 10. ordination
     await addOrdination(
@@ -5378,6 +5492,36 @@ const ingest1704 = async () => {
   }
 
   console.log('ingestion complete');
+  session.close();
+  // stop executing
+  process.exit();
+};
+
+const execQuery = async () => {
+  const session = driver.session();
+  // const userId = await getAdminId();
+
+  const query = `MATCH (n:Organisation {label: "Abbeygormacan", organisationType:"Parish"})
+  OPTIONAL MATCH (n)-[r]->(d:Organisation {label:"Meath",organisationType:"Diocese"})
+  RETURN n, d`;
+  const data = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      const records = result.records;
+      if (records.length > 0) {
+        const record = records[0];
+        const record1 = record.toObject().n || null;
+        const n = record1 !== null ? helpers.outputRecord(record1) : null;
+        const record2 = record.toObject().d || null;
+        const d = record2 !== null ? helpers.outputRecord(record2) : null;
+        return { n, d };
+      }
+      return null;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  console.log(data);
   session.close();
   // stop executing
   process.exit();
@@ -5463,4 +5607,7 @@ if (argv._.includes('ingest1704Parishes')) {
 }
 if (argv._.includes('ingest1704')) {
   ingest1704();
+}
+if (argv._.includes('execQuery')) {
+  execQuery();
 }

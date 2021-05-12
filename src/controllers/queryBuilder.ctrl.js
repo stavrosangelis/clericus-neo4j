@@ -130,7 +130,9 @@ const parseParams = async (req) => {
     } else {
       queryText += ' AND ';
     }
-    queryText += ` id(n) IN [${eventIds}]`;
+    if (eventIds.length > 0) {
+      queryText += ` id(n) IN [${eventIds}]`;
+    }
     mainQuery += queryText;
   }
 
@@ -155,10 +157,12 @@ const parseParams = async (req) => {
     let queryText = '';
     if (!mainQuery.includes('WHERE')) {
       queryText += ' WHERE ';
-    } else {
+    } else if (queryText !== '') {
       queryText += ' AND ';
     }
-    queryText += ` id(n) IN [${eventIds}]`;
+    if (eventIds.length > 0) {
+      queryText += ` id(n) IN [${eventIds}]`;
+    }
     mainQuery += queryText;
   }
 
