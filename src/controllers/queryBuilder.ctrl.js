@@ -127,7 +127,7 @@ const parseParams = async (req) => {
     let queryText = '';
     if (!mainQuery.includes('WHERE')) {
       queryText += ' WHERE ';
-    } else {
+    } else if (queryText !== '') {
       queryText += ' AND ';
     }
     if (eventIds.length > 0) {
