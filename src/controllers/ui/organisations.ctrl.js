@@ -343,8 +343,36 @@ const getOrganisationsActiveFilters = async (req, resp) => {
   });
 };
 
+const getOrganisationsFilters = async (req, resp) => {
+  const session = driver.session();
+  const query = `MATCH (o:Organisation {status:'public'})-[r]-(t) RETURN DISTINCT id(o) AS _id, o.label AS label`;
+  const nodes = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      let output = [];
+      if (result.records.length > 0) {
+        const records = [];
+        for (let i = 0; i < result.records.length; i += 1) {
+          const record = result.records[i].toObject();
+          helpers.prepareOutput(record);
+          records.push(record);
+        }
+        output = records;
+      }
+      return output;
+    });
+  session.close();
+  resp.json({
+    status: true,
+    data: nodes,
+    error: [],
+    msg: 'Query results',
+  });
+};
+
 module.exports = {
   getOrganisations: getOrganisations,
   getOrganisation: getOrganisation,
   getOrganisationsActiveFilters: getOrganisationsActiveFilters,
+  getOrganisationsFilters: getOrganisationsFilters,
 };

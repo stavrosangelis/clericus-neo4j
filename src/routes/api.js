@@ -100,6 +100,10 @@ server.post(
   '/ui-organisations-active-filters',
   organisationsUiController.getOrganisationsActiveFilters
 );
+server.get(
+  '/ui-organisations-filters',
+  organisationsUiController.getOrganisationsFilters
+);
 
 // ******* ui people  ******** //
 server.post('/ui-people', peopleController.getPeople);
