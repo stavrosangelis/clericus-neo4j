@@ -224,7 +224,7 @@ const getArticleCategories = async (req, resp) => {
   let data = [];
   for (let i = 0; i < items.length; i++) {
     let item = items[i];
-    item.children = await getArticleCategoriesChildren(parseInt(item._id, 10));
+    item.children = await getArticleCategoriesChildren(Number(item._id));
     data.push(item);
   }
   if (data.error) {
@@ -246,7 +246,7 @@ const getArticleCategories = async (req, resp) => {
 
 const getArticleCategoriesChildren = async (_id) => {
   let session = driver.session();
-  let query = `MATCH (n:ArticleCategory) WHERE n.parentId="${_id}" RETURN n ORDER BY n.label`;
+  let query = `MATCH (n:ArticleCategory) WHERE n.parentId=${_id} RETURN n ORDER BY n.label`;
   let nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
@@ -257,7 +257,7 @@ const getArticleCategoriesChildren = async (_id) => {
   let data = [];
   for (let i = 0; i < items.length; i++) {
     let item = items[i];
-    item.children = await getArticleCategoriesChildren(parseInt(item._id, 10));
+    item.children = await getArticleCategoriesChildren(Number(item._id));
     data.push(item);
   }
   return data;

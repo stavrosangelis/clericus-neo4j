@@ -1,7 +1,7 @@
 const driver = require('../../config/db-driver');
 const helpers = require('../../helpers');
-const UploadedFile = require('../uploadedFile.ctrl').UploadedFile;
-const ArticleCategory = require('../articleCategory.ctrl').ArticleCategory;
+const { UploadedFile } = require('../uploadedFile.ctrl');
+const { ArticleCategory } = require('../articleCategory.ctrl');
 const User = require('../user.ctrl').User;
 
 class Article {
@@ -121,7 +121,7 @@ const getArticles = async (req, resp) => {
   if (typeof parameters.categoryId !== 'undefined') {
     categoryId = parameters.categoryId;
     if (categoryId !== '') {
-      queryParams += `n.category=${categoryId} `;
+      queryParams += ` ANY (category IN n.category  WHERE category IN [${categoryId}]) `
     }
   }
   if (typeof parameters.categoryName !== 'undefined') {
@@ -130,7 +130,7 @@ const getArticles = async (req, resp) => {
       let category = new ArticleCategory({ label: categoryName });
       await category.load();
       categoryId = category._id;
-      queryParams += `n.category="${categoryId}" `;
+      queryParams += ` ANY (category IN n.category  WHERE category IN [${categoryId}]) `;
     }
   }
   if (typeof parameters.orderField !== 'undefined') {
@@ -327,7 +327,7 @@ async function getArticleCategoryTree(_id) {
 
 async function getArticleCategoryChildrenTree(_id) {
   let children = [];
-  let query = `MATCH (n:ArticleCategory) WHERE n.parentId="${_id}" return n`;
+  let query = `MATCH (n:ArticleCategory) WHERE n.parentId=${_id} return n`;
   let session = driver.session();
   let nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
@@ -367,7 +367,7 @@ const getArticleCategory = async (req, resp) => {
   if (typeof parameters.categoryId !== 'undefined') {
     categoryId = parameters.categoryId;
     if (categoryId !== '') {
-      queryParams += `n.category=${categoryId} `;
+      queryParams += ` ANY (category IN n.category  WHERE category IN [${categoryId}]) `;
     }
   }
   if (typeof parameters.permalink !== 'undefined') {
@@ -387,7 +387,7 @@ const getArticleCategory = async (req, resp) => {
     category._id
   );
   categoryId = category._id;
-  queryParams += `n.category="${categoryId}" `;
+  queryParams += ` ANY (category IN n.category  WHERE category IN [${categoryId}]) `;
 
   if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;

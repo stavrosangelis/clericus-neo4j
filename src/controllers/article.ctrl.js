@@ -301,7 +301,7 @@ const getArticles = async (req, resp) => {
       let categories = await getArticleCategoriesChildren(categoryId);
       let childrenCategoriesIds = categories.map((c) => `"${c._id}"`);
       let categoryIds = [`"${categoryId}"`, ...childrenCategoriesIds];
-      queryParams += `n.category IN [${categoryIds}] `;
+      queryParams += ` ANY (category IN n.category WHERE category IN [${categoryIds}]) `;
     }
   }
   if (typeof parameters.categoryName !== 'undefined') {
@@ -312,8 +312,8 @@ const getArticles = async (req, resp) => {
       categoryId = category._id;
       let categories = await getArticleCategoriesChildren(categoryId);
       let childrenCategoriesIds = categories.map((c) => `"${c._id}"`);
-      let categoryIds = [`"${categoryId}"`, ...childrenCategoriesIds];
-      queryParams += `n.category IN [${categoryIds}] `;
+      let categoryIds = [`${categoryId}`, ...childrenCategoriesIds];
+      queryParams += ` ANY (category IN n.category WHERE category IN [${categoryIds}]) `;
     }
   }
   if (typeof parameters.status !== 'undefined') {
@@ -362,7 +362,6 @@ const getArticles = async (req, resp) => {
     skip +
     ' LIMIT ' +
     limit;
-
   let data = await getArticlesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
