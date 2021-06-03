@@ -24,6 +24,7 @@ const DEBUG = false;
 // parse arguments
 const argv = yargs
   .command('parse', 'Parse provided csv or csvs')
+  .command('letterKey', 'Find the key of a column')
   .command('ec1', 'Export matriculation classes 1')
   .command('ec2', 'Export matriculation classes 2')
   .command('ic', 'Ingest classes from exported csvs')
@@ -56,9 +57,15 @@ const argv = yargs
   .command('cob', '1704 dataset check ordination bishops')
   .command('ib', '1704 dataset ingest ordination bishops')
   .command(
+    'laySuretiesLocations',
+    '1704 dataset prepare lay sureties locations'
+  )
+  .command(
     'checkOrdinationLocation',
     '1704 dataset check ordination location values'
   )
+  .command('mergeLaySureties', '1704 lay sureties merge people')
+  .command('ingestLaySureties', 'ingest 1704 dataset lay sureties')
   .example('$0 parse -i data.csv', 'parse the contents of the csv file')
   .option('csv', {
     alias: 'c',
@@ -92,6 +99,14 @@ if (argv.csv) {
     process.exit();
   }
 }
+
+const cellOutput = (valueParam = '') => {
+  let value = valueParam;
+  if (value !== '') {
+    value = value.trim();
+  }
+  return value;
+};
 
 // get admin id
 const getAdminId = async () => {
@@ -1735,7 +1750,6 @@ const exportParishes = async () => {
   }
   let csvPath = `${archivePath}documents/1704/parishes.csv`;
   let csvText = parishText.join('\n');
-  console.log(csvText);
   let writeFile = await new Promise((resolve, reject) => {
     fs.writeFile(csvPath, '\ufeff' + csvText, 'utf8', function (err) {
       if (err) {
@@ -5516,31 +5530,636 @@ const execQuery = async () => {
   const session = driver.session();
   // const userId = await getAdminId();
 
-  const query = `MATCH (n:Organisation {label: "Abbeygormacan", organisationType:"Parish"})
-  OPTIONAL MATCH (n)-[r]->(d:Organisation {label:"Meath",organisationType:"Diocese"})
-  RETURN n, d`;
+  const queryResource = `MATCH (n:Resource {label:"A List of the Names of the Popish Parish Priests Throughout the Several Counties in the Kingdom of Ireland (Dublin, 1705)"}) RETURN n`;
   const data = await session
-    .writeTransaction((tx) => tx.run(query, {}))
+    .writeTransaction((tx) => tx.run(queryResource, {}))
     .then((result) => {
       const records = result.records;
       if (records.length > 0) {
-        const record = records[0];
-        const record1 = record.toObject().n || null;
-        const n = record1 !== null ? helpers.outputRecord(record1) : null;
-        const record2 = record.toObject().d || null;
-        const d = record2 !== null ? helpers.outputRecord(record2) : null;
-        return { n, d };
+        const output = records.map((r) => {
+          const record = r.toObject();
+          return helpers.outputRecord(record.n);
+        });
+        return output;
       }
-      return null;
-    })
-    .catch((error) => {
-      console.log(error);
+      return [];
     });
-  console.log(data);
+  console.log(data[0]._id);
   session.close();
   // stop executing
   process.exit();
 };
+
+const laySuretiesLocations = async () => {
+  const t0 = performance.now();
+  const session = driver.session();
+
+  const locationsCsvPath = `${archivePath}documents/1704/locations.csv`;
+  const locationsCsv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(locationsCsvPath)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const locationsKeys = Object.keys(locationsCsv['0']);
+
+  const laySuretiesCsvPath = `${archivePath}documents/1704/lay-sureties.csv`;
+  const laySuretiesCsv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(laySuretiesCsvPath)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const laySuretiesKeys = Object.keys(laySuretiesCsv['0']);
+
+  const newLocations = [];
+  for (let i = 0; i < laySuretiesCsv.length; i += 1) {
+    const row = laySuretiesCsv[i];
+    let placeNameUpdated = row[laySuretiesKeys[5]] || '';
+    placeNameUpdated = placeNameUpdated.trim();
+    let locationType = row[laySuretiesKeys[6]] || '';
+    locationType = locationType.trim();
+    let placeNameAlternate = row[laySuretiesKeys[7]] || '';
+    placeNameAlternate = placeNameAlternate.trim();
+    let county = row[laySuretiesKeys[8]] || '';
+    county = county.trim();
+    let diocese = row[laySuretiesKeys[9]] || '';
+    diocese = diocese.trim();
+    const location =
+      locationsCsv.find(
+        (f) =>
+          f[locationsKeys[1]].trim() === placeNameUpdated &&
+          f[locationsKeys[2]].trim() === locationType &&
+          f[locationsKeys[3]].trim() === diocese
+      ) || null;
+    if (location === null) {
+      const query = `MATCH (n:Organisation {label:"${placeNameUpdated}",organisationType:"${locationType}"}) RETURN n`;
+      const locationDB = await session
+        .writeTransaction((tx) => tx.run(query, {}))
+        .then((result) => {
+          let records = result.records;
+          if (records.length > 0) {
+            let record = records[0].toObject();
+            let outputRecord = helpers.outputRecord(record.n);
+            return outputRecord;
+          }
+          return null;
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+      if (locationDB === null) {
+        const newLocation = {
+          'Place name updated': placeNameUpdated,
+          'Location Type': locationType,
+          'Place name alternate appellation': placeNameAlternate,
+          County: county,
+          Diocese: diocese,
+        };
+        const inNewLocations =
+          newLocations.find(
+            (f) =>
+              f['Place name updated'] === placeNameUpdated &&
+              f['Location Type'] === locationType
+          ) || null;
+        if (inNewLocations === null) {
+          newLocations.push(newLocation);
+        }
+      }
+    }
+  }
+  newLocations.sort((a, b) =>
+    a['Place name updated'] > b['Place name updated'] ? 1 : -1
+  );
+  const outputPath = `${archivePath}documents/1704/lay-sureties-locations.csv`;
+  let csvText =
+    'Place name updated,Location Type,Place name alternate appellation,County,Diocese\n';
+  for (let k in newLocations) {
+    let row = newLocations[k];
+    csvText += `${row['Place name updated']},${row['Location Type']},${row['Place name alternate appellation']},${row.County},${row.Diocese}\n`;
+  }
+  await new Promise((resolve, reject) => {
+    fs.writeFile(outputPath, csvText, 'utf8', function (err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+
+  const t1 = performance.now();
+  const elapsed = helpers.msToTime(t1 - t0);
+  console.log(`process completed in ${elapsed}`);
+  session.close();
+  // stop executing
+  process.exit();
+};
+
+const mergeLaySureties = async () => {
+  const t0 = performance.now();
+
+  const laySuretiesCsvPath = `${archivePath}documents/1704/lay-sureties.csv`;
+  const laySuretiesCsv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(laySuretiesCsvPath)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const laySuretiesKeys = Object.keys(laySuretiesCsv['0']);
+
+  const newData = [];
+  for (let i = 0; i < laySuretiesCsv.length; i += 1) {
+    const row = laySuretiesCsv[i];
+    let dataItem = {
+      Name: '',
+      Count: '',
+      Lines: '',
+      'Name updated': '',
+      'Alternate appellation': '',
+      'Place name updated': '',
+      'Location Type': '',
+      'Place name alternate appellation': '',
+      County: '',
+      Diocese: '',
+      'Title (honorific prefix)': '',
+      Profesion: '',
+      Number: '',
+      Skip: '',
+      Date: '',
+    };
+
+    const name = cellOutput(row[laySuretiesKeys[0]]);
+    const count = cellOutput(row[laySuretiesKeys[1]]);
+    const lines = cellOutput(row[laySuretiesKeys[2]]);
+    const nameUpdated = cellOutput(row[laySuretiesKeys[3]]);
+    const alternateAppellation = cellOutput(row[laySuretiesKeys[4]]);
+    const placeNameUpdated = cellOutput(row[laySuretiesKeys[5]]);
+    const locationType = cellOutput(row[laySuretiesKeys[6]]);
+    const placeNameAlternateAppellation = cellOutput(row[laySuretiesKeys[7]]);
+    const county = cellOutput(row[laySuretiesKeys[8]]);
+    const diocese = cellOutput(row[laySuretiesKeys[9]]);
+    const titleHonorificPrefix = cellOutput(row[laySuretiesKeys[10]]);
+    const profesion = cellOutput(row[laySuretiesKeys[11]]);
+    const numberId = cellOutput(row[laySuretiesKeys[12]]);
+    const skip = cellOutput(row[laySuretiesKeys[13]]);
+    const date = cellOutput(row[laySuretiesKeys[14]]);
+    if (skip !== '' && Number(skip) === 1) {
+      continue;
+    }
+
+    const existingLine = newData.find((l) => l['Number'] === numberId) || null;
+    if (existingLine === null) {
+      dataItem['Name'] = name;
+      dataItem['Count'] = count;
+      dataItem['Lines'] = lines;
+      dataItem['Name updated'] = nameUpdated;
+      dataItem['Alternate appellation'] = alternateAppellation;
+      dataItem['Place name updated'] = placeNameUpdated;
+      dataItem['Location Type'] = locationType;
+      dataItem[
+        'Place name alternate appellation'
+      ] = placeNameAlternateAppellation;
+      dataItem['County'] = county;
+      dataItem['Diocese'] = diocese;
+      dataItem['Title (honorific prefix)'] = titleHonorificPrefix;
+      dataItem['Profesion'] = profesion;
+      dataItem['Number'] = numberId;
+      dataItem['Skip'] = skip;
+      dataItem['Date'] = date;
+      newData.push(dataItem);
+    } else {
+      const index = newData.indexOf(existingLine);
+      if (!existingLine['Name'].includes(name)) {
+        if (existingLine['Name'] !== '') {
+          existingLine['Name'] += ';';
+        }
+        existingLine['Name'] += name;
+      }
+      existingLine['Count'] = Number(existingLine['Count']) + Number(count);
+      if (!existingLine['Lines'].includes(lines)) {
+        if (existingLine['Lines'] !== '') {
+          existingLine['Lines'] += '|';
+        }
+        existingLine['Lines'] += lines;
+      }
+      if (!existingLine['Name updated'].includes(nameUpdated)) {
+        if (existingLine['Name updated'] !== '') {
+          if (!existingLine['Alternate appellation'].includes(nameUpdated)) {
+            if (existingLine['Alternate appellation'] !== '') {
+              existingLine['Alternate appellation'] += ';';
+            }
+            existingLine['Alternate appellation'] += nameUpdated;
+          }
+        } else {
+          existingLine['Name updated'] += nameUpdated;
+        }
+      }
+      if (
+        !existingLine['Alternate appellation'].includes(alternateAppellation)
+      ) {
+        if (existingLine['Alternate appellation'] !== '') {
+          existingLine['Alternate appellation'] += ';';
+        }
+        existingLine['Alternate appellation'] += alternateAppellation;
+      }
+      if (!existingLine['Place name updated'].includes(placeNameUpdated)) {
+        if (existingLine['Place name updated'] !== '') {
+          existingLine['Place name updated'] += ';';
+        }
+        existingLine['Place name updated'] += placeNameUpdated;
+      }
+      if (!existingLine['Location Type'].includes(locationType)) {
+        if (existingLine['Location Type'] !== '') {
+          existingLine['Location Type'] += ';';
+        }
+        existingLine['Location Type'] += locationType;
+      }
+      if (
+        !existingLine['Place name alternate appellation'].includes(
+          placeNameAlternateAppellation
+        )
+      ) {
+        if (existingLine['Place name alternate appellation'] !== '') {
+          existingLine['Place name alternate appellation'] += ';';
+        }
+        existingLine[
+          'Place name alternate appellation'
+        ] += placeNameAlternateAppellation;
+      }
+      if (!existingLine['County'].includes(county)) {
+        if (existingLine['County'] !== '') {
+          existingLine['County'] += ';';
+        }
+        existingLine['County'] += county;
+      }
+      if (!existingLine['Diocese'].includes(diocese)) {
+        if (existingLine['Diocese'] !== '') {
+          existingLine['Diocese'] += ';';
+        }
+        existingLine['Diocese'] += diocese;
+      }
+      if (
+        !existingLine['Title (honorific prefix)'].includes(titleHonorificPrefix)
+      ) {
+        existingLine['Title (honorific prefix)'] += `|${titleHonorificPrefix}`;
+      }
+      if (!existingLine['Profesion'].includes(profesion)) {
+        existingLine['Profesion'] += `|${profesion}`;
+      }
+      if (!existingLine['Number'].includes(numberId)) {
+        existingLine['Number'] += `|${numberId}`;
+      }
+      if (!existingLine['Skip'].includes(skip)) {
+        existingLine['Skip'] += `|${skip}`;
+      }
+      if (!existingLine['Date'].includes(date)) {
+        existingLine['Date'] += `|${date}`;
+      }
+      newData[index] = existingLine;
+    }
+  }
+
+  const outputPath = `${archivePath}documents/1704/lay-sureties-merged.csv`;
+  let csvText = `Name,"Count","Lines","Name updated","Alternate appellation","Place name updated","Location Type","Place name alternate appellation","County","Diocese","Title (honorific prefix)","Profesion","Number","Skip","Date"\n`;
+  for (let i = 0; i < newData.length; i += 1) {
+    const row = newData[i];
+    csvText += `"${row['Name']}","${row['Count']}","${row['Lines']}","${row['Name updated']}","${row['Alternate appellation']}","${row['Place name updated']}","${row['Location Type']}","${row['Place name alternate appellation']}","${row['County']}","${row['Diocese']}","${row['Title (honorific prefix)']}","${row['Profesion']}","${row['Number']}","${row['Skip']}","${row['Date']}",\n`;
+  }
+  await new Promise((resolve, reject) => {
+    fs.writeFile(outputPath, csvText, 'utf8', function (err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+  const t1 = performance.now();
+  const elapsed = helpers.msToTime(t1 - t0);
+  console.log(`process completed in ${elapsed}`);
+  // stop executing
+  process.exit();
+};
+
+const ingestLaySureties = async () => {
+  const t0 = performance.now();
+  const session = driver.session();
+
+  const locationsCsvPath = `${archivePath}documents/1704/locations.csv`;
+  const locationsCsv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(locationsCsvPath)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  // const locationsKeys = Object.keys(locationsCsv['0']);
+
+  const laySuretiesCsvPath = `${archivePath}documents/1704/lay-sureties-merged.csv`;
+  const laySuretiesCsv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(laySuretiesCsvPath)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const laySuretiesKeys = Object.keys(laySuretiesCsv['0']);
+
+  const masterCsvPath = `${archivePath}documents/1704/1704-master.csv`;
+  const masterCsv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(masterCsvPath)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const masterCsvKeys = Object.keys(masterCsv['0']);
+
+  // handle name
+  const handleName = (str = '') => {
+    if (str === '') {
+      return '';
+    }
+    const partsArr = str.split(' ');
+    const parts = partsArr.map((p) => cellOutput(p));
+    const fullName = {
+      firstName: '',
+      middleName: '',
+      lastName: '',
+    };
+    switch (parts.length) {
+      case 3:
+        fullName.firstName = parts[0];
+        fullName.middleName = parts[1];
+        fullName.lastName = parts[2];
+        break;
+      case 2:
+        fullName.firstName = parts[0];
+        fullName.lastName = parts[1];
+        break;
+      case 1:
+        if (parts[0].includes('f:')) {
+          const newFirstName = parts[0].replace('f:', '');
+          fullName.firstName = newFirstName;
+        } else {
+          fullName.lastName = parts[0];
+        }
+        break;
+      default:
+        fullName.firstName = parts[0];
+        fullName.lastName = parts[1];
+    }
+    return fullName;
+  };
+
+  const handleAlternateAppelations = (str = '') => {
+    if (str === '') {
+      return [];
+    }
+    const partsArr = str.split(';');
+    const alternateAppellations = partsArr.map((p) =>
+      handleName(cellOutput(p))
+    );
+    return alternateAppellations;
+  };
+
+  // handle new person
+  const newPerson = (fullName, honorificPrefix, alternateAppellations) => {
+    // rule 1b
+    const personData = {
+      personType: 'Laity',
+    };
+    for (let key in fullName) {
+      personData[key] = fullName[key];
+    }
+    // rule 1c
+    if (honorificPrefix !== '') {
+      personData.honorificPrefix = [honorificPrefix];
+    }
+    // rule 2
+    if (alternateAppellations.length > 0) {
+      personData.alternateAppelations = alternateAppellations;
+    }
+    return personData;
+  };
+
+  // matches
+  const queryReferenceDocument = `MATCH (n:Resource {label:"A List of the Names of the Popish Parish Priests Throughout the Several Counties in the Kingdom of Ireland (Dublin, 1705)"}) RETURN n`;
+  const referenceDocument = await session
+    .writeTransaction((tx) => tx.run(queryReferenceDocument, {}))
+    .then((result) => {
+      const records = result.records;
+      if (records.length > 0) {
+        const output = records.map((r) => {
+          const record = r.toObject();
+          return helpers.outputRecord(record.n);
+        });
+        return output[0];
+      }
+      return null;
+    });
+  const handleMatches = (matches) => {
+    if (matches === '') {
+      return [];
+    }
+    const partsArr = matches.split('|');
+    const parts = partsArr.map((p) => {
+      const match = Number(cellOutput(p)) - 1;
+      return masterCsv[match];
+    });
+    return parts;
+  };
+
+  const preparePriestData = (priest, keys) => {
+    let surname = cellOutput(priest[keys[0]]);
+    let firstName = cellOutput(priest[keys[1]]);
+    const alternateAppellation = { firstName: '', lastName: '' };
+    const surnameUpdated = cellOutput(priest[keys[3]]);
+    const firstNameUpdated = cellOutput(priest[keys[5]]);
+    if (surnameUpdated !== '') {
+      alternateAppellation.lastName = surname;
+      surname = surnameUpdated;
+    }
+    if (firstNameUpdated !== '') {
+      alternateAppellation.firstName = firstName;
+      firstName = firstNameUpdated;
+    }
+    if (
+      alternateAppellation.firstName !== '' &&
+      alternateAppellation.lastName === ''
+    ) {
+      alternateAppellation.lastName = surname;
+    }
+    if (
+      alternateAppellation.firstName === '' &&
+      alternateAppellation.lastName !== ''
+    ) {
+      alternateAppellation.firstName = firstName;
+    }
+    const output = {
+      firstName,
+      surname,
+      alternateAppellation,
+    };
+
+    return output;
+  };
+
+  const matchPriestToDb = async (priest, referenceDocument, keys) => {
+    const dbId = cellOutput(priest[keys[24]]);
+    console.log(dbId);
+    if (dbId !== '') {
+      const query = `MATCH (n:Person)-[r]->(t:Resource) WHERE id(t)=${dbId} return n`;
+      const priests = await session
+        .writeTransaction((tx) => tx.run(query, {}))
+        .then((result) => {
+          const records = result.records;
+          if (records.length > 0) {
+            const output = records.map((r) => {
+              const record = r.toObject();
+              return helpers.outputRecord(record.n);
+            });
+            return output;
+          }
+          return [];
+          });
+      return priests;
+    }
+    const person = preparePriestData(priest, keys);
+    const query = `MATCH (n:Person {firstName:"${person.firstName}", lastName:"${person.surname}"})-[r]->(t:Resource) WHERE id(t)=${referenceDocument._id} return n`;
+    let priests = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        const records = result.records;
+        if (records.length > 0) {
+          const output = records.map((r) => {
+            const record = r.toObject();
+            return helpers.outputRecord(record.n);
+          });
+          return output;
+        }
+        return [];
+      });
+    if (priests.length > 1) {
+      const newMatches = [];
+      for (let i = 0; i < priests.length; i += 1) {
+        const p = priests[i];
+        const pAlt = p.alternateAppelations.map((a) => JSON.parse(a));
+        const match =
+          pAlt.find(
+            (f) =>
+              f.firstName === person.alternateAppellation.firstName &&
+              f.lastName === person.alternateAppellation.lastName
+          ) || null;
+        if (match !== null) {
+          newMatches.push(p);
+        }
+      }
+      if (newMatches.length > 0) {
+        priests = newMatches;
+      }
+    }
+    return priests;
+  };
+
+  let oneMatch = 0;
+  let manyMatches = 0;
+  let zeroMatches = 0;
+
+  let consoleResults = [];
+
+  for (let i = 0; i < laySuretiesCsv.length; i += 1) {
+    const row = laySuretiesCsv[i];
+    const skip = cellOutput(row[laySuretiesKeys[13]]);
+    if (skip !== '' && Number(skip) === 1) {
+      continue;
+    }
+    const nameUpdated = cellOutput(row[laySuretiesKeys[3]]);
+    const honorificPrefix = cellOutput(row[laySuretiesKeys[10]]);
+    const alternateAppellations = cellOutput(row[laySuretiesKeys[4]]);
+    const matches = cellOutput(row[laySuretiesKeys[2]]);
+
+    // rule 1
+    const fullName = handleName(nameUpdated);
+
+    // rule 2
+    const newAlternateAppellations = handleAlternateAppelations(
+      alternateAppellations
+    );
+
+    const person = newPerson(
+      fullName,
+      honorificPrefix,
+      newAlternateAppellations
+    );
+
+    // rule 3
+    const matchPriests = handleMatches(matches);
+    const matchesArray = matches.split("|");
+    for (let m = 0; m < matchPriests.length; m += 1) {
+      const matchedPriest = matchPriests[m];
+      const priest = await matchPriestToDb(
+        matchedPriest,
+        referenceDocument,
+        masterCsvKeys
+      );
+      if (priest.length === 1) {
+        oneMatch += 1;
+      } else if (priest.length > 1) {
+        const line = Number(matchesArray[m]) + 1;
+        const find = consoleResults.find((f) => f.line === line) || null;
+        if (find === null) {
+          consoleResults.push({
+            line: line,
+            name: `${cellOutput(matchedPriest[masterCsvKeys[1]])} ${cellOutput(
+              matchedPriest[masterCsvKeys[0]]
+            )}`,
+          });
+        }
+        manyMatches += 1;
+      } else {
+        zeroMatches += 1;
+      }
+    }
+    // console.log(person);
+  }
+  consoleResults.sort((a, b) => (a.line > b.line ? 1 : -1));
+  // console.log(consoleResults);
+  console.log(`unique zero: ${consoleResults.length}`);
+  console.log(`one: ${oneMatch}`);
+  console.log(`many: ${manyMatches}`);
+  console.log(`zero: ${zeroMatches}`);
+  const t1 = performance.now();
+  const elapsed = helpers.msToTime(t1 - t0);
+  console.log(`process completed in ${elapsed}`);
+  session.close();
+  // stop executing
+  process.exit();
+};
+
+const letterKey = (letterParam = '') => {
+  const letterParam = argv.csv;
+  const letter = letterParam.toLowerCase();
+  const alphabet = 'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z';
+  const letters = alphabet.split(',');
+  return letters.indexOf(letter);
+}
 
 if (argv._.includes('parse')) {
   parseCsv();
@@ -5625,4 +6244,16 @@ if (argv._.includes('ingest1704')) {
 }
 if (argv._.includes('execQuery')) {
   execQuery();
+}
+if (argv._.includes('laySuretiesLocations')) {
+  laySuretiesLocations();
+}
+if (argv._.includes('ingestLaySureties')) {
+  ingestLaySureties();
+}
+if (argv._.includes('mergeLaySureties')) {
+  mergeLaySureties();
+}
+if (argv._.includes('letterKey')) {
+  letterKey();
 }

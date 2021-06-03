@@ -266,10 +266,42 @@ class Person {
       let newAppelations = [];
       if (this.alternateAppelations.length > 0) {
         for (let key in this.alternateAppelations) {
-          let alternateAppelation = JSON.stringify(
-            this.alternateAppelations[key]
+          const alternateAppelation = this.alternateAppelations[key];
+          if (
+            typeof alternateAppelation.appelation === 'undefined' ||
+            alternateAppelation.appelation === ''
+          ) {
+            let newAltAppelation = '';
+            if (
+              alternateAppelation.firstName !== 'undefined' &&
+              alternateAppelation.firstName !== ''
+            ) {
+              newAltAppelation += alternateAppelation.firstName;
+            }
+            if (
+              alternateAppelation.middleName !== 'undefined' &&
+              alternateAppelation.middleName !== ''
+            ) {
+              if (newAltAppelation !== '') {
+                newAltAppelation += ' ';
+              }
+              newAltAppelation += alternateAppelation.middleName;
+            }
+            if (
+              alternateAppelation.lastName !== 'undefined' &&
+              alternateAppelation.lastName !== ''
+            ) {
+              if (newAltAppelation !== '') {
+                newAltAppelation += ' ';
+              }
+              newAltAppelation += alternateAppelation.lastName;
+            }
+            alternateAppelation.appelation = newAltAppelation;
+          }
+          let alternateAppelationStringified = JSON.stringify(
+            alternateAppelation
           );
-          newAppelations.push(alternateAppelation);
+          newAppelations.push(alternateAppelationStringified);
         }
       }
       this.alternateAppelations = newAppelations;

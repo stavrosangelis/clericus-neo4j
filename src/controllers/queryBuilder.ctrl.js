@@ -404,8 +404,9 @@ const getNodes = async (params) => {
     });
   session.close();
   const totalPages = Math.ceil(count / params.limit);
+  const currentPage = params.page <= totalPages ? params.page : totalPages;
   const result = {
-    currentPage: params.page,
+    currentPage: currentPage,
     nodes: nodes,
     count: count,
     totalPages: totalPages,

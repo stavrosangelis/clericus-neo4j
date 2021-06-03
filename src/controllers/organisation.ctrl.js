@@ -40,7 +40,7 @@ class Organisation {
     }
     if (this.alternateAppelations.length > 0) {
       for (let key in this.alternateAppelations) {
-        let alternateAppelation = this.alternateAppelations[key];
+        const alternateAppelation = this.alternateAppelations[key];
         if (alternateAppelation.label.length < 2) {
           status = false;
           errors.push({

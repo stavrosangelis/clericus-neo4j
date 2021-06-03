@@ -121,7 +121,7 @@ const getArticles = async (req, resp) => {
   if (typeof parameters.categoryId !== 'undefined') {
     categoryId = parameters.categoryId;
     if (categoryId !== '') {
-      queryParams += ` ANY (category IN n.category  WHERE category IN [${categoryId}]) `
+      queryParams += ` ANY (category IN n.category  WHERE category IN [${categoryId}]) `;
     }
   }
   if (typeof parameters.categoryName !== 'undefined') {
