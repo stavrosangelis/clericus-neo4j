@@ -70,11 +70,11 @@ const getAdminId = async () => {
   return userNode._id;
 };
 
-/*
 const getDaysInMonth = (m, y) => {
   return new Date(y, m + 1, 0).getDate();
 };
 
+/*
 const getTaxonomyTerms = async (_id) => {
   let session = driver.session();
   let query = `MATCH (t:Taxonomy) WHERE id(t)=${_id} MATCH (n:TaxonomyTerm)-[r:isChildOf]->(t) RETURN n ORDER BY n.label`;
@@ -1026,12 +1026,27 @@ const ingestLaySureties = async () => {
   const wasSuretyToLabel = helpers.normalizeLabelId('was surety to');
   const receivedLabel = helpers.normalizeLabelId('received');
 
-  const addDate = async (startDate = '', endDate = null) => {
-    if (startDate === '') {
+  const prepareDate = (date) => {
+    const parts = date.split('-');
+    const y = parts[0];
+    const m = parts[1];
+    const d = parts[2] === '??' ? '01' : parts[2];
+    const startDate = `${d}-${m}-${y}`;
+    let endDate = null;
+    if (parts[2] === '??') {
+      const endDay = getDaysInMonth(m, y);
+      endDate = `${endDay}-${m}-${y}`;
+    }
+    return { startDate, endDate };
+  };
+
+  const addDate = async (startDateParam = '') => {
+    if (startDateParam === '') {
       return null;
     }
+    const { startDate, endDate } = prepareDate(startDateParam);
     let queryEndDate = '';
-    if (endDate !== null && endDate !== '') {
+    if (endDate !== null) {
       queryEndDate = `AND n.endDate="${endDate}" `;
     }
     const query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" ${queryEndDate} RETURN n`;
