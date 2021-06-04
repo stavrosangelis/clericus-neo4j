@@ -33,6 +33,7 @@ const argv = yargs
   .command('mergeLaySureties', '1704 lay sureties merge people')
   .command('ingestLaySureties', 'ingest 1704 dataset lay sureties')
   .command('addIds', '')
+  .command('addBom', '')
   .example('$0 parse -i data.csv', 'parse the contents of the csv file')
   .option('letter', {
     alias: 'l',
@@ -48,6 +49,43 @@ const cellOutput = (valueParam = '') => {
     value = value.trim();
   }
   return value;
+};
+
+const addBom = async () => {
+  const path = `${archivePath}documents/1704/lay-sureties-merged.csv`;
+  const csv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(path)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const csvKeys = Object.keys(csv['0']);
+  const head = csvKeys.map((h) => `"${h}"`).join(',');
+  let csvText = `${head}\n`;
+  for (let i = 0; i < csv.length; i += 1) {
+    const row = csv[i];
+    let rowText = '';
+    // eslint-disable-next-line
+    for (const [key, value] of Object.entries(row)) {
+      rowText += `"${value}",`;
+    }
+    csvText += `${rowText}\n`;
+  }
+  const outputPath = `${archivePath}documents/1704/lay-sureties-merged-2.csv`;
+  await new Promise((resolve, reject) => {
+    fs.writeFile(outputPath, `\ufeff${csvText}`, 'utf8', function (err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+  // stop executing
+  process.exit();
 };
 
 // get admin id
@@ -275,7 +313,7 @@ const laySuretiesLocations = async () => {
     csvText += `${row['Place name updated']},${row['Location Type']},${row['Place name alternate appellation']},${row.County},${row.Diocese}\n`;
   }
   await new Promise((resolve, reject) => {
-    fs.writeFile(outputPath, csvText, 'utf8', function (err) {
+    fs.writeFile(outputPath, `\ufeff${csvText}`, 'utf8', function (err) {
       if (err) {
         reject(err);
       } else {
@@ -466,7 +504,7 @@ const mergeLaySureties = async () => {
     csvText += `"${row['Name']}","${row['Count']}","${row['Lines']}","${row['Name updated']}","${row['Alternate appellation']}","${row['Place name updated']}","${row['Location Type']}","${row['Place name alternate appellation']}","${row['County']}","${row['Diocese']}","${row['Title (honorific prefix)']}","${row['Profesion']}","${row['Number']}","${row['Skip']}","${row['Date']}",\n`;
   }
   await new Promise((resolve, reject) => {
-    fs.writeFile(outputPath, csvText, 'utf8', function (err) {
+    fs.writeFile(outputPath, `\ufeff${csvText}`, 'utf8', function (err) {
       if (err) {
         reject(err);
       } else {
@@ -1234,8 +1272,8 @@ const ingestLaySureties = async () => {
       locationType,
       placeNameAlt
     );
-    for (let i = 0; i < organisations.length; i += 1) {
-      const organisation = organisations[i];
+    for (let io = 0; io < organisations.length; io += 1) {
+      const organisation = organisations[io];
       if (organisation !== null) {
         // 1. add relation to person
         // John Doe was resident of Slane
@@ -1253,7 +1291,7 @@ const ingestLaySureties = async () => {
         const dioceses = diocesesArr.map((d) => cellOutput(d));
         for (let d = 0; d < dioceses.length; d += 1) {
           const di = dioceses[d];
-          const dioceseDb = await loadOrganisation(di, 'Diosece');
+          const dioceseDb = await loadOrganisation(di, 'Diocese');
           if (dioceseDb !== null) {
             const hasItsEpiscopalSeeIn =
               dioceseDb.spatial.find(
@@ -1323,7 +1361,7 @@ const ingestLaySureties = async () => {
         // add event episcopal see in
         for (let d = 0; d < dioceses.length; d += 1) {
           const di = dioceses[d];
-          const dioceseDb = await loadOrganisation(di, 'Diosece');
+          const dioceseDb = await loadOrganisation(di, 'Diocese');
           if (dioceseDb !== null) {
             const hasItsEpiscopalSeeIn =
               dioceseDb.spatial.find(
@@ -1576,7 +1614,7 @@ const addIds = async () => {
     csvText += `${rowText}\n`;
   }
   await new Promise((resolve, reject) => {
-    fs.writeFile(outputPath, csvText, 'utf8', function (err) {
+    fs.writeFile(outputPath, `\ufeff${csvText}`, 'utf8', function (err) {
       if (err) {
         reject(err);
       } else {
@@ -1607,4 +1645,7 @@ if (argv._.includes('letterKey')) {
 }
 if (argv._.includes('addIds')) {
   addIds();
+}
+if (argv._.includes('addBom')) {
+  addBom();
 }
