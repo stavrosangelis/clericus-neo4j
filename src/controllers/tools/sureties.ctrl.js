@@ -627,18 +627,6 @@ const ingestLaySureties = async () => {
   const session = driver.session();
   const userId = await getAdminId();
 
-  /* const locationsCsvPath = `${archivePath}documents/1704/locations.csv`;
-  const locationsCsv = await new Promise((resolve) => {
-    let results = [];
-    fs.createReadStream(locationsCsvPath)
-      .pipe(csvParser())
-      .on('data', (data) => results.push(data))
-      .on('end', () => {
-        resolve(results);
-      });
-  });
-  const locationsKeys = Object.keys(locationsCsv['0']); */
-
   const laySuretiesCsvPath = `${archivePath}documents/1704/lay-sureties-merged.csv`;
   const laySuretiesCsv = await new Promise((resolve) => {
     let results = [];
@@ -698,6 +686,29 @@ const ingestLaySureties = async () => {
     },
   ];
   await addNewRelationsTypes(newRelationsTypes);
+
+  //add new reference resource
+  const resourceSystemType = new TaxonomyTerm({
+    labelId: 'Document',
+  });
+  await resourceSystemType.load();
+
+  const newResourceQuery = `MATCH (n:Resource {label:
+    'A List of the Names of the Popish Parish Priests Throughout the Several Counties in the Kingdom of Ireland (Dublin, 1705)', resourceType: 'document', systemType: '${resourceSystemType._id}'}) return n`;
+  const newResources = await session
+    .writeTransaction((tx) => tx.run(newResourceQuery, {}))
+    .then((result) => {
+      const records = result.records;
+      if (records.length > 0) {
+        const output = records.map((r) => {
+          const record = r.toObject();
+          return helpers.outputRecord(record.n);
+        });
+        return output;
+      }
+      return [];
+    });
+  const refResource = newResources[0];
 
   // handle name
   const handleName = (str = '') => {
@@ -1233,6 +1244,20 @@ const ingestLaySureties = async () => {
         await updateReference(sponsorshipTemporalReference);
       }
     }
+
+    // link person with reference resource
+    const newResourceRef = {
+      items: [
+        { _id: person._id, type: 'Person', role: '' },
+        {
+          _id: refResource._id,
+          type: 'Resource',
+          role: '',
+        },
+      ],
+      taxonomyTermLabel: `isReferencedIn`,
+    };
+    await updateReference(newResourceRef);
 
     // link event with person
     const residenceEventRef = {
