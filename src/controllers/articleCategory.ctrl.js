@@ -52,7 +52,12 @@ class ArticleCategory {
     }
     let query = '';
     if (this._id !== null) {
-      query = `MATCH (n:ArticleCategory) WHERE id(n)=${this._id} return n`;
+      if (this._id.length > 1) {
+        query = `MATCH (n:ArticleCategory) WHERE id(n) IN [${this._id}] return n`;
+      } else {
+        query = `MATCH (n:ArticleCategory) WHERE id(n)=${this._id} return n`;
+      }
+
     }
     if (this.label !== null) {
       query = `MATCH (n:ArticleCategory) WHERE n.label="${this.label}" return n`;
