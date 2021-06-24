@@ -113,8 +113,75 @@ const loadAppSettings = async () => {
   return settings;
 };
 
+const loadItems = async (query) => {
+  const session = driver.session();
+  const items = await session
+    .run(query, {})
+    .then((result) => {
+      const records = result.records;
+      if (records.length > 0) {
+        const output = records.map((r) => {
+          const record = r.toObject();
+          return helpers.outputRecord(record.n);
+        });
+        return output;
+      }
+      return [];
+    })
+    .catch((error) => {
+      let output = { error: error, status: false, data: [] };
+      return output;
+    });
+  session.close();
+  return items;
+};
+
+const getDefaultRelations = async (req, resp) => {
+  const query1 = `MATCH (n:Event) RETURN n ORDER BY n.label SKIP 0 LIMIT 25`;
+  const query2 = `MATCH (n:Organisation) RETURN n ORDER BY n.label SKIP 0 LIMIT 25`;
+  const query3 = `MATCH (n:Person) RETURN n ORDER BY n.lastName SKIP 0 LIMIT 25`;
+  const query4 = `MATCH (n:Resource) RETURN n ORDER BY n.label SKIP 0 LIMIT 25`;
+  const query5 = `MATCH (n:Temporal) RETURN n ORDER BY n.label SKIP 0 LIMIT 25`;
+  const query6 = `MATCH (n:Spatial) RETURN n ORDER BY n.label SKIP 0 LIMIT 25`;
+  const eventsData = await loadItems(query1);
+  const organisations = await loadItems(query2);
+  const people = await loadItems(query3);
+  const resources = await loadItems(query4);
+  const spatial = await loadItems(query5);
+  const temporal = await loadItems(query6);
+  const events = [];
+  for (let e = 0; e < eventsData.length; e += 1) {
+    const eventItem = eventsData[e];
+    eventItem.temporal = await helpers.loadRelations(
+      eventItem._id,
+      'Event',
+      'Temporal'
+    );
+    eventItem.spatial = await helpers.loadRelations(
+      eventItem._id,
+      'Event',
+      'Spatial'
+    );
+    events.push(eventItem);
+  }
+  return resp.json({
+    status: true,
+    data: {
+      events,
+      organisations,
+      people,
+      resources,
+      spatial,
+      temporal,
+    },
+    error: [],
+    msg: '',
+  });
+};
+
 module.exports = {
   getSettings: getSettings,
   updateAppSettings: updateAppSettings,
   getAppSettings: getAppSettings,
+  getDefaultRelations: getDefaultRelations,
 };

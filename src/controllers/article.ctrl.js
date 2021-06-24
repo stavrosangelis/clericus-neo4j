@@ -6,9 +6,8 @@ const fs = require('fs');
 const mimeType = require('mime-types');
 const formidable = require('formidable');
 const UploadedFile = require('./uploadedFile.ctrl').UploadedFile;
-const ArticleCategory = require('./articleCategory.ctrl').ArticleCategory;
-const getArticleCategoriesChildren = require('./articleCategory.ctrl')
-  .getArticleCategoriesChildren;
+const { ArticleCategory } = require('./articleCategory.ctrl');
+const { getArticleCategoriesChildren } = require('./articleCategory.ctrl');
 
 class Article {
   constructor({
@@ -387,8 +386,8 @@ const getArticles = async (req, resp) => {
 };
 
 const getArticlesQuery = async (query, queryParams, limit) => {
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
@@ -397,7 +396,7 @@ const getArticlesQuery = async (query, queryParams, limit) => {
       console.log(error);
     });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  const nodes = helpers.normalizeRecordsOutput(nodesPromise);
 
   for (let i = 0; i < nodes.length; i++) {
     let node = nodes[i];
@@ -409,6 +408,25 @@ const getArticlesQuery = async (query, queryParams, limit) => {
       await featuredImageDetails.load();
       node.featuredImageDetails = featuredImageDetails;
     } else node.featuredImageDetails = null;
+    const categories = [];
+    if (typeof node.category !== 'undefined') {
+      if (
+        typeof node.category === 'object' &&
+        node.category.length !== 'undefined'
+      ) {
+        for (let j = 0; j < node.category.length; j += 1) {
+          const ac = node.category[j];
+          const category = new ArticleCategory({ _id: ac });
+          await category.load();
+          categories.push(category);
+        }
+      } else if (node.category !== 0) {
+        const category = new ArticleCategory({ _id: node.category });
+        await category.load();
+        categories.push(category);
+      }
+    }
+    node.categories = categories;
   }
 
   let count = await session

@@ -303,8 +303,10 @@ class Resource {
 * @apiName get resources
 * @apiGroup Resources
 *
+* @apiParam {_id} [_id] An unique _id.
 * @apiParam {string} [label] A string to match against the resources' labels.
 * @apiParam {string} [systemType] A system type id.
+* @apiParam {string} [resourceType] A resource Type label.
 * @apiParam {string} [description] A string to match against the peoples' description.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
@@ -327,6 +329,7 @@ const getResources = async (req, resp) => {
   let parameters = req.query;
   let label = '';
   let systemType = '';
+  let resourceType = '';
   let status = '';
   let description = '';
   let page = 0;
@@ -338,63 +341,82 @@ const getResources = async (req, resp) => {
   let query = '';
   let queryParams = '';
 
-  if (typeof parameters.label !== 'undefined') {
-    label = parameters.label;
-    if (label !== '') {
-      queryParams = "toLower(n.label) =~ toLower('.*" + label + ".*') ";
-    }
-  }
-  if (typeof parameters.systemType !== 'undefined') {
-    systemType = parameters.systemType;
-    if (systemType !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
+  if (
+    typeof parameters._id !== 'undefined' &&
+    parameters._id !== null &&
+    parameters._id !== ''
+  ) {
+    const eventId = parameters._id.trim();
+    queryParams = `id(n)=${eventId} `;
+  } else {
+    if (typeof parameters.label !== 'undefined') {
+      label = parameters.label.trim();
+      if (label !== '') {
+        queryParams = "toLower(n.label) =~ toLower('.*" + label + ".*') ";
       }
-      queryParams += `n.systemType = '${systemType}' `;
     }
-  }
-  if (typeof parameters.description !== 'undefined') {
-    description = parameters.description;
-    if (description !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
+    if (typeof parameters.systemType !== 'undefined') {
+      systemType = parameters.systemType.trim();
+      if (systemType !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += `n.systemType = '${systemType}' `;
       }
-      queryParams +=
-        "toLower(n.description) =~ toLower('.*" + description + ".*') ";
     }
-  }
-  if (typeof parameters.status !== 'undefined') {
-    status = parameters.status;
-    if (status !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
+    if (typeof parameters.resourceType !== 'undefined') {
+      resourceType = parameters.resourceType.trim();
+      if (resourceType !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += `toLower(n.resourceType) = toLower('${resourceType}') `;
       }
-      queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
     }
-  }
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
-  if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
-      queryOrder += ' DESC';
+    if (typeof parameters.description !== 'undefined') {
+      description = parameters.description;
+      if (description !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams +=
+          "toLower(n.description) =~ toLower('.*" + description + ".*') ";
+      }
+    }
+    if (typeof parameters.status !== 'undefined') {
+      status = parameters.status;
+      if (status !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
+      }
+    }
+    if (typeof parameters.orderField !== 'undefined') {
+      orderField = parameters.orderField;
+    }
+    if (orderField !== '') {
+      queryOrder = 'ORDER BY n.' + orderField;
+      if (
+        typeof parameters.orderDesc !== 'undefined' &&
+        parameters.orderDesc === 'true'
+      ) {
+        queryOrder += ' DESC';
+      }
+    }
+
+    if (typeof parameters.page !== 'undefined') {
+      page = parseInt(parameters.page, 10);
+      queryPage = parseInt(parameters.page, 10) - 1;
+      if (queryPage < 0) {
+        queryPage = 0;
+      }
+    }
+    if (typeof parameters.limit !== 'undefined') {
+      limit = parseInt(parameters.limit, 10);
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-    if (queryPage < 0) {
-      queryPage = 0;
-    }
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
   let currentPage = page;
   if (page === 0) {
     currentPage = 1;

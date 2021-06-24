@@ -130,9 +130,9 @@ const putReferences = async (req, resp) => {
 };
 
 const updateReference = async (reference) => {
-  let session = driver.session();
-  let srcItem = reference.items[0];
-  let targetItem = reference.items[1];
+  const session = driver.session();
+  const srcItem = reference.items[0];
+  const targetItem = reference.items[1];
   let taxonomyTermQuery = '';
   if (typeof reference.taxonomyTermId !== 'undefined') {
     taxonomyTermQuery = {

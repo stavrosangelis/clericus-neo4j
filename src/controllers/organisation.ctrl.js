@@ -225,6 +225,7 @@ class Organisation {
 * @apiName get organisations
 * @apiGroup Organisations
 *
+* @apiParam {_id} [_id] A unique _id.
 * @apiParam {string} [label] A string to match against the organisations' labels.
 * @apiParam {string} [organisationType] An organisation type label.
 * @apiParam {string} [orderField=firstName] The field to order the results by.
@@ -267,57 +268,67 @@ const getOrganisations = async (req, resp) => {
   let query = '';
   let queryParams = '';
 
-  if (typeof parameters.label !== 'undefined') {
-    label = parameters.label;
-    if (label !== '') {
-      let escapeLabel = helpers.addslashes(label);
-      queryParams = `toLower(n.label) =~ toLower('.*${escapeLabel}.*')`;
-    }
-  }
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
-  if (typeof parameters.organisationType !== 'undefined') {
-    organisationType = parameters.organisationType;
-    if (organisationType !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
+  if (
+    typeof parameters._id !== 'undefined' &&
+    parameters._id !== null &&
+    parameters._id !== ''
+  ) {
+    const orgId = parameters._id.trim();
+    queryParams = `id(n)=${orgId} `;
+  } else {
+    if (typeof parameters.label !== 'undefined') {
+      label = parameters.label;
+      if (label !== '') {
+        let escapeLabel = helpers.addslashes(label);
+        queryParams = `toLower(n.label) =~ toLower('.*${escapeLabel}.*')`;
       }
-      queryParams +=
-        "toLower(n.organisationType) =~ toLower('.*" +
-        organisationType +
-        ".*') ";
     }
-  }
-  if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
-      queryOrder += ' DESC';
+    if (typeof parameters.orderField !== 'undefined') {
+      orderField = parameters.orderField;
     }
-  }
-  if (typeof parameters.status !== 'undefined') {
-    status = parameters.status;
-    if (status !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
+    if (typeof parameters.organisationType !== 'undefined') {
+      organisationType = parameters.organisationType;
+      if (organisationType !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams +=
+          "toLower(n.organisationType) =~ toLower('.*" +
+          organisationType +
+          ".*') ";
       }
-      queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
+    }
+    if (orderField !== '') {
+      queryOrder = 'ORDER BY n.' + orderField;
+      if (
+        typeof parameters.orderDesc !== 'undefined' &&
+        parameters.orderDesc === 'true'
+      ) {
+        queryOrder += ' DESC';
+      }
+    }
+    if (typeof parameters.status !== 'undefined') {
+      status = parameters.status;
+      if (status !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
+      }
+    }
+
+    if (typeof parameters.page !== 'undefined') {
+      page = parseInt(parameters.page, 10);
+      queryPage = parseInt(parameters.page, 10) - 1;
+      if (queryPage < 0) {
+        queryPage = 0;
+      }
+    }
+    if (typeof parameters.limit !== 'undefined') {
+      limit = parseInt(parameters.limit, 10);
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-    if (queryPage < 0) {
-      queryPage = 0;
-    }
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
   let currentPage = page;
   if (page === 0) {
     currentPage = 1;

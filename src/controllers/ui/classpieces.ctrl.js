@@ -566,7 +566,7 @@ const getClasspiecesPrepareQueryParams = async (req) => {
     if (queryParams !== '') {
       queryParams += ' AND ';
     }
-    queryParams += `toLower(n.systemType) = '${systemType}' `;
+    queryParams += `n.systemType = '${systemType}' `;
   }
   if (typeof parameters.description !== 'undefined') {
     description = parameters.description;

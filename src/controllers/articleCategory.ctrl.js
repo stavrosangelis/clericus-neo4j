@@ -57,7 +57,6 @@ class ArticleCategory {
       } else {
         query = `MATCH (n:ArticleCategory) WHERE id(n)=${this._id} return n`;
       }
-
     }
     if (this.label !== null) {
       query = `MATCH (n:ArticleCategory) WHERE n.label="${this.label}" return n`;

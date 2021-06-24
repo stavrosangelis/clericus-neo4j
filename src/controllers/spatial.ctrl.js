@@ -218,8 +218,11 @@ class Spatial {
 * @apiName get spatials
 * @apiGroup Spatials
 *
+* @apiParam {_id} [_id] A unique _id.
 * @apiParam {string} [label] A label to match against the spatials' label.
-* @apiParam {string} [orderField=firstName] The field to order the results by.
+* @apiParam {string} [country] A country to match against the spatials' countries.
+* @apiParam {string} [locationType] A locationType to match against the spatials' locationTypes.
+* @apiParam {string} [orderField=label] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
@@ -233,6 +236,8 @@ http://localhost:5100/api/spatials?page=1&limit=25
 const getSpatials = async (req, resp) => {
   let parameters = req.query;
   let label = '';
+  let country = '';
+  let locationType = '';
   let page = 0;
   let orderField = 'label';
   let queryPage = 0;
@@ -241,36 +246,63 @@ const getSpatials = async (req, resp) => {
 
   let query = '';
   let queryParams = '';
+  if (
+    typeof parameters._id !== 'undefined' &&
+    parameters._id !== null &&
+    parameters._id !== ''
+  ) {
+    const newId = parameters._id.trim();
+    queryParams = `id(n)=${newId} `;
+  } else {
+    if (typeof parameters.label !== 'undefined') {
+      label = parameters.label.trim();
+      if (label !== '') {
+        queryParams += `toLower(n.label) =~ toLower('.*${label}.*') `;
+      }
+    }
+    if (typeof parameters.country !== 'undefined') {
+      country = parameters.country.trim();
+      if (country !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += `n.country IS NOT NULL AND toLower(n.country) =~ toLower('.*${country}.*') `;
+      }
+    }
+    if (typeof parameters.locationType !== 'undefined') {
+      locationType = parameters.locationType.trim();
+      if (locationType !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += `n.locationType IS NOT NULL AND toLower(n.locationType) =~ toLower('.*${locationType}.*') `;
+      }
+    }
+    if (typeof parameters.orderField !== 'undefined') {
+      orderField = parameters.orderField;
+    }
+    if (orderField !== '') {
+      queryOrder = 'ORDER BY n.' + orderField;
+      if (
+        typeof parameters.orderDesc !== 'undefined' &&
+        parameters.orderDesc === 'true'
+      ) {
+        queryOrder += ' DESC';
+      }
+    }
 
-  if (typeof parameters.label !== 'undefined') {
-    label = parameters.label;
-    if (label !== '') {
-      queryParams += `toLower(n.label) =~ toLower('.*${label}.*') `;
+    if (typeof parameters.page !== 'undefined') {
+      page = parseInt(parameters.page, 10);
+      queryPage = parseInt(parameters.page, 10) - 1;
+      if (queryPage < 0) {
+        queryPage = 0;
+      }
     }
-  }
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
-  if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
-      queryOrder += ' DESC';
+    if (typeof parameters.limit !== 'undefined') {
+      limit = parseInt(parameters.limit, 10);
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-    if (queryPage < 0) {
-      queryPage = 0;
-    }
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
   let currentPage = page;
   if (page === 0) {
     currentPage = 1;
@@ -289,6 +321,7 @@ const getSpatials = async (req, resp) => {
     skip +
     ' LIMIT ' +
     limit;
+
   let data = await getSpatialsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({

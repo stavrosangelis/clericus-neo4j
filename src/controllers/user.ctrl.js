@@ -412,15 +412,19 @@ const getUsers = async (req, resp) => {
 };
 
 const getUsersQuery = async (query, limit) => {
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
     });
 
-  let nodesResults = helpers.normalizeRecordsOutput(nodesPromise);
-  let nodes = nodesResults.map((node) => {
+  const nodesResults = helpers.normalizeRecordsOutput(nodesPromise);
+  const nodes = nodesResults.map((node) => {
+    node.label = node.firstName;
+    if (node.lastName !== '') {
+      node.label += node.lastName;
+    }
     delete node.password;
     delete node.token;
     return node;

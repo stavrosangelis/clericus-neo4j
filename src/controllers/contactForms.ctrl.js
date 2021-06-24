@@ -3,6 +3,7 @@ const helpers = require('../helpers');
 
 const getContactForms = async (req, resp) => {
   let parameters = req.query;
+  let searchTerm = '';
   let name = '';
   let email = '';
   let subject = '';
@@ -14,6 +15,19 @@ const getContactForms = async (req, resp) => {
 
   let query = '';
   let queryParams = '';
+  if (typeof parameters.searchTerm !== 'undefined') {
+    searchTerm = parameters.searchTerm.trim();
+    searchTerm = helpers.addslashes(searchTerm);
+    if (searchTerm !== '') {
+      queryParams += `(
+        toLower(n.name) =~ toLower('.*${searchTerm}.*') OR
+        toLower(n.email) =~ toLower('.*${searchTerm}.*') OR
+        toLower(n.subject) =~ toLower('.*${searchTerm}.*') OR
+        toLower(n.message) =~ toLower('.*${searchTerm}.*') OR
+
+      )`;
+    }
+  }
   if (typeof parameters.name !== 'undefined') {
     name = parameters.name;
     if (name !== '') {

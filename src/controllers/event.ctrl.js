@@ -172,7 +172,9 @@ class Event {
 * @apiName get events
 * @apiGroup Events
 *
+* @apiParam {_id} [_id] An event unique _id.
 * @apiParam {string} [label] A string to match against the events labels.
+* @apiParam {eventType} [eventType] An eventType _id .
 * @apiParam {string} [temporal] A temporal value.
 * @apiParam {string} [spatial] A spatial label.
 * @apiParam {string} [orderField=firstName] The field to order the results by.
@@ -202,59 +204,69 @@ const getEvents = async (req, resp) => {
   let query = '';
   let queryParams = '';
 
-  if (typeof parameters.label !== 'undefined') {
-    label = parameters.label;
-    if (label !== '') {
-      queryParams = `toLower(n.label) =~ toLower('.*${label}.*') `;
+  if (
+    typeof parameters._id !== 'undefined' &&
+    parameters._id !== null &&
+    parameters._id !== ''
+  ) {
+    const eventId = parameters._id.trim();
+    queryParams = `id(n)=${eventId} `;
+  } else {
+    if (typeof parameters.label !== 'undefined') {
+      label = parameters.label;
+      if (label !== '') {
+        queryParams = `toLower(n.label) =~ toLower('.*${label}.*') `;
+      }
     }
-  }
-  if (typeof parameters.temporal !== 'undefined') {
-    temporal = parameters.temporal;
-  }
-  if (typeof parameters.spatial !== 'undefined') {
-    spatial = parameters.spatial;
-  }
-  if (typeof parameters.eventType !== 'undefined') {
-    eventType = parameters.eventType;
-    if (queryParams !== '') {
-      queryParams += ' AND ';
+    if (typeof parameters.temporal !== 'undefined') {
+      temporal = parameters.temporal;
     }
-    if (eventType !== '') {
-      queryParams += `toLower(n.eventType)= "${eventType}" `;
+    if (typeof parameters.spatial !== 'undefined') {
+      spatial = parameters.spatial;
     }
-  }
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
-  if (orderField !== '') {
-    queryOrder = `ORDER BY n.${orderField}`;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
-      queryOrder += ' DESC';
-    }
-  }
-  if (typeof parameters.status !== 'undefined') {
-    status = parameters.status;
-    if (status !== '') {
+    if (typeof parameters.eventType !== 'undefined') {
+      eventType = parameters.eventType;
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams += `n.status='${status}'`;
+      if (eventType !== '') {
+        queryParams += `n.eventType= "${eventType}" `;
+      }
+    }
+    if (typeof parameters.orderField !== 'undefined') {
+      orderField = parameters.orderField;
+    }
+    if (orderField !== '') {
+      queryOrder = `ORDER BY n.${orderField}`;
+      if (
+        typeof parameters.orderDesc !== 'undefined' &&
+        parameters.orderDesc === 'true'
+      ) {
+        queryOrder += ' DESC';
+      }
+    }
+    if (typeof parameters.status !== 'undefined') {
+      status = parameters.status;
+      if (status !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += `n.status='${status}'`;
+      }
+    }
+
+    if (typeof parameters.page !== 'undefined') {
+      page = parseInt(parameters.page, 10);
+      queryPage = parseInt(parameters.page, 10) - 1;
+      if (queryPage < 0) {
+        queryPage = 0;
+      }
+    }
+    if (typeof parameters.limit !== 'undefined') {
+      limit = parseInt(parameters.limit, 10);
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-    if (queryPage < 0) {
-      queryPage = 0;
-    }
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
   let currentPage = page;
   if (page === 0) {
     currentPage = 1;
@@ -267,7 +279,7 @@ const getEvents = async (req, resp) => {
     }
   }
 
-  query = `MATCH (n:Event) ${queryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+  query = `MATCH (n:Event) ${queryParams} RETURN DISTINCT n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
   if (temporal !== '' || spatial !== '') {
     let newQueryParams = queryParams;
     if (newQueryParams !== '') {
@@ -285,14 +297,15 @@ const getEvents = async (req, resp) => {
       if (temporal !== '') {
         matchSpatial = ',';
       }
-      matchSpatial += '(n)-[r2]->(s:Spatial)';
+      matchSpatial += '(n:Event)-[r2]->(s:Spatial)';
       if (queryTemporalParams !== '') {
         querySpatialParams = 'AND ';
       }
       querySpatialParams += `toLower(s.label)=~toLower('.*${spatial}.*')`;
     }
-    query = `MATCH ${matchTemporal} ${matchSpatial} WHERE ${queryTemporalParams} ${querySpatialParams} ${newQueryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+    query = `MATCH ${matchTemporal} ${matchSpatial} WHERE ${queryTemporalParams} ${querySpatialParams} ${newQueryParams} RETURN DISTINCT n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
   }
+
   let data = await getEventsQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
@@ -318,15 +331,15 @@ const getEvents = async (req, resp) => {
 };
 
 const getEventsQuery = async (query, queryParams, limit) => {
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
     });
 
-  let nodes = [];
-  let nodesOutput = helpers.normalizeRecordsOutput(nodesPromise);
+  const nodes = [];
+  const nodesOutput = helpers.normalizeRecordsOutput(nodesPromise);
   for (let i = 0; i < nodesOutput.length; i++) {
     let node = nodesOutput[i];
     let temporal = await helpers.loadRelations(node._id, 'Event', 'Temporal');
@@ -335,24 +348,24 @@ const getEventsQuery = async (query, queryParams, limit) => {
     node.spatial = spatial;
     nodes.push(node);
   }
-  let query2 = query.substring(0, query.indexOf('RETURN n'));
-  query2 = query2 + ' RETURN count(*)';
-  let count = await session
-    .writeTransaction((tx) => tx.run(query2))
+  let queryCount = query.substring(0, query.indexOf('RETURN DISTINCT n'));
+  queryCount = queryCount + ' RETURN count(*)';
+  const count = await session
+    .writeTransaction((tx) => tx.run(queryCount))
     .then((result) => {
-      session.close();
       let resultRecord = result.records[0];
       let countObj = resultRecord.toObject();
       helpers.prepareOutput(countObj);
       let output = countObj['count(*)'];
       return output;
     });
-  let totalPages = Math.ceil(count / limit);
-  let result = {
+  const totalPages = Math.ceil(count / limit);
+  const result = {
     nodes: nodes,
     count: count,
     totalPages: totalPages,
   };
+  session.close();
   return result;
 };
 

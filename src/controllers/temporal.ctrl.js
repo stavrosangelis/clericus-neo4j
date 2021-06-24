@@ -212,6 +212,8 @@ http://localhost:5100/api/temporals?page=1&limit=25
 const getTemporals = async (req, resp) => {
   let parameters = req.query;
   let label = '';
+  let startDate = '';
+  let endDate = '';
   let page = 0;
   let orderField = 'label';
   let queryPage = 0;
@@ -221,35 +223,69 @@ const getTemporals = async (req, resp) => {
   let query = '';
   let queryParams = '';
 
-  if (typeof parameters.label !== 'undefined') {
-    label = parameters.label;
-    if (label !== '') {
-      queryParams += "toLower(n.label) =~ toLower('.*" + label + ".*') ";
+  if (
+    typeof parameters._id !== 'undefined' &&
+    parameters._id !== null &&
+    parameters._id !== ''
+  ) {
+    const newId = parameters._id.trim();
+    queryParams = `id(n)=${newId} `;
+  } else {
+    if (typeof parameters.label !== 'undefined') {
+      label = parameters.label.trim();
+      if (label !== '') {
+        queryParams += "toLower(n.label) =~ toLower('.*" + label + ".*') ";
+      }
     }
-  }
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
-  if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
     if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
+      typeof parameters.startDate !== 'undefined' &&
+      parameters.startDate !== ''
     ) {
-      queryOrder += ' DESC';
+      startDate = parameters.startDate.trim();
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      if (startDate !== '') {
+        queryParams += "n.startDate =~ '.*" + startDate + ".*' ";
+      }
+    }
+    if (
+      typeof parameters.endDate !== 'undefined' &&
+      parameters.endDate !== ''
+    ) {
+      endDate = parameters.endDate.trim();
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      if (endDate !== '') {
+        queryParams += "n.endDate =~ '.*" + endDate + ".*' ";
+      }
+    }
+    if (typeof parameters.orderField !== 'undefined') {
+      orderField = parameters.orderField;
+    }
+    if (orderField !== '') {
+      queryOrder = 'ORDER BY n.' + orderField;
+      if (
+        typeof parameters.orderDesc !== 'undefined' &&
+        parameters.orderDesc === 'true'
+      ) {
+        queryOrder += ' DESC';
+      }
+    }
+
+    if (typeof parameters.page !== 'undefined') {
+      page = parseInt(parameters.page, 10);
+      queryPage = parseInt(parameters.page, 10) - 1;
+      if (queryPage < 0) {
+        queryPage = 0;
+      }
+    }
+    if (typeof parameters.limit !== 'undefined') {
+      limit = parseInt(parameters.limit, 10);
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-    if (queryPage < 0) {
-      queryPage = 0;
-    }
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
   let currentPage = page;
   if (page === 0) {
     currentPage = 1;

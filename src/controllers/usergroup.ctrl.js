@@ -221,7 +221,8 @@ class Usergroup {
 * @apiGroup Usergroups
 * @apiPermission admin
 *
-* @apiParam {string} [orderField=firstName] The field to order the results by.
+* @apiParam {string} [label] A string to match against the usergroup's label.
+* @apiParam {string} [orderField=label] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page
@@ -230,6 +231,7 @@ class Usergroup {
 */
 const getUsergroups = async (req, resp) => {
   let parameters = req.query;
+  let label = '';
   let page = 0;
   let orderField = 'label';
   let queryPage = 0;
@@ -237,6 +239,14 @@ const getUsergroups = async (req, resp) => {
   let limit = 25;
 
   let query = {};
+  let queryParams = '';
+
+  if (typeof parameters.label !== 'undefined') {
+    label = helpers.addslashes(parameters.label);
+    if (label !== '') {
+      queryParams += `toLower(n.label) =~ toLower('.*${label}.*')`;
+    }
+  }
 
   if (typeof parameters.orderField !== 'undefined') {
     orderField = parameters.orderField;
@@ -263,13 +273,12 @@ const getUsergroups = async (req, resp) => {
   }
 
   let skip = limit * queryPage;
-  query =
-    'MATCH (n:Usergroup) RETURN n ' +
-    queryOrder +
-    ' SKIP ' +
-    skip +
-    ' LIMIT ' +
-    limit;
+  let where = '';
+  if (queryParams !== '') {
+    where = `WHERE ${queryParams}`;
+  }
+
+  query = `MATCH (n:Usergroup) ${where} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
   let data = await getUsergroupsQuery(query, limit);
   if (data.error) {
     resp.json({

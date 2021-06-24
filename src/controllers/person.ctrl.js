@@ -394,6 +394,7 @@ class Person {
 * @apiName get people
 * @apiGroup People
 *
+* @apiParam {_id} [_id] A unique _id.
 * @apiParam {string} [label] A string to match against the peoples' labels.
 * @apiParam {string} [firstName] A string to match against the peoples' first names.
 * @apiParam {string} [lastName] A string to match against the peoples' last names.
@@ -439,102 +440,114 @@ const getPeople = async (req, resp) => {
 
   let query = '';
   let queryParams = '';
-  if (typeof parameters.label !== 'undefined') {
-    label = helpers.addslashes(parameters.label);
-    if (label !== '') {
-      queryParams += "toLower(n.label) =~ toLower('.*" + label + ".*') ";
+
+  if (
+    typeof parameters._id !== 'undefined' &&
+    parameters._id !== null &&
+    parameters._id !== ''
+  ) {
+    const personId = parameters._id.trim();
+    queryParams = `id(n)=${personId} `;
+  } else {
+    if (typeof parameters.label !== 'undefined') {
+      label = helpers.addslashes(parameters.label);
+      if (label !== '') {
+        queryParams += "toLower(n.label) =~ toLower('.*" + label + ".*') ";
+      }
     }
-  }
-  if (typeof parameters.firstName !== 'undefined') {
-    firstName = helpers.addslashes(parameters.firstName);
-    if (firstName !== '') {
+    if (typeof parameters.firstName !== 'undefined') {
+      firstName = helpers.addslashes(parameters.firstName);
+      if (firstName !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams +=
+          "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
+      }
+    }
+    if (typeof parameters.lastName !== 'undefined') {
+      lastName = helpers.addslashes(parameters.lastName);
+      if (lastName !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams +=
+          "toLower(n.lastName) =~ toLower('.*" + lastName + ".*') ";
+      }
+    }
+    if (typeof parameters.fnameSoundex !== 'undefined') {
+      fnameSoundex = helpers.soundex(parameters.fnameSoundex);
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
       queryParams +=
-        "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
+        "toLower(n.fnameSoundex) =~ toLower('.*" + fnameSoundex + ".*') ";
     }
-  }
-  if (typeof parameters.lastName !== 'undefined') {
-    lastName = helpers.addslashes(parameters.lastName);
-    if (lastName !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
-      }
-      queryParams += "toLower(n.lastName) =~ toLower('.*" + lastName + ".*') ";
-    }
-  }
-  if (typeof parameters.fnameSoundex !== 'undefined') {
-    fnameSoundex = helpers.soundex(parameters.fnameSoundex);
-    if (queryParams !== '') {
-      queryParams += ' AND ';
-    }
-    queryParams +=
-      "toLower(n.fnameSoundex) =~ toLower('.*" + fnameSoundex + ".*') ";
-  }
-  if (typeof parameters.lnameSoundex !== 'undefined') {
-    lnameSoundex = helpers.soundex(parameters.lnameSoundex);
-    if (queryParams !== '') {
-      queryParams += ' AND ';
-    }
-    queryParams +=
-      "toLower(n.lnameSoundex) =~ toLower('.*" + lnameSoundex + ".*') ";
-  }
-  if (typeof parameters.description !== 'undefined') {
-    description = helpers.addslashes(parameters.description.toLowerCase());
-    if (queryParams !== '') {
-      queryParams += ' AND ';
-    }
-    queryParams +=
-      "toLower(n.description) =~ toLower('.*" + description + ".*') ";
-  }
-  if (typeof parameters.status !== 'undefined') {
-    status = parameters.status;
-    if (status !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
-      }
-      queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
-    }
-  }
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
-  if (typeof parameters.personType !== 'undefined') {
-    personType = parameters.personType;
-    if (personType !== '') {
+    if (typeof parameters.lnameSoundex !== 'undefined') {
+      lnameSoundex = helpers.soundex(parameters.lnameSoundex);
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
       queryParams +=
-        "exists(n.personType) AND toLower(n.personType) =~ toLower('.*" +
-        personType +
-        ".*') ";
+        "toLower(n.lnameSoundex) =~ toLower('.*" + lnameSoundex + ".*') ";
     }
-  }
-  if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
-      queryOrder += ' DESC';
+    if (typeof parameters.description !== 'undefined') {
+      description = helpers.addslashes(parameters.description.toLowerCase());
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      queryParams +=
+        "toLower(n.description) =~ toLower('.*" + description + ".*') ";
     }
-  }
-  if (typeof parameters.classpieceId !== 'undefined') {
-    classpieceId = parseInt(parameters.classpieceId, 10);
+    if (typeof parameters.status !== 'undefined') {
+      status = parameters.status;
+      if (status !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
+      }
+    }
+    if (typeof parameters.orderField !== 'undefined') {
+      orderField = parameters.orderField;
+    }
+    if (typeof parameters.personType !== 'undefined') {
+      personType = parameters.personType;
+      if (personType !== '') {
+        if (queryParams !== '') {
+          queryParams += ' AND ';
+        }
+        queryParams +=
+          "exists(n.personType) AND toLower(n.personType) =~ toLower('.*" +
+          personType +
+          ".*') ";
+      }
+    }
+    if (orderField !== '') {
+      queryOrder = 'ORDER BY n.' + orderField;
+      if (
+        typeof parameters.orderDesc !== 'undefined' &&
+        parameters.orderDesc === 'true'
+      ) {
+        queryOrder += ' DESC';
+      }
+    }
+    if (typeof parameters.classpieceId !== 'undefined') {
+      classpieceId = parseInt(parameters.classpieceId, 10);
+    }
+
+    if (typeof parameters.page !== 'undefined') {
+      page = parseInt(parameters.page, 10);
+      queryPage = parseInt(parameters.page, 10) - 1;
+      if (queryPage < 0) {
+        queryPage = 0;
+      }
+    }
+    if (typeof parameters.limit !== 'undefined') {
+      limit = parseInt(parameters.limit, 10);
+    }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-    if (queryPage < 0) {
-      queryPage = 0;
-    }
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
   let currentPage = page;
   if (page === 0) {
     currentPage = 1;

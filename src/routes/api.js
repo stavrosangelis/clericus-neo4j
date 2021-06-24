@@ -648,6 +648,11 @@ server.post('/seed-db', seedController.seedData);
 
 // settings
 server.get('/settings', settingsController.getSettings);
+server.get(
+  '/default-relations',
+  auth.checkAdminToken,
+  settingsController.getDefaultRelations
+);
 server.post(
   '/app-settings',
   auth.checkAdminToken,
