@@ -885,19 +885,18 @@ const getHighlights = async (req, resp) => {
   if (typeof parameters.limit !== 'undefined') {
     limit = parseInt(parameters.limit, 10);
   }
-  let skip = limit * queryPage;
-  let query = `MATCH (n:Article) WHERE n.highlight=true RETURN n ORDER BY n.highlightOrder SKIP ${skip} LIMIT ${limit}`;
-  let session = driver.session();
-  let nodesPromise = await session
+  const skip = limit * queryPage;
+  const query = `MATCH (n:Article) WHERE n.highlight=true RETURN n ORDER BY n.highlightOrder SKIP ${skip} LIMIT ${limit}`;
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
-      session.close();
       return result.records;
     })
     .catch((error) => {
       console.log(error);
     });
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  const nodes = helpers.normalizeRecordsOutput(nodesPromise);
   for (let i = 0; i < nodes.length; i++) {
     let node = nodes[i];
     if (
@@ -909,7 +908,8 @@ const getHighlights = async (req, resp) => {
       node.featuredImageDetails = featuredImageDetails;
     } else node.featuredImageDetails = null;
   }
-  resp.json({
+  session.close();
+  return resp.json({
     status: true,
     data: nodes,
     error: [],
@@ -923,27 +923,25 @@ const updateHighlights = async (req, resp) => {
     typeof parameters.item === 'undefined' ||
     typeof parameters.otherItem === 'undefined'
   ) {
-    resp.json({
+    return resp.json({
       status: false,
       data: [],
       error: true,
       msg: 'Please provide two valid items to continue',
     });
-    return false;
   }
   let item = parameters.item;
   let otherItem = parameters.otherItem;
-
-  let userId = req.decoded.id;
-  let now = new Date().toISOString();
   let results = {
     status: false,
     data: [],
     error: true,
     msg: '',
   };
-  let queryItem = `MATCH (n:Article) WHERE id(n)=${item._id} SET n.highlight=true, n.highlightOrder=${item.order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
-  let session = driver.session();
+  let queryItem = `MATCH (n:Article) WHERE id(n)=${
+    item._id
+  } SET n.highlight=true, n.highlightOrder=${Number(item.order)} RETURN n`;
+  const session = driver.session();
   await session.run(queryItem, {}).then((result) => {
     let records = result.records;
     if (records.length > 0) {
@@ -957,9 +955,10 @@ const updateHighlights = async (req, resp) => {
     }
     return records;
   });
-  let queryOtherItem = `MATCH (n:Article) WHERE id(n)=${otherItem._id} SET n.highlight=true, n.highlightOrder=${otherItem.order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+  let queryOtherItem = `MATCH (n:Article) WHERE id(n)=${
+    otherItem._id
+  } SET n.highlight=true, n.highlightOrder=${Number(otherItem.order)} RETURN n`;
   await session.run(queryOtherItem, {}).then((result) => {
-    session.close();
     let records = result.records;
     if (records.length > 0) {
       let record = records[0];
@@ -970,8 +969,9 @@ const updateHighlights = async (req, resp) => {
     }
     return records;
   });
-  await normalizeHighlightsOrder(userId);
-  resp.json(results);
+  await normalizeHighlightsOrder();
+  session.close();
+  return resp.json(results);
 };
 
 const addHighlight = async (req, resp) => {
@@ -987,10 +987,7 @@ const addHighlight = async (req, resp) => {
   }
   let _id = parameters._id;
   let order = Number(parameters.order);
-
-  let userId = req.decoded.id;
-  let now = new Date().toISOString();
-  let query = `MATCH (n:Article) WHERE id(n)=${_id} SET n.highlight=true, n.highlightOrder=${order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+  let query = `MATCH (n:Article) WHERE id(n)=${_id} SET n.highlight=true, n.highlightOrder=${order} RETURN n`;
   let session = driver.session();
   let resultPromise = await session.run(query, {}).then((result) => {
     session.close();
@@ -1010,7 +1007,7 @@ const addHighlight = async (req, resp) => {
     }
     return output;
   });
-  await normalizeHighlightsOrder(userId);
+  await normalizeHighlightsOrder();
   resp.json(resultPromise);
 };
 
@@ -1049,15 +1046,15 @@ const removeHighlight = async (req, resp) => {
     }
     return output;
   });
-  await normalizeHighlightsOrder(userId);
+  await normalizeHighlightsOrder();
   resp.json(resultPromise);
 };
 
-const normalizeHighlightsOrder = async (userId) => {
-  let query =
+const normalizeHighlightsOrder = async () => {
+  const query =
     'MATCH (n:Article) WHERE n.highlight=true RETURN n ORDER BY n.highlightOrder';
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
@@ -1065,12 +1062,11 @@ const normalizeHighlightsOrder = async (userId) => {
     .catch((error) => {
       console.log(error);
     });
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  const nodes = helpers.normalizeRecordsOutput(nodesPromise);
   for (let i = 0; i < nodes.length; i++) {
     let n = nodes[i];
     let order = i + 1;
-    let now = new Date().toISOString();
-    let query = `MATCH (n:Article) WHERE id(n)=${n._id} SET n.highlightOrder=${order}, n.updatedBy=${userId}, n.updatedAt="${now}" RETURN n`;
+    let query = `MATCH (n:Article) WHERE id(n)=${n._id} SET n.highlightOrder=${order} RETURN n`;
     await session.run(query, {}).then((result) => {
       let records = result.records;
       return records;
