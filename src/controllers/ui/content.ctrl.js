@@ -79,7 +79,7 @@ class Article {
       await featuredImageDetails.load();
       this.featuredImageDetails = featuredImageDetails;
     }
-    let author = new User({ _id: this.updatedBy });
+    let author = new User({ _id: this.createdBy });
     await author.load();
     let authorLabel = '';
     if (author.firstName !== '') {
@@ -218,7 +218,7 @@ const getArticlesQuery = async (query, queryParams, limit) => {
       node.featuredImageDetails = featuredImageDetails;
     } else node.featuredImageDetails = null;
 
-    let author = new User({ _id: node.updatedBy });
+    let author = new User({ _id: node.createdBy });
     await author.load();
     let authorLabel = '';
     if (author.firstName !== '') {
@@ -495,7 +495,7 @@ const getHighlights = async (req, resp) => {
       node.featuredImageDetails = featuredImageDetails;
     } else node.featuredImageDetails = null;
 
-    let author = new User({ _id: node.updatedBy });
+    let author = new User({ _id: node.createdBy });
     await author.load();
     let authorLabel = '';
     if (author.firstName !== '') {
