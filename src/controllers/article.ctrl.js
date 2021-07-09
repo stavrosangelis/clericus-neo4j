@@ -299,7 +299,7 @@ const getArticles = async (req, resp) => {
     if (categoryId !== '') {
       let categories = await getArticleCategoriesChildren(categoryId);
       let childrenCategoriesIds = categories.map((c) => `"${c._id}"`);
-      let categoryIds = [`"${categoryId}"`, ...childrenCategoriesIds];
+      let categoryIds = [`${categoryId}`, ...childrenCategoriesIds];
       queryParams += ` ANY (category IN n.category WHERE category IN [${categoryIds}]) `;
     }
   }
