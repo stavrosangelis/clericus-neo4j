@@ -112,7 +112,7 @@ const putReferences = async (req, resp) => {
   let promises = [];
   for (let refKey in references) {
     let reference = references[refKey];
-    let addReference = updateReference(reference);
+    let addReference = await updateReference(reference);
     promises.push(addReference);
   }
 
