@@ -3,7 +3,7 @@ const helpers = require('../../helpers');
 const fs = require('fs');
 const archivePath = process.env.ARCHIVEPATH;
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
-const schedule = require('node-schedule');
+// const schedule = require('node-schedule');
 const d3 = require('d3');
 const d32 = require('d3-force-reuse');
 const { performance } = require('perf_hooks');
@@ -298,9 +298,9 @@ const itemGraphSimulation = (req, resp) => {
   });
 };
 
-const cronJob = schedule.scheduleJob('0 4 * * *', async () => {
-  produceGraphNetwork();
-});
+// const cronJob = schedule.scheduleJob('0 4 * * *', async () => {
+//  produceGraphNetwork();
+// });
 
 const getHeatmap = async (req, resp) => {
   let query =
