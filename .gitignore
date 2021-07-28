@@ -12,6 +12,9 @@
 # archive
 /archive
 
+# backups
+/backups
+
 # uploads
 /uploads
 

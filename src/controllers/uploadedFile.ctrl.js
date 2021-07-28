@@ -56,7 +56,7 @@ class UploadedFile {
     if (this._id === null) {
       return false;
     }
-    let query = 'MATCH (n:UploadedFile) WHERE id(n)=' + this._id + ' return n';
+    let query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} return n`;
     let session = driver.session();
     let node = await session
       .writeTransaction((tx) => tx.run(query, {}))
