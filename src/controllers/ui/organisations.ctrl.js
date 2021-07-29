@@ -1,5 +1,11 @@
+const moment = require('moment');
 const driver = require('../../config/db-driver');
-const helpers = require('../../helpers');
+const {
+  prepareOutput,
+  loadRelations,
+  normalizeRecordsOutput,
+  outputRecord,
+} = require('../../helpers');
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 
 /**
@@ -136,11 +142,11 @@ const getOrganisationsQuery = async (query, queryParams, limit) => {
       return result.records;
     });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  let nodes = normalizeRecordsOutput(nodesPromise);
   // get related resources
   for (let i = 0; i < nodes.length; i += 1) {
     const node = nodes[i];
-    node.resources = await helpers.loadRelations(
+    node.resources = await loadRelations(
       node._id,
       'Organisation',
       'Resource',
@@ -155,7 +161,7 @@ const getOrganisationsQuery = async (query, queryParams, limit) => {
       session.close();
       let resultRecord = result.records[0];
       let countObj = resultRecord.toObject();
-      helpers.prepareOutput(countObj);
+      prepareOutput(countObj);
       let output = countObj['count(*)'];
       output = parseInt(output, 10);
       return output;
@@ -179,7 +185,7 @@ const getOrganisationsQuery = async (query, queryParams, limit) => {
 {"status":true,"data":{"_id":"375","label":"Cill Da Lua","labelSoundex":"C434","description":null,"organisationType":"Diocese","status":false,"alternateAppelations":[],"createdBy":null,"createdAt":null,"updatedBy":null,"updatedAt":null,"events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
 */
 const getOrganisation = async (req, resp) => {
-  let parameters = req.query;
+  const parameters = req.query;
   if (typeof parameters._id === 'undefined' || parameters._id === '') {
     resp.json({
       status: false,
@@ -189,40 +195,35 @@ const getOrganisation = async (req, resp) => {
     });
     return false;
   }
-  let _id = parameters._id;
-  let session = driver.session();
-  let query =
+  const _id = parameters._id;
+  const session = driver.session();
+  const query =
     'MATCH (n:Organisation) WHERE id(n)=' +
     _id +
     " AND n.status='public' return n";
-  let organisation = await session
+  const organisation = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
-      session.close();
-      let records = result.records;
+      const records = result.records;
       if (records.length > 0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
-        return outputRecord;
+        const record = records[0].toObject();
+        const output = outputRecord(record.n);
+        return output;
       }
     })
     .catch((error) => {
       console.log(error);
     });
+  session.close();
   if (typeof organisation !== 'undefined') {
-    let events = await helpers.loadRelations(
-      _id,
-      'Organisation',
-      'Event',
-      true
-    );
-    let organisations = await helpers.loadRelations(
+    const events = await loadRelations(_id, 'Organisation', 'Event', true);
+    const organisations = await loadRelations(
       _id,
       'Organisation',
       'Organisation',
       true
     );
-    let people = await helpers.loadRelations(
+    const people = await loadRelations(
       _id,
       'Organisation',
       'Person',
@@ -230,29 +231,86 @@ const getOrganisation = async (req, resp) => {
       null,
       'rn.lastName'
     );
-    let resources = await helpers.loadRelations(
+    const resources = await loadRelations(
       _id,
       'Organisation',
       'Resource',
       true
     );
-    let spatial = await helpers.loadRelations(
-      _id,
-      'Organisation',
-      'Spatial',
-      false
-    );
-    let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
+    const spatial = await loadRelations(_id, 'Organisation', 'Spatial', false);
+
+    for (let i = 0; i < events.length; i++) {
+      const eventItem = events[i];
+      eventItem.temporal = await loadRelations(
+        eventItem.ref._id,
+        'Event',
+        'Temporal',
+        true
+      );
+      if (eventItem.temporal.length > 0) {
+        eventItem.temporal.sort((a, b) => {
+          const akey = a.ref.startDate || null;
+          const bkey = b.ref.startDate || null;
+          if (akey !== null && bkey !== null) {
+            const aParts = akey.split('-');
+            const aDate = moment(`${aParts[2]}-${aParts[1]}-${aParts[0]}`);
+            const bParts = bkey.split('-');
+            const bDate = moment(`${bParts[2]}-${bParts[1]}-${bParts[0]}`);
+            if (aDate.diff(bDate) > 0) {
+              return 1;
+            } else {
+              return -1;
+            }
+          }
+          return 0;
+        });
+      }
+      eventItem.spatial = await loadRelations(
+        eventItem.ref._id,
+        'Event',
+        'Spatial',
+        true
+      );
+      eventItem.organisations = await loadRelations(
+        eventItem.ref._id,
+        'Event',
+        'Organisation',
+        true
+      );
+      eventItem.people = await loadRelations(
+        eventItem.ref._id,
+        'Event',
+        'Person',
+        true
+      );
+    }
+    const classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
     await classpieceSystemType.load();
-    let classpieces = [];
-    let systemType = classpieceSystemType._id;
+    const classpieces = [];
+    const systemType = classpieceSystemType._id;
     for (let i = 0; i < resources.length; i++) {
-      let resource = resources[i];
+      const resource = resources[i];
       if (resource.ref.systemType === systemType) {
         classpieces.push(resource);
         resources.splice(i, 1);
       }
     }
+    events.sort((a, b) => {
+      const akey = a.temporal[0]?.ref?.startDate || null;
+      const bkey = b.temporal[0]?.ref?.startDate || null;
+      if (akey !== null && bkey !== null) {
+        const aParts = akey.split('-');
+        const aDate = moment(`${aParts[2]}-${aParts[1]}-${aParts[0]}`);
+        const bParts = bkey.split('-');
+        const bDate = moment(`${bParts[2]}-${bParts[1]}-${bParts[0]}`);
+        if (aDate.diff(bDate) > 0) {
+          return 1;
+        } else {
+          return -1;
+        }
+      }
+      return 0;
+    });
     organisation.events = events;
     organisation.organisations = organisations;
     organisation.people = people;
@@ -290,7 +348,7 @@ const getOrganisationsActiveFilters = async (req, resp) => {
     });
 
   let nodes = nodesPromise.map((record) => {
-    helpers.prepareOutput(record);
+    prepareOutput(record);
     let outputItem = record.toObject();
     outputItem.type = outputItem.labels[0];
     delete outputItem.labels;
@@ -354,7 +412,7 @@ const getOrganisationsFilters = async (req, resp) => {
         const records = [];
         for (let i = 0; i < result.records.length; i += 1) {
           const record = result.records[i].toObject();
-          helpers.prepareOutput(record);
+          prepareOutput(record);
           records.push(record);
         }
         output = records;

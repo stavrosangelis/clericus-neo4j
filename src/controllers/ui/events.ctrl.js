@@ -93,6 +93,22 @@ const getEventsQuery = async (query, match, queryParams, limit) => {
       'Spatial',
       true
     );
+    const organisations = await helpers.loadRelations(
+      node._id,
+      'Event',
+      'Organisation',
+      true
+    );
+    const people = await helpers.loadRelations(
+      node._id,
+      'Event',
+      'Person',
+      true,
+      null,
+      'rn.lastName'
+    );
+    node.people = people;
+    node.organisations = organisations;
     node.temporal = temporal;
     node.spatial = spatial;
     nodes.push(node);

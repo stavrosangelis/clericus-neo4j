@@ -1,5 +1,15 @@
+const moment = require('moment');
 const driver = require('../../config/db-driver');
-const helpers = require('../../helpers');
+const {
+  addslashes,
+  eventsFromTypes,
+  loadRelations,
+  normalizeRecordsOutput,
+  outputRecord,
+  prepareOutput,
+  soundex,
+  temporalEvents,
+} = require('../../helpers');
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 
 /**
@@ -92,14 +102,13 @@ const getPeopleQuery = async (query, queryCount, limit) => {
       console.log(error);
     });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  let nodes = normalizeRecordsOutput(nodesPromise, 'n');
 
   // get related resources/thumbnails
   for (let i = 0; i < nodes.length; i += 1) {
     const node = nodes[i];
     let resources =
-      (await helpers.loadRelations(node._id, 'Person', 'Resource', true)) ||
-      null;
+      (await loadRelations(node._id, 'Person', 'Resource', true)) || null;
     if (resources !== null) {
       resources = resources.map((item) => {
         let ref = item.ref;
@@ -121,7 +130,7 @@ const getPeopleQuery = async (query, queryCount, limit) => {
       });
     }
     node.resources = resources;
-    node.affiliations = await helpers.loadRelations(
+    node.affiliations = await loadRelations(
       node._id,
       'Person',
       'Organisation',
@@ -136,7 +145,7 @@ const getPeopleQuery = async (query, queryCount, limit) => {
       session.close();
       let resultRecord = result.records[0];
       let countObj = resultRecord.toObject();
-      helpers.prepareOutput(countObj);
+      prepareOutput(countObj);
       let output = countObj['c'];
       return output;
     });
@@ -159,43 +168,41 @@ const getPeopleQuery = async (query, queryCount, limit) => {
 {"status":true,"data":{"_id":"2069","honorificPrefix":["My"],"firstName":"fname","middleName":"mname","lastName":"lname","label":"fname mname lname","fnameSoundex":"F550","lnameSoundex":"L550","description":"description","status":"private","alternateAppelations":[{"appelation":"","firstName":"altfname","middleName":"altmname","lastName":"altlname","note":"note","language":{"value":"en","label":"English"}}],"createdBy":"260","createdAt":"2020-01-14T15:39:10.638Z","updatedBy":"260","updatedAt":"2020-01-14T15:42:42.939Z","events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
 */
 const getPerson = async (req, resp) => {
-  let parameters = req.query;
+  const parameters = req.query;
   if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+    return resp.json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let _id = parameters._id;
-  let session = driver.session();
-  let query =
-    'MATCH (n:Person) WHERE id(n)=' + _id + " AND n.status='public' return n";
-  let person = await session
+  const _id = parameters._id;
+  const session = driver.session();
+  const query = `MATCH (n:Person {status:'public'}) WHERE id(n)=${_id} RETURN n`;
+  const person = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();
-      let records = result.records;
+      const records = result.records;
       if (records.length > 0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
-        return outputRecord;
+        const record = records[0].toObject();
+        const output = outputRecord(record.n);
+        return output;
       }
     })
     .catch((error) => {
       console.log(error);
     });
   if (typeof person !== 'undefined') {
-    let events = await helpers.loadRelations(_id, 'Person', 'Event', true);
-    let organisations = await helpers.loadRelations(
+    const events = await loadRelations(_id, 'Person', 'Event', true);
+    const organisations = await loadRelations(
       _id,
       'Person',
       'Organisation',
       true
     );
-    let people = await helpers.loadRelations(
+    const people = await loadRelations(
       _id,
       'Person',
       'Person',
@@ -203,57 +210,92 @@ const getPerson = async (req, resp) => {
       null,
       'rn.lastName'
     );
-    let resources = await helpers.loadRelations(
-      _id,
-      'Person',
-      'Resource',
-      true
-    );
+    const resources = await loadRelations(_id, 'Person', 'Resource', true);
     for (let i = 0; i < events.length; i++) {
-      let eventItem = events[i];
-      eventItem.temporal = await helpers.loadRelations(
+      const eventItem = events[i];
+      eventItem.temporal = await loadRelations(
         eventItem.ref._id,
         'Event',
         'Temporal',
         true
       );
-      eventItem.spatial = await helpers.loadRelations(
+      if (eventItem.temporal.length > 0) {
+        eventItem.temporal.sort((a, b) => {
+          const akey = a.ref.startDate || null;
+          const bkey = b.ref.startDate || null;
+          if (akey !== null && bkey !== null) {
+            const aParts = akey.split('-');
+            const aDate = moment(`${aParts[2]}-${aParts[1]}-${aParts[0]}`);
+            const bParts = bkey.split('-');
+            const bDate = moment(`${bParts[2]}-${bParts[1]}-${bParts[0]}`);
+            if (aDate.diff(bDate) > 0) {
+              return 1;
+            } else {
+              return -1;
+            }
+          }
+          return 0;
+        });
+      }
+      eventItem.spatial = await loadRelations(
         eventItem.ref._id,
         'Event',
         'Spatial',
         true
       );
-      eventItem.organisations = await helpers.loadRelations(
+      eventItem.organisations = await loadRelations(
         eventItem.ref._id,
         'Event',
         'Organisation',
         true
       );
+      eventItem.people = await loadRelations(
+        eventItem.ref._id,
+        'Event',
+        'Person',
+        true
+      );
     }
-    let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
+    const classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
     await classpieceSystemType.load();
-    let classpieces = [];
-    let systemType = classpieceSystemType._id;
+    const classpieces = [];
+    const systemType = classpieceSystemType._id;
     for (let i = 0; i < resources.length; i++) {
-      let resource = resources[i];
+      const resource = resources[i];
       if (resource.ref.systemType === systemType) {
         classpieces.push(resource);
         resources.splice(i, 1);
       }
     }
+    events.sort((a, b) => {
+      const akey = a.temporal[0]?.ref?.startDate || null;
+      const bkey = b.temporal[0]?.ref?.startDate || null;
+      if (akey !== null && bkey !== null) {
+        const aParts = akey.split('-');
+        const aDate = moment(`${aParts[2]}-${aParts[1]}-${aParts[0]}`);
+        const bParts = bkey.split('-');
+        const bDate = moment(`${bParts[2]}-${bParts[1]}-${bParts[0]}`);
+        if (aDate.diff(bDate) > 0) {
+          return 1;
+        } else {
+          return -1;
+        }
+      }
+      return 0;
+    });
     person.events = events;
     person.organisations = organisations;
     person.people = people;
     person.resources = resources;
     person.classpieces = classpieces;
-    resp.json({
+    return resp.json({
       status: true,
       data: person,
       error: [],
       msg: 'Query results',
     });
   } else {
-    resp.json({
+    return resp.json({
       status: false,
       data: [],
       error: true,
@@ -274,7 +316,7 @@ const getPersonActiveFilters = async (req, resp) => {
   let peopleIds = [];
   for (let i in peopleIdsResults) {
     let record = peopleIdsResults[i];
-    helpers.prepareOutput(record);
+    prepareOutput(record);
     peopleIds.push(record.toObject()['_id']);
   }
   let query = `MATCH (p:Person {status:'public'})-->(n {status:'public'}) WHERE id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, labels(n) as labels, n.eventType as eventType, n.systemType as systemType`;
@@ -286,7 +328,7 @@ const getPersonActiveFilters = async (req, resp) => {
   session.close();
 
   let nodes = nodesPromise.map((record) => {
-    helpers.prepareOutput(record);
+    prepareOutput(record);
     let outputItem = record.toObject();
     outputItem.type = outputItem.labels[0];
     delete outputItem.labels;
@@ -368,7 +410,7 @@ const getPeoplePrepareQueryParams = async (req) => {
     typeof parameters.label !== 'undefined' &&
     typeof parameters.advancedSearch === 'undefined'
   ) {
-    label = helpers.addslashes(parameters.label).trim();
+    label = addslashes(parameters.label).trim();
     if (label !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
@@ -380,7 +422,7 @@ const getPeoplePrepareQueryParams = async (req) => {
     typeof parameters.firstName !== 'undefined' &&
     typeof parameters.advancedSearch === 'undefined'
   ) {
-    firstName = helpers.addslashes(parameters.firstName).trim();
+    firstName = addslashes(parameters.firstName).trim();
     if (firstName !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
@@ -393,7 +435,7 @@ const getPeoplePrepareQueryParams = async (req) => {
     typeof parameters.lastName !== 'undefined' &&
     typeof parameters.advancedSearch === 'undefined'
   ) {
-    lastName = helpers.addslashes(parameters.lastName).trim();
+    lastName = addslashes(parameters.lastName).trim();
     if (lastName !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
@@ -405,7 +447,7 @@ const getPeoplePrepareQueryParams = async (req) => {
     typeof parameters.fnameSoundex !== 'undefined' &&
     typeof parameters.advancedSearch === 'undefined'
   ) {
-    fnameSoundex = helpers.soundex(parameters.fnameSoundex).trim();
+    fnameSoundex = soundex(parameters.fnameSoundex).trim();
     if (queryParams !== '') {
       queryParams += ' AND ';
     }
@@ -416,7 +458,7 @@ const getPeoplePrepareQueryParams = async (req) => {
     typeof parameters.lnameSoundex !== 'undefined' &&
     typeof parameters.advancedSearch === 'undefined'
   ) {
-    lnameSoundex = helpers.soundex(parameters.lnameSoundex).trim();
+    lnameSoundex = soundex(parameters.lnameSoundex).trim();
     if (queryParams !== '') {
       queryParams += ' AND ';
     }
@@ -427,7 +469,7 @@ const getPeoplePrepareQueryParams = async (req) => {
     typeof parameters.description !== 'undefined' &&
     typeof parameters.advancedSearch === 'undefined'
   ) {
-    description = helpers.addslashes(parameters.description).trim();
+    description = addslashes(parameters.description).trim();
     if (queryParams !== '') {
       queryParams += ' AND ';
     }
@@ -435,7 +477,7 @@ const getPeoplePrepareQueryParams = async (req) => {
       "toLower(n.description) =~ toLower('.*" + description + ".*') ";
   }
   if (typeof parameters.personType !== 'undefined') {
-    personType = helpers.addslashes(parameters.personType).trim();
+    personType = addslashes(parameters.personType).trim();
     if (queryParams !== '') {
       queryParams += ' AND ';
     }
@@ -482,12 +524,12 @@ const getPeoplePrepareQueryParams = async (req) => {
       typeof temporals.startDate !== 'undefined' &&
       temporals.startDate !== ''
     ) {
-      temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
+      temporalEventIds = await temporalEvents(temporals, eventTypes);
       if (temporalEventIds.length === 0) {
         returnResults = false;
       }
     } else if (typeof eventTypes !== 'undefined') {
-      temporalEventIds = await helpers.eventsFromTypes(eventTypes);
+      temporalEventIds = await eventsFromTypes(eventTypes);
     }
   }
   // spatial
@@ -503,7 +545,7 @@ const getPeoplePrepareQueryParams = async (req) => {
       });
     for (let s = 0; s < spatialResults.length; s++) {
       let sr = spatialResults[s];
-      helpers.prepareOutput(sr);
+      prepareOutput(sr);
       spatialEventIds.push(sr._fields[0]);
     }
   }
@@ -662,7 +704,7 @@ const advancedQueryBuilder = (advancedSearch) => {
       item.select === 'fnameSoundex' ||
       item.select === 'lnameSoundex'
     ) {
-      let inputVal = helpers.soundex(item.input).trim();
+      let inputVal = soundex(item.input).trim();
       if (item.qualifier === 'not_equals') {
         query += ` NOT n.${item.select} = "${inputVal}" `;
       }
@@ -706,7 +748,7 @@ const getPeopleSources = async (req, resp) => {
     .catch((error) => {
       console.log(error);
     });
-  let sources = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  let sources = normalizeRecordsOutput(nodesPromise, 'n');
   session.close();
   return resp.json({
     status: true,

@@ -173,7 +173,8 @@ const readJSONFile = (path) => {
 
 const outputRecord = (record) => {
   prepareOutput(record);
-  let output = Object.assign({}, record.properties);
+  const output = Object.assign({}, record.properties);
+  output.label = stripslashes(output.label);
   output._id = record.identity;
   delete output.identity;
   return output;
