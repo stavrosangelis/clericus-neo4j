@@ -123,6 +123,36 @@ class Organisation {
     this.spatial = spatial;
   }
 
+  async loadUnpopulated() {
+    if (this._id === null) {
+      return false;
+    }
+    let session = driver.session();
+    let query = 'MATCH (n:Organisation) WHERE id(n)=' + this._id + ' return n';
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+      });
+    for (let key in node) {
+      this[key] = node[key];
+      let newAppelations = [];
+      if (key === 'alternateAppelations' && node[key].length > 0) {
+        for (let akey in node[key]) {
+          let alternateAppelation = JSON.parse(node[key][akey]);
+          newAppelations.push(alternateAppelation);
+        }
+        this[key] = newAppelations;
+      }
+    }
+  }
+
   async save(userId) {
     let validateOrganisation = this.validate();
     if (!validateOrganisation.status) {

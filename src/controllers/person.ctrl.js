@@ -257,6 +257,39 @@ class Person {
     this.resources = resources;
   }
 
+  async loadUnpopulated() {
+    if (this._id === null) {
+      return false;
+    }
+    let session = driver.session();
+    let query = 'MATCH (n:Person) WHERE id(n)=' + this._id + ' return n';
+    let node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        let records = result.records;
+        if (records.length > 0) {
+          let record = records[0].toObject();
+          let outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    for (let key in node) {
+      this[key] = node[key];
+      let newAppelations = [];
+      if (key === 'alternateAppelations' && node[key].length > 0) {
+        for (let akey in node[key]) {
+          let alternateAppelation = JSON.parse(node[key][akey]);
+          newAppelations.push(alternateAppelation);
+        }
+        this[key] = newAppelations;
+      }
+    }
+  }
+
   async save(userId) {
     let validatePerson = this.validate();
     if (!validatePerson.status) {
@@ -298,9 +331,8 @@ class Person {
             }
             alternateAppelation.appelation = newAltAppelation;
           }
-          let alternateAppelationStringified = JSON.stringify(
-            alternateAppelation
-          );
+          let alternateAppelationStringified =
+            JSON.stringify(alternateAppelation);
           newAppelations.push(alternateAppelationStringified);
         }
       }

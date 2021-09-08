@@ -394,9 +394,8 @@ const mergeLaySureties = async () => {
       dataItem['Alternate appellation'] = alternateAppellation;
       dataItem['Place name updated'] = placeNameUpdated;
       dataItem['Location Type'] = locationType;
-      dataItem[
-        'Place name alternate appellation'
-      ] = placeNameAlternateAppellation;
+      dataItem['Place name alternate appellation'] =
+        placeNameAlternateAppellation;
       dataItem['County'] = county;
       dataItem['Diocese'] = diocese;
       dataItem['Title (honorific prefix)'] = titleHonorificPrefix;
@@ -460,9 +459,8 @@ const mergeLaySureties = async () => {
         if (existingLine['Place name alternate appellation'] !== '') {
           existingLine['Place name alternate appellation'] += ';';
         }
-        existingLine[
-          'Place name alternate appellation'
-        ] += placeNameAlternateAppellation;
+        existingLine['Place name alternate appellation'] +=
+          placeNameAlternateAppellation;
       }
       if (!existingLine['County'].includes(county)) {
         if (existingLine['County'] !== '') {
@@ -949,9 +947,8 @@ const ingestLaySureties = async () => {
         }
       }
       if (update) {
-        const organisationAlternateAppelations = organisation.alternateAppelations.map(
-          (a) => JSON.parse(a)
-        );
+        const organisationAlternateAppelations =
+          organisation.alternateAppelations.map((a) => JSON.parse(a));
         organisation.alternateAppelations = organisationAlternateAppelations;
         const updatedOrganisation = new Organisation(organisation);
         const save = await updatedOrganisation.save(userId);

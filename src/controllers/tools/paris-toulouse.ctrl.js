@@ -10,12 +10,13 @@ const helpers = require('../../helpers');
 const csvParser = require('csv-parser');
 const driver = require('../../config/db-driver');
 const fs = require('fs');
-const archivePath = process.env.ARCHIVEPATH;
+const { readFile } = require('fs/promises');
+const { ABSPATH: absPath, ARCHIVEPATH: archivePath } = process.env;
 const { Person } = require('../person.ctrl');
 const { Organisation } = require('../organisation.ctrl');
 const { Event } = require('../event.ctrl');
 const { Temporal } = require('../temporal.ctrl');
-const { Taxonomy } = require('../taxonomy.ctrl');
+// const { Taxonomy } = require('../taxonomy.ctrl');
 const { TaxonomyTerm } = require('../taxonomyTerm.ctrl');
 const { updateReference } = require('../references.ctrl');
 
@@ -25,6 +26,7 @@ const { updateReference } = require('../references.ctrl');
 const argv = yargs
   .command('key', 'Find the key of a column')
   .command('ingest', 'Ingest the data')
+  .command('check', 'Check part of the data')
   .example('$0 parse -i data.csv', 'parse the contents of the csv file')
   .option('letter', {
     alias: 'l',
@@ -90,6 +92,101 @@ const execQuery = async () => {
   process.exit();
 };
 
+/*
+const preparedDates = (value) => {
+  const parts = value.split(';');
+  const dates = parts.map((p) => p.trim());
+  return dates;
+};
+*/
+const prepareDate = (date) => {
+  const parts = date.split(' - ');
+  const start = parts[0].trim();
+  const sParts = start.split('-');
+  let sy = sParts[0];
+  let sm = sParts[1];
+  let sd = sParts[2];
+  if (sy.includes('c.')) {
+    sy = sy.replace('c.', '');
+  }
+  if (sm === '??') {
+    sm = `01`;
+  }
+  if (sd === '??') {
+    sd = `01`;
+  }
+  const startDate = `${sd}-${sm}-${sy}`;
+  let endDate = null;
+  if (parts.length === 1) {
+    const lm = sParts[1] !== '??' ? sm : '12';
+    const ld = getDaysInMonth(lm, sy);
+    endDate = `${ld}-${lm}-${sy}`;
+  }
+  if (parts.length > 1) {
+    const lParts = parts[1].trim().split('-');
+    let ly = lParts[0];
+    let lm = lParts[1];
+    let ld = lParts[2];
+    if (ly.includes('c.')) {
+      ly = ly.replace('c.', '');
+    }
+    if (lm === '??') {
+      lm = `12`;
+    }
+    if (ld === '??') {
+      ld = getDaysInMonth(lm, ly);
+    }
+    endDate = `${ld}-${sm}-${sy}`;
+  }
+  let label = '';
+  if (!date.includes('?')) {
+    label = date;
+  } else {
+    label = date.replace(/-\?\?/g, '');
+  }
+  return { startDate, endDate, label };
+};
+
+const saveDate = async (dateParam = '', userId) => {
+  const session = driver.session();
+  if (dateParam === '') {
+    return null;
+  }
+  const { startDate, endDate, label } = dateParam;
+  let queryEndDate = '';
+  if (endDate !== null) {
+    queryEndDate = `AND n.endDate="${endDate}" `;
+  }
+  const query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" ${queryEndDate} RETURN n`;
+  let temporal = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      let records = result.records;
+      let outputRecord = null;
+      if (records.length > 0) {
+        let record = records[0].toObject();
+        outputRecord = helpers.outputRecord(record.n);
+      }
+      return outputRecord;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  if (temporal === null) {
+    const temporalData = {
+      label,
+      startDate,
+      endDate,
+    };
+    const newTemporal = new Temporal(temporalData);
+    const save = await newTemporal.save(userId);
+    temporal = save.data;
+  }
+  session.close();
+  return temporal;
+};
+
+/*
 const addNewRelationsTypes = async (newTypes = []) => {
   if (newTypes.length > 0) {
     const userId = await getAdminId();
@@ -192,25 +289,276 @@ const addNewEventTypes = async (newTypes = []) => {
     session.close();
   }
 };
+*/
+const loadPerson = async (_id) => {
+  const person = new Person({ _id });
+  await person.loadUnpopulated();
+  return person;
+};
 
-const ingest = async () => {
-  const t0 = performance.now();
+const findOrganisation = async ({ label = '', type = '' }) => {
   const session = driver.session();
-  const userId = await getAdminId();
-
-  const laySuretiesCsvPath = `${archivePath}documents/1704/lay-sureties-merged.csv`;
-  const laySuretiesCsv = await new Promise((resolve) => {
-    let results = [];
-    fs.createReadStream(laySuretiesCsvPath)
-      .pipe(csvParser())
-      .on('data', (data) => results.push(data))
-      .on('end', () => {
-        resolve(results);
+  const queryLabel = helpers.addslashes(label);
+  const queryType = type.includes(' ') ? helpers.normalizeLabelId(type) : type;
+  let query = `MATCH (n:Organisation) WHERE toLower(n.label) =~ toLower('.*${queryLabel}.*') RETURN n`;
+  if (type !== '') {
+    query = `MATCH (n:Organisation) WHERE toLower(n.label) =~ toLower('.*${queryLabel}.*') AND n.organisationType = '${queryType}' RETURN n`;
+  }
+  let organisation = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      if (result.records.length > 0) {
+        const record = result.records[0].toObject();
+        const outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+      return null;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  if (organisation === null) {
+    query = `MATCH (n:Organisation) WHERE n.label = '${queryLabel}' RETURN n`;
+    if (type !== '') {
+      query = `MATCH (n:Organisation) WHERE n.label = '${queryLabel}' AND n.organisationType = '${queryType}' RETURN n`;
+    }
+    organisation = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        if (result.records.length > 0) {
+          const record = result.records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
       });
-  });
-  const laySuretiesKeys = Object.keys(laySuretiesCsv['0']);
+  }
+  session.close();
+  return organisation;
+};
 
-  const masterCsvPath = `${archivePath}documents/1704/1704-master-ids.csv`;
+const findSpatial = async (label) => {
+  const session = driver.session();
+  const query = `MATCH (n:Spatial {label: "${label}"}) RETURN n`;
+  const spatial = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => {
+      if (result.records.length > 0) {
+        const record = result.records[0].toObject();
+        const outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+      return null;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  session.close();
+  return spatial;
+};
+
+const firstNameParse = (firstNameParam = '') => {
+  let firstName = '';
+  let middleName = '';
+  if (firstNameParam !== '') {
+    const firstNameParts = firstNameParam.split(' ');
+    if (firstNameParts.length > 1) {
+      firstName = firstNameParts[0];
+      middleName = firstNameParts[1];
+    } else if (firstNameParts.length === 1) {
+      firstName = firstNameParts[0];
+    }
+  }
+
+  return { firstName, middleName };
+};
+
+const personLabel = (firstName, middleName, lastName) => {
+  let label = '';
+  if (firstName !== '') {
+    label += firstName;
+  }
+  if (middleName !== '') {
+    if (label !== '') {
+      label += ' ';
+    }
+    label += middleName;
+  }
+  if (lastName !== '') {
+    if (label !== '') {
+      label += ' ';
+    }
+    label += lastName;
+  }
+  return label;
+};
+
+const alternateAppellationsParse = (
+  alternateLastNameParam,
+  alternateFirstNameParam,
+  alternateFirstNameLangParam,
+  alternateFirstNameParam2,
+  alternateFirstNameLangParam2
+) => {
+  const lastNameParts = alternateLastNameParam.split(';');
+  const { firstName: alternateFirstName, middleName: alternateMiddleName } =
+    firstNameParse(alternateFirstNameParam);
+  const { firstName: alternateFirstName2, middleName: alternateMiddleName2 } =
+    firstNameParse(alternateFirstNameParam2);
+  const alternateAppellations = [];
+
+  const alternateAppellation1 = {};
+  const alternateLastName =
+    typeof lastNameParts[0] !== 'undefined' && lastNameParts[0] !== ''
+      ? lastNameParts[0]
+      : '';
+  if (alternateLastName !== '') {
+    alternateAppellation1.lastName = alternateLastName;
+  }
+  if (alternateFirstName !== '') {
+    alternateAppellation1.firstName = alternateFirstName;
+  }
+  if (alternateMiddleName !== '') {
+    alternateAppellation1.middleName = alternateMiddleName;
+  }
+  if (alternateFirstNameLangParam !== null) {
+    alternateAppellation1.language = {
+      value: alternateFirstNameLangParam.alpha2,
+      label: alternateFirstNameLangParam.English,
+    };
+  }
+  const alternateAppellationLabel = personLabel(
+    alternateFirstName,
+    alternateMiddleName,
+    alternateLastName
+  );
+  if (alternateAppellationLabel !== '') {
+    alternateAppellation1.appelation = alternateAppellationLabel;
+  }
+  if (Object.keys(alternateAppellation1).length > 0) {
+    alternateAppellations.push(alternateAppellation1);
+  }
+
+  const alternateAppellation2 = {};
+  const alternateLastName2 =
+    typeof lastNameParts[1] !== 'undefined' && lastNameParts[1] !== ''
+      ? lastNameParts[1]
+      : '';
+  if (alternateLastName2 !== '') {
+    alternateAppellation2.lastName = alternateLastName2;
+  }
+  if (alternateFirstName2 !== '') {
+    alternateAppellation2.firstName = alternateFirstName2;
+  }
+  if (alternateMiddleName2 !== '') {
+    alternateAppellation2.middleName = alternateMiddleName2;
+  }
+  if (alternateFirstNameLangParam2 !== null) {
+    alternateAppellation2.language = {
+      value: alternateFirstNameLangParam2.alpha2,
+      label: alternateFirstNameLangParam2.English,
+    };
+  }
+  const alternateAppellationLabel2 = personLabel(
+    alternateFirstName2,
+    alternateMiddleName2,
+    alternateLastName2
+  );
+  if (alternateAppellationLabel2 !== '') {
+    alternateAppellation2.appelation = alternateAppellationLabel2;
+  }
+  if (Object.keys(alternateAppellation2).length > 0) {
+    alternateAppellations.push(alternateAppellation2);
+  }
+
+  const alternateAppellation3 = {};
+  const alternateLastName3 =
+    typeof lastNameParts[2] !== 'undefined' && lastNameParts[2] !== ''
+      ? lastNameParts[2]
+      : '';
+  if (alternateLastName3 !== '') {
+    alternateAppellation3.lastName = alternateLastName3;
+    alternateAppellation2.appelation = alternateLastName3;
+  }
+  if (Object.keys(alternateAppellation3).length > 0) {
+    alternateAppellations.push(alternateAppellation3);
+  }
+  return alternateAppellations;
+};
+
+const loadOrganisation = async (_id) => {
+  const organisation = new Organisation({ _id });
+  await organisation.loadUnpopulated();
+  return organisation;
+};
+
+const saveOrganisation = async (organisation = null, userId) => {
+  if (
+    organisation === null ||
+    typeof organisation.label === 'undefined' ||
+    organisation.label === null
+  ) {
+    return null;
+  }
+  const updatedOrganisation = new Organisation(organisation);
+  const save = await updatedOrganisation.save(userId);
+  const newOrganisation = save.data;
+  return newOrganisation;
+};
+
+const eventTypeId = async (labelParam) => {
+  const typeLabel = labelParam.includes(' ')
+    ? helpers.normalizeLabelId(labelParam)
+    : labelParam;
+  const type = new TaxonomyTerm({
+    labelId: typeLabel,
+  });
+  await type.load();
+  // console.log(type);
+  return type._id.toString();
+};
+
+const saveEvent = async (label, eventTypeId, description = '', userId) => {
+  const eventData = {
+    label,
+    eventType: eventTypeId,
+    status: 'private',
+  };
+  if (description !== '') {
+    eventData.description = description;
+  }
+  const newEvent = new Event(eventData);
+  const save = await newEvent.save(userId);
+  const event = save.data;
+  return event;
+};
+
+/*
+const prepareTypeString = (strParam) => {
+  if (typeof strParam !== 'string') {
+    return strParam;
+  }
+  let str = strParam.replace(/\(/g, ' ');
+  str = str.replace(/\)/g, ' ');
+  str = str.replace(/-/g, ' ');
+  const parts = str.split(' ');
+  let output = '';
+  for (let i = 0; i < parts.length; i += 1) {
+    const part = parts[i];
+    const firstLetter = part.charAt(0).toUpperCase();
+    const restOfString = part.slice(1);
+    output += `${firstLetter}${restOfString}`;
+  }
+  output = output.replace(/\s/g, '');
+  return output;
+};
+*/
+
+const check = async () => {
+  const masterCsvPath = `${archivePath}documents/paris-toulouse/source.csv`;
   const masterCsv = await new Promise((resolve) => {
     let results = [];
     fs.createReadStream(masterCsvPath)
@@ -222,825 +570,750 @@ const ingest = async () => {
   });
   const masterCsvKeys = Object.keys(masterCsv['0']);
 
-  // add new event types
-  const newEventTypes = [
-    { label: 'profession', inverseLabel: 'profession' },
-    { label: 'sponsorship/guarantor', inverseLabel: 'sponsorship/guarantor' },
-  ];
-  await addNewEventTypes(newEventTypes);
+  // output csv
+  const data = [];
+  // data loop
+  // const controlGroup = [];
+  const session = driver.session();
+  for (let i = 0; i < masterCsv.length; i += 1) {
+    // if (i > 1) break;
+    const row = masterCsv[i];
 
-  // add new relations types
-  const newRelationsTypes = [
-    {
-      label: 'had profession',
-      inverseLabel: 'was profession of',
-      from: 'Person',
-      to: 'Event',
-    },
-    {
-      label: 'provided',
-      inverseLabel: 'was provided by',
-      from: 'Person',
-      to: 'Event',
-    },
-    {
-      label: 'was surety to',
-      inverseLabel: 'had surety',
-      from: 'Person',
-      to: 'Person',
-    },
-    {
-      label: 'received',
-      inverseLabel: 'was received by',
-      from: 'Person',
-      to: 'Event',
-    },
-  ];
-  await addNewRelationsTypes(newRelationsTypes);
-
-  //add new reference resource
-  const resourceSystemType = new TaxonomyTerm({
-    labelId: 'Document',
-  });
-  await resourceSystemType.load();
-
-  const newResourceQuery = `MATCH (n:Resource {label:
-    'A List of the Names of the Popish Parish Priests Throughout the Several Counties in the Kingdom of Ireland (Dublin, 1705)', resourceType: 'document', systemType: '${resourceSystemType._id}'}) return n`;
-  const newResources = await session
-    .writeTransaction((tx) => tx.run(newResourceQuery, {}))
-    .then((result) => {
-      const records = result.records;
-      if (records.length > 0) {
-        const output = records.map((r) => {
-          const record = r.toObject();
-          return helpers.outputRecord(record.n);
-        });
-        return output;
-      }
-      return [];
-    });
-  const refResource = newResources[0];
-
-  // handle name
-  const handleName = (str = '') => {
-    if (str === '') {
-      return '';
-    }
-    const partsArr = str.split(' ');
-    const parts = partsArr.map((p) => cellOutput(p));
-    const fullName = {
-      firstName: '',
-      middleName: '',
-      lastName: '',
-    };
-    switch (parts.length) {
-      case 3:
-        fullName.firstName = parts[0];
-        fullName.middleName = parts[1];
-        fullName.lastName = parts[2];
-        break;
-      case 2:
-        fullName.firstName = parts[0];
-        fullName.lastName = parts[1];
-        break;
-      case 1:
-        if (parts[0].includes('f:')) {
-          const newFirstName = parts[0].replace('f:', '');
-          fullName.firstName = newFirstName;
-        } else {
-          fullName.lastName = parts[0];
-        }
-        break;
-      default:
-        fullName.firstName = parts[0];
-        fullName.lastName = parts[1];
-    }
-    return fullName;
-  };
-
-  const handleAlternateAppelations = (str = '') => {
-    if (str === '') {
-      return [];
-    }
-    const partsArr = str.split(';');
-    const alternateAppellations = partsArr.map((p) =>
-      handleName(cellOutput(p))
-    );
-    return alternateAppellations;
-  };
-
-  // handle new person
-  const newPerson = async (
-    fullName,
-    honorificPrefix,
-    alternateAppellations
-  ) => {
-    // rule 1b
-    const personData = {
-      personType: 'Laity',
-    };
-    for (let key in fullName) {
-      personData[key] = fullName[key];
-    }
-    // rule 1c
-    if (honorificPrefix !== '') {
-      personData.honorificPrefix = [honorificPrefix];
-    }
-    // rule 2
-    if (alternateAppellations.length > 0) {
-      personData.alternateAppelations = alternateAppellations;
-    }
-    const newPerson = new Person(personData);
-    const personSave = await newPerson.save(userId);
-    return personSave.data;
-  };
-
-  // matches
-  const queryReferenceDocument = `MATCH (n:Resource {label:"A List of the Names of the Popish Parish Priests Throughout the Several Counties in the Kingdom of Ireland (Dublin, 1705)"}) RETURN n`;
-  const referenceDocument = await session
-    .writeTransaction((tx) => tx.run(queryReferenceDocument, {}))
-    .then((result) => {
-      const records = result.records;
-      if (records.length > 0) {
-        const output = records.map((r) => {
-          const record = r.toObject();
-          return helpers.outputRecord(record.n);
-        });
-        return output[0];
-      }
-      return null;
-    });
-
-  const handleMatches = (matches) => {
-    if (matches === '') {
-      return [];
-    }
-    const partsArr = matches.split('|');
-    const parts = partsArr.map((p) => {
-      const match = Number(cellOutput(p)) - 1;
-      return masterCsv[match];
-    });
-    return parts;
-  };
-
-  const preparePriestData = (priest, keys) => {
-    let surname = cellOutput(priest[keys[0]]);
-    let firstName = cellOutput(priest[keys[1]]);
-    const alternateAppellation = { firstName: '', lastName: '' };
-    const surnameUpdated = cellOutput(priest[keys[3]]);
-    const firstNameUpdated = cellOutput(priest[keys[5]]);
-    if (surnameUpdated !== '') {
-      alternateAppellation.lastName = surname;
-      surname = surnameUpdated;
-    }
-    if (firstNameUpdated !== '') {
-      alternateAppellation.firstName = firstName;
-      firstName = firstNameUpdated;
-    }
-    if (
-      alternateAppellation.firstName !== '' &&
-      alternateAppellation.lastName === ''
-    ) {
-      alternateAppellation.lastName = surname;
-    }
-    if (
-      alternateAppellation.firstName === '' &&
-      alternateAppellation.lastName !== ''
-    ) {
-      alternateAppellation.firstName = firstName;
-    }
-    const output = {
-      firstName,
-      surname,
-      alternateAppellation,
-    };
-
-    return output;
-  };
-
-  const matchPriestToDb = async (priest, referenceDocument, keys) => {
-    const dbId = cellOutput(priest[keys[24]]);
-    if (dbId !== '') {
-      const query = `MATCH (n:Person) WHERE id(n)=${dbId} return n`;
-      const priests = await session
-        .writeTransaction((tx) => tx.run(query, {}))
-        .then((result) => {
-          const records = result.records;
-          if (records.length > 0) {
-            const output = records.map((r) => {
-              const record = r.toObject();
-              return helpers.outputRecord(record.n);
-            });
-            return output;
-          }
-          return [];
-        });
-      return priests;
-    }
-    const person = preparePriestData(priest, keys);
-    const query = `MATCH (n:Person {firstName:"${person.firstName}", lastName:"${person.surname}"})-[r]->(t:Resource) WHERE id(t)=${referenceDocument._id} return n`;
-    let priests = await session
-      .writeTransaction((tx) => tx.run(query, {}))
-      .then((result) => {
-        const records = result.records;
-        if (records.length > 0) {
-          const output = records.map((r) => {
-            const record = r.toObject();
-            return helpers.outputRecord(record.n);
-          });
-          return output;
-        }
-        return [];
-      });
-    if (priests.length > 1) {
-      const newMatches = [];
-      for (let i = 0; i < priests.length; i += 1) {
-        const p = priests[i];
-        const pAlt = p.alternateAppelations.map((a) => JSON.parse(a));
-        const match =
-          pAlt.find(
-            (f) =>
-              f.firstName === person.alternateAppellation.firstName &&
-              f.lastName === person.alternateAppellation.lastName
-          ) || null;
-        if (match !== null) {
-          newMatches.push(p);
-        }
-      }
-      if (newMatches.length > 0) {
-        priests = newMatches;
+    const role = cellOutput(row[masterCsvKeys[71]]);
+    if (role !== '') {
+      if (data.indexOf(role) === -1) {
+        data.push(role);
       }
     }
-    return priests;
-  };
-
-  const queryOrganisation = async (label, type) => {
-    const query = `MATCH (n:Organisation {label: "${label}", organisationType: "${type}" }) RETURN n`;
-    const organisationDB = await session.run(query, {});
-    const records = organisationDB.records;
-    let organisation = null;
-    if (records.length > 0) {
-      const record = records[0].toObject();
-      organisation = helpers.outputRecord(record.n);
-    }
-    return organisation;
-  };
-
-  const newOrganisation = async (
-    placeNameUpdated,
-    locationType,
-    placeNameAlt
-  ) => {
-    if (placeNameUpdated === '' && placeNameAlt === '') {
-      return null;
-    }
-    let organisation = await queryOrganisation(placeNameUpdated, locationType);
-    if (organisation === null && placeNameAlt !== '') {
-      organisation = await queryOrganisation(placeNameAlt, locationType);
-    }
-
-    if (organisation !== null && placeNameAlt !== '') {
-      const altAppellations = organisation.alternateAppelations.map((a) =>
-        JSON.parse(a)
-      );
-      let update = false;
-      if (organisation.label !== placeNameAlt) {
-        const match =
-          altAppellations.find((f) => f.label === placeNameAlt) || null;
-        if (match === null) {
-          altAppellations.push({ label: placeNameAlt });
-          update = true;
-        }
+  }
+  session.close();
+  const outputPath = `${archivePath}documents/paris-toulouse/roles.json`;
+  await new Promise((resolve, reject) => {
+    fs.writeFile(outputPath, JSON.stringify(data), 'utf8', function (err) {
+      if (err) {
+        reject(err);
       } else {
-        const match =
-          altAppellations.find((f) => f.label === placeNameUpdated) || null;
-        if (match === null) {
-          altAppellations.push({ label: placeNameUpdated });
-          update = true;
-        }
+        resolve(true);
       }
-      if (update) {
-        const organisationAlternateAppelations = organisation.alternateAppelations.map(
-          (a) => JSON.parse(a)
-        );
-        organisation.alternateAppelations = organisationAlternateAppelations;
-        const updatedOrganisation = new Organisation(organisation);
-        const save = await updatedOrganisation.save(userId);
-        organisation = save.data;
-      }
-    } else if (organisation === null) {
-      const organisationData = {};
-      if (placeNameUpdated !== '') {
-        organisationData.label = placeNameUpdated;
-        organisationData.status = 'private';
-      }
-      if (placeNameAlt !== '') {
-        organisationData.alternateAppelations = [{ label: placeNameAlt }];
-      }
-      if (locationType !== '') {
-        organisationData.organisationType = locationType;
-      }
-      const updatedOrganisation = new Organisation(organisationData);
-      const save = await updatedOrganisation.save(userId);
-      organisation = save.data;
-    }
-    return organisation;
-  };
-
-  const parseOrganisations = async (
-    placeNameUpdated,
-    locationType,
-    placeNameAlt
-  ) => {
-    const output = [];
-    const organisationsArray = placeNameUpdated.split(';');
-    const organisations = organisationsArray.map((o) => cellOutput(o));
-    let locationTypes = [];
-    if (locationType !== '') {
-      const locationTypesArray = locationType.split(';');
-      locationTypes = locationTypesArray.map((l) => cellOutput(l));
-    }
-    let placeNameAlts = [];
-    if (placeNameAlt !== '') {
-      const placeNameAltsArray = placeNameAlt.split(';');
-      placeNameAlts = placeNameAltsArray.map((p) => cellOutput(p));
-    }
-    for (let i = 0; i < organisations.length; i += 1) {
-      const organisationLabel = organisations[i];
-      const organisationLocationType =
-        locationTypes[i] || locationTypes[locationTypes.length] || '';
-      const organisationPlaceNameAlts = placeNameAlts[i] || '';
-      const organisation = await newOrganisation(
-        organisationLabel,
-        organisationLocationType,
-        organisationPlaceNameAlts
-      );
-      output.push(organisation);
-    }
-    return output;
-  };
-
-  const loadOrganisation = async (label = '', type = '') => {
-    if (label === '' || type === '') {
-      return null;
-    }
-    const query = `MATCH (n:Organisation {label: "${label}", organisationType: "${type}" }) RETURN n`;
-    const organisationDB = await session.run(query, {});
-    const records = organisationDB.records;
-    let organisation = null;
-    if (records.length > 0) {
-      const record = records[0].toObject();
-      organisation = helpers.outputRecord(record.n);
-    }
-    if (organisation === null) {
-      const orgData = {
-        label,
-        organisationType: type,
-        status: 'private',
-      };
-      const newOrganisation = new Organisation(orgData);
-      const save = await newOrganisation.save(userId);
-      organisation = save.data;
-      organisation.spatial = [];
-    } else {
-      const spatial = await helpers.loadRelations(
-        organisation._id,
-        'Organisation',
-        'Spatial'
-      );
-      organisation.spatial = spatial;
-    }
-    return organisation;
-  };
-
-  const addEvent = async (label, eventTypeId, description = '') => {
-    const eventData = {
-      label,
-      eventType: eventTypeId,
-      status: 'private',
-    };
-    if (description !== '') {
-      eventData.description = description;
-    }
-    const newEvent = new Event(eventData);
-    const save = await newEvent.save(userId);
-    const event = save.data;
-    return event;
-  };
-
-  const eventTypeId = async (label) => {
-    const typeLabel = helpers.normalizeLabelId(label);
-    const type = new TaxonomyTerm({
-      labelId: typeLabel,
     });
-    await type.load();
-    return type._id.toString();
-  };
+  });
+  process.exit();
+};
 
-  const habitationTypeId = await eventTypeId('habitation');
-  const maintainedLabel = helpers.normalizeLabelId('maintained');
-  const professionTypeId = await eventTypeId('profession');
-  const hadProfessionLabel = helpers.normalizeLabelId('had profession');
-  const sponsorshipTypeId = await eventTypeId('sponsorship/guarantor');
-  const providedLabel = helpers.normalizeLabelId('provided');
-  const wasSuretyToLabel = helpers.normalizeLabelId('was surety to');
-  const receivedLabel = helpers.normalizeLabelId('received');
-
-  const prepareDate = (date) => {
-    const parts = date.split('-');
-    const y = parts[0];
-    const m = parts[1];
-    const d = parts[2] === '??' ? '01' : parts[2];
-    const startDate = `${d}-${m}-${y}`;
-    let endDate = null;
-    if (parts[2] === '??') {
-      const endDay = getDaysInMonth(m, y);
-      endDate = `${endDay}-${m}-${y}`;
-    }
-    return { startDate, endDate };
-  };
-
-  const addDate = async (startDateParam = '') => {
-    if (startDateParam === '') {
-      return null;
-    }
-    const { startDate, endDate } = prepareDate(startDateParam);
-    let queryEndDate = '';
-    if (endDate !== null) {
-      queryEndDate = `AND n.endDate="${endDate}" `;
-    }
-    const query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" ${queryEndDate} RETURN n`;
-    let temporal = await session
-      .writeTransaction((tx) => tx.run(query, {}))
-      .then((result) => {
-        let records = result.records;
-        let outputRecord = null;
-        if (records.length > 0) {
-          let record = records[0].toObject();
-          outputRecord = helpers.outputRecord(record.n);
-        }
-        return outputRecord;
-      })
-      .catch((error) => {
-        console.log(error);
-      });
-    if (temporal === null) {
-      let label = startDate;
-      if (endDate !== null) {
-        label += ` - ${endDate}`;
-      }
-      let temporalData = {
-        label: label,
-        startDate: startDate,
-        endDate: endDate,
+const addEvent = async ({
+  label = '',
+  eventType = null,
+  eventTaxonomyTerm = 'hasParticipant',
+  eventRole = '',
+  userId,
+  person,
+  organisation = null,
+  spatialCell = '',
+  temporalCell = '',
+}) => {
+  let eventRoleId = '';
+  if (eventRole !== '') {
+    eventRoleId = await eventTypeId(eventRole);
+  }
+  const newEvent = await saveEvent(label, eventType, '', userId);
+  if (newEvent !== null) {
+    const newEventRef = {
+      items: [
+        { _id: newEvent._id, type: 'Event', role: '' },
+        { _id: person._id, type: 'Person', role: eventRoleId },
+      ],
+      taxonomyTermLabel: eventTaxonomyTerm,
+    };
+    await updateReference(newEventRef);
+  }
+  // organisation
+  if (organisation !== null) {
+    const orgRef = {
+      items: [
+        { _id: newEvent._id, type: 'Event', role: '' },
+        { _id: organisation._id, type: 'Organisation', role: '' },
+      ],
+      taxonomyTermLabel: 'hasRelation',
+    };
+    await updateReference(orgRef);
+  }
+  // spatial
+  if (spatialCell !== '') {
+    const spatial = await findSpatial(spatialCell);
+    if (spatial !== null) {
+      const spatialRef = {
+        items: [
+          { _id: newEvent._id, type: 'Event', role: '' },
+          {
+            _id: spatial._id,
+            type: 'Spatial',
+            role: '',
+          },
+        ],
+        taxonomyTermLabel: 'hasLocation',
       };
-      const newTemporal = new Temporal(temporalData);
-      const save = await newTemporal.save(userId);
-      temporal = save.data;
+      await updateReference(spatialRef);
     }
-    return temporal;
-  };
+  }
+  // temporal
+  if (temporalCell !== '') {
+    const date = prepareDate(temporalCell);
+    const temporal = await saveDate(date, userId);
+    const temporalRef = {
+      items: [
+        { _id: newEvent._id, type: 'Event' },
+        { _id: temporal._id, type: 'Temporal' },
+      ],
+      taxonomyTermLabel: 'hasTime',
+    };
+    await updateReference(temporalRef);
+  }
+};
 
-  for (let i = 0; i < laySuretiesCsv.length; i += 1) {
-    const row = laySuretiesCsv[i];
-    const skip = cellOutput(row[laySuretiesKeys[13]]);
-    if (skip !== '' && Number(skip) === 1) {
+const ingest = async () => {
+  const t0 = performance.now();
+  const session = driver.session();
+  const userId = await getAdminId();
+
+  const masterCsvPath = `${archivePath}documents/paris-toulouse/source.csv`;
+  const masterCsv = await new Promise((resolve) => {
+    let results = [];
+    fs.createReadStream(masterCsvPath)
+      .pipe(csvParser())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        resolve(results);
+      });
+  });
+  const masterCsvKeys = Object.keys(masterCsv['0']);
+
+  // languages
+  const languagesPath = `${absPath}src/config/language-codes.json`;
+  const languagesFile = await readFile(languagesPath);
+  const languages = JSON.parse(languagesFile);
+
+  const birthEventType = await eventTypeId('Birth');
+  const deathEventType = await eventTypeId('Death');
+  const residenceEventType = await eventTypeId('Habitation');
+  const ordinationEventType = await eventTypeId('ordination');
+  const matriculationEventType = await eventTypeId('matriculation');
+  const registrationEventType = await eventTypeId('Registration_2');
+  const maEventType = await eventTypeId('MastersOfArt');
+  const posEventType = await eventTypeId('ProgramOfStudy');
+  const attendanceEventType = await eventTypeId('Attendance');
+  const membershipEventType = await eventTypeId('Membership');
+  const wasServingAsEventType = await eventTypeId('wasServingAs');
+
+  const resourceQuery = `MATCH (n:Resource) WHERE toLower(n.label) =~ toLower('.*Prosopography of Irish Clerics in the Universities of Paris and Toulouse, 1573-1792.*') RETURN n`;
+  const resource = await session
+    .writeTransaction((tx) => tx.run(resourceQuery, {}))
+    .then((result) => {
+      const records = result.records;
+      if (records.length > 0) {
+        const record = records[0].toObject();
+        const outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+
+  for (let i = 0; i < masterCsv.length; i += 1) {
+    /* if (i + 2 < 1520) {
       continue;
     }
-    const nameUpdated = cellOutput(row[laySuretiesKeys[3]]);
-    const honorificPrefix = cellOutput(row[laySuretiesKeys[10]]);
-    const alternateAppellations = cellOutput(row[laySuretiesKeys[4]]);
-    const matches = cellOutput(row[laySuretiesKeys[2]]);
+    if (i + 2 > 1520) {
+      break;
+    } */
+    const row = masterCsv[i];
+    const dbId = cellOutput(row[masterCsvKeys[0]]);
 
-    const placeNameUpdated = cellOutput(row[laySuretiesKeys[5]]);
-    const locationType = cellOutput(row[laySuretiesKeys[6]]);
-    const placeNameAlt = cellOutput(row[laySuretiesKeys[7]]);
-    const county = cellOutput(row[laySuretiesKeys[8]]);
-    const diocese = cellOutput(row[laySuretiesKeys[9]]);
-    const profession = cellOutput(row[laySuretiesKeys[11]]);
+    // 1-4) person
+    const firstNameCell = cellOutput(row[masterCsvKeys[3]]);
+    const lastName = cellOutput(row[masterCsvKeys[1]]);
 
-    // rule 1
-    const fullName = handleName(nameUpdated);
+    const { firstName, middleName } = firstNameParse(firstNameCell);
 
-    // rule 2
-    const newAlternateAppellations = handleAlternateAppelations(
-      alternateAppellations
+    console.log(`${i + 2}. ${firstName} ${middleName} ${lastName}`);
+
+    const alternateLastName = cellOutput(row[masterCsvKeys[2]]);
+    const alternateFirstName = cellOutput(row[masterCsvKeys[4]]);
+    const alternateFirstNameLang = cellOutput(row[masterCsvKeys[5]]);
+    const alternateFirstName2 = cellOutput(row[masterCsvKeys[6]]);
+    const alternateFirstNameLang2 = cellOutput(row[masterCsvKeys[7]]);
+    const alternateFirstNameLangValue =
+      alternateFirstNameLang !== ''
+        ? languages.find((l) => l.English === alternateFirstNameLang)
+        : null;
+    const alternateFirstNameLangValue2 =
+      alternateFirstNameLang2 !== ''
+        ? languages.find((l) => l.English === alternateFirstNameLang2)
+        : null;
+    const alternateAppellations = alternateAppellationsParse(
+      alternateLastName,
+      alternateFirstName,
+      alternateFirstNameLangValue,
+      alternateFirstName2,
+      alternateFirstNameLangValue2
     );
+    let person = {};
+    if (dbId !== '') {
+      person = await loadPerson(dbId);
+      const newAlternateAppellations = person.alternateAppellations || [];
+      for (let ap = 0; ap < alternateAppellations.length; ap += 1) {
+        const alternateAppellation = alternateAppellations[ap];
+        const find =
+          newAlternateAppellations.find((nap) => {
+            let label = '';
+            let altLabel = '';
+            if (nap.firstName !== 'undefined') {
+              label += nap.firstName;
+            }
+            if (nap.lastName !== 'undefined') {
+              label += nap.lastName;
+            }
+            if (alternateAppellation.lastName !== 'undefined') {
+              altLabel += alternateAppellation.lastName;
+            }
+            if (alternateAppellation.lastName !== 'undefined') {
+              altLabel += alternateAppellation.lastName;
+            }
 
-    const person = await newPerson(
-      fullName,
-      honorificPrefix,
-      newAlternateAppellations
-    );
-
-    // rule 5 event habitation
-    const residenceEvent = await addEvent('residence', habitationTypeId);
-
-    // rule 6 profession event
-    let professionEvent = null;
-    if (profession !== '') {
-      professionEvent = await addEvent(profession, professionTypeId);
-    }
-
-    // rule 7 sponsorship/guarantor event
-    const sponsorshipEvent = await addEvent(
-      'surety',
-      sponsorshipTypeId,
-      'As per the 1704 Popery Act (2 Ann c.7), a lay surety provided a sum of money as guarantee for the ‘peaceable’ behaviour of a particular priest'
-    );
-
-    // rule 3
-    const matchPriests = handleMatches(matches);
-    for (let m = 0; m < matchPriests.length; m += 1) {
-      const matchedPriest = matchPriests[m];
-      const priests = await matchPriestToDb(
-        matchedPriest,
-        referenceDocument,
-        masterCsvKeys
-      );
-      if (priests.length > 0) {
-        for (let p = 0; p < priests.length; p += 1) {
-          const priest = priests[p];
-          // rule 8 link priest to person
-          const priestRef = {
-            items: [
-              { _id: person._id, type: 'Person', role: '' },
-              { _id: priest._id, type: 'Person', role: '' },
-            ],
-            taxonomyTermLabel: wasSuretyToLabel,
-          };
-          await updateReference(priestRef);
-          // link sponsorship with priest
-          const sponsorshipEventRef = {
-            items: [
-              { _id: priest._id, type: 'Person', role: '' },
-              { _id: sponsorshipEvent._id, type: 'Event', role: '' },
-            ],
-            taxonomyTermLabel: receivedLabel,
-          };
-          await updateReference(sponsorshipEventRef);
+            if (label === altLabel) {
+              return true;
+            }
+            return false;
+          }) || null;
+        if (find === null) {
+          if (typeof person.alternateAppelations === 'undefined') {
+            person.alternateAppelations = [];
+          }
+          person.alternateAppelations.push(alternateAppellation);
         }
       }
-
-      // rule 5 residence event time
-      const dateServing = cellOutput(matchedPriest[13]);
-      if (dateServing !== '') {
-        const newTemporal = await addDate(dateServing);
-        const residenceTemporalReference = {
-          items: [
-            { _id: residenceEvent._id, type: 'Event' },
-            { _id: newTemporal._id, type: 'Temporal' },
-          ],
-          taxonomyTermLabel: 'hasTime',
-        };
-        await updateReference(residenceTemporalReference);
-        if (professionEvent !== null) {
-          const professionTemporalReference = {
-            items: [
-              { _id: professionEvent._id, type: 'Event' },
-              { _id: newTemporal._id, type: 'Temporal' },
-            ],
-            taxonomyTermLabel: 'hasTime',
-          };
-          await updateReference(professionTemporalReference);
-        }
-
-        const sponsorshipTemporalReference = {
-          items: [
-            { _id: sponsorshipEvent._id, type: 'Event' },
-            { _id: newTemporal._id, type: 'Temporal' },
-          ],
-          taxonomyTermLabel: 'hasTime',
-        };
-        await updateReference(sponsorshipTemporalReference);
-      }
+    } else {
+      // load person details
+      const personData = {
+        honorificPrefix: [],
+        firstName,
+        middleName,
+        lastName,
+        label: personLabel(firstName, middleName, lastName),
+        personType: 'Clergy',
+        status: 'private',
+        alternateAppelations: alternateAppellations,
+      };
+      const newPerson = new Person(personData);
+      const savedPerson = await newPerson.save(userId);
+      person = savedPerson.data;
     }
 
-    // link person with reference resource
-    const newResourceRef = {
-      items: [
-        { _id: person._id, type: 'Person', role: '' },
-        {
-          _id: refResource._id,
-          type: 'Resource',
-          role: '',
-        },
-      ],
-      taxonomyTermLabel: `isReferencedIn`,
-    };
-    await updateReference(newResourceRef);
+    // 5) Column I (Diocese)
+    const dioceseCell = cellOutput(row[masterCsvKeys[8]]);
+    const dioceseDBID = cellOutput(row[masterCsvKeys[9]]);
 
-    // link event with person
-    const residenceEventRef = {
-      items: [
-        { _id: person._id, type: 'Person', role: '' },
-        { _id: residenceEvent._id, type: 'Event', role: '' },
-      ],
-      taxonomyTermLabel: maintainedLabel,
-    };
-    await updateReference(residenceEventRef);
-    // link profession with person
-    if (professionEvent !== null) {
-      const professionEventRef = {
+    let diocese = null;
+    if (dioceseDBID !== '') {
+      diocese = await loadOrganisation(dioceseDBID);
+    } else if (dioceseCell !== '') {
+      const dioceseData = {
+        label: dioceseCell,
+        organisationType: 'Diocese',
+        status: 'private',
+      };
+      diocese = await saveOrganisation(dioceseData, userId);
+    }
+    // add relationship to diocese
+    if (diocese !== null) {
+      const dioceseRef = {
         items: [
           { _id: person._id, type: 'Person', role: '' },
-          { _id: professionEvent._id, type: 'Event', role: '' },
+          { _id: diocese._id, type: 'Organisation', role: '' },
         ],
-        taxonomyTermLabel: hadProfessionLabel,
+        taxonomyTermLabel: 'hasAffiliation',
       };
-      await updateReference(professionEventRef);
+      await updateReference(dioceseRef);
     }
 
-    // link sponsorship with person
-    const sponsorshipEventRef = {
-      items: [
-        { _id: person._id, type: 'Person', role: '' },
-        { _id: sponsorshipEvent._id, type: 'Event', role: '' },
-      ],
-      taxonomyTermLabel: providedLabel,
-    };
-    await updateReference(sponsorshipEventRef);
+    // 6) Native place
+    const nativePlaceCell = cellOutput(row[masterCsvKeys[10]]);
+    const nativePlaceDBID = cellOutput(row[masterCsvKeys[11]]);
+    const nativePlaceAltLabel = cellOutput(row[masterCsvKeys[12]]);
+    const nativePlaceType = cellOutput(row[masterCsvKeys[13]]);
 
-    // rule 4
-    // multiple organisations
-    const organisations = await parseOrganisations(
-      placeNameUpdated,
-      locationType,
-      placeNameAlt
-    );
-    for (let io = 0; io < organisations.length; io += 1) {
-      const organisation = organisations[io];
-      if (organisation !== null) {
-        // 1. add relation to person
-        // John Doe was resident of Slane
-        const personRef = {
-          items: [
-            { _id: person._id, type: 'Person' },
-            { _id: organisation._id, type: 'Organisation' },
-          ],
-          taxonomyTermLabel: 'wasResidentOf',
-        };
-        await updateReference(personRef);
-
-        // 2. Spatial1 = has its episcopal see in, inverse is the episcopal see of = corresponding episcopal see of diocese in column (column J)
-        const diocesesArr = diocese.split(';');
-        const dioceses = diocesesArr.map((d) => cellOutput(d));
-        for (let d = 0; d < dioceses.length; d += 1) {
-          const di = dioceses[d];
-          const dioceseDb = await loadOrganisation(di, 'Diocese');
-          if (dioceseDb !== null) {
-            const hasItsEpiscopalSeeIn =
-              dioceseDb.spatial.find(
-                (s) => s.term.label === `hasItsEpiscopalSeeIn`
-              ) || null;
-            if (hasItsEpiscopalSeeIn !== null) {
-              const episcopalSeeInRef = {
-                items: [
-                  { _id: organisation._id, type: 'Organisation' },
-                  {
-                    _id: hasItsEpiscopalSeeIn.ref._id,
-                    type: 'Spatial',
-                    role: '',
-                  },
-                ],
-                taxonomyTermLabel: 'hasItsEpiscopalSeeIn',
-              };
-              await updateReference(episcopalSeeInRef);
-            }
+    let nativePlace = null;
+    if (nativePlaceDBID !== '') {
+      nativePlace = await loadOrganisation(nativePlaceDBID);
+    } else if (nativePlaceCell !== '') {
+      const nativePlaceData = {
+        label: nativePlaceCell,
+        organisationType: nativePlaceType,
+        status: 'private',
+      };
+      if (nativePlaceAltLabel) {
+        nativePlaceCell.alternateAppelations[
+          {
+            label: nativePlaceAltLabel,
           }
-        }
-
-        // 3. Spatial2 = has location = county (column I), location type = county
-        const countyDb = await loadOrganisation(county, 'County');
-        if (countyDb !== null) {
-          const hasLocation =
-            countyDb.spatial.find((s) => s.term.label === `hasLocation`) ||
-            null;
-          if (hasLocation !== null) {
-            const hasLocationRef = {
-              items: [
-                { _id: organisation._id, type: 'Organisation' },
-                {
-                  _id: hasLocation.ref._id,
-                  type: 'Spatial',
-                  role: '',
-                },
-              ],
-              taxonomyTermLabel: 'hasLocation',
-            };
-            await updateReference(hasLocationRef);
-          }
-        }
-
-        // link organisation to residence event
-        const organisationResidenceRef = {
-          items: [
-            { _id: organisation._id, type: 'Organisation', role: '' },
-            { _id: residenceEvent._id, type: 'Event', role: '' },
-          ],
-          taxonomyTermLabel: 'hasRelation',
-        };
-        await updateReference(organisationResidenceRef);
-
-        // link organisation to profession event
-        if (professionEvent !== null) {
-          const organisationProfessionRef = {
-            items: [
-              { _id: organisation._id, type: 'Organisation', role: '' },
-              { _id: professionEvent._id, type: 'Event', role: '' },
-            ],
-            taxonomyTermLabel: 'hasRelation',
-          };
-          await updateReference(organisationProfessionRef);
-        }
-
-        // add event episcopal see in
-        for (let d = 0; d < dioceses.length; d += 1) {
-          const di = dioceses[d];
-          const dioceseDb = await loadOrganisation(di, 'Diocese');
-          if (dioceseDb !== null) {
-            const hasItsEpiscopalSeeIn =
-              dioceseDb.spatial.find(
-                (s) => s.term.label === `hasItsEpiscopalSeeIn`
-              ) || null;
-            if (hasItsEpiscopalSeeIn !== null) {
-              const episcopalSeeInRef = {
-                items: [
-                  { _id: residenceEvent._id, type: 'Event' },
-                  {
-                    _id: hasItsEpiscopalSeeIn.ref._id,
-                    type: 'Spatial',
-                    role: '',
-                  },
-                ],
-                taxonomyTermLabel: 'hasItsEpiscopalSeeIn',
-              };
-              await updateReference(episcopalSeeInRef);
-
-              const sponsorshipEpiscopalSeeInRef = {
-                items: [
-                  { _id: sponsorshipEvent._id, type: 'Event' },
-                  {
-                    _id: hasItsEpiscopalSeeIn.ref._id,
-                    type: 'Spatial',
-                    role: '',
-                  },
-                ],
-                taxonomyTermLabel: 'hasItsEpiscopalSeeIn',
-              };
-              await updateReference(sponsorshipEpiscopalSeeInRef);
-            }
-          }
-        }
-
-        // 3. Spatial2 = has location = county (column I), location type = county
-        if (countyDb !== null) {
-          const hasLocation =
-            countyDb.spatial.find((s) => s.term.label === `hasLocation`) ||
-            null;
-          if (hasLocation !== null) {
-            const hasLocationRef = {
-              items: [
-                { _id: residenceEvent._id, type: 'Event' },
-                {
-                  _id: hasLocation.ref._id,
-                  type: 'Spatial',
-                  role: '',
-                },
-              ],
-              taxonomyTermLabel: 'hasLocation',
-            };
-            await updateReference(hasLocationRef);
-            if (professionEvent !== null) {
-              const professionHasLocationRef = {
-                items: [
-                  { _id: professionEvent._id, type: 'Event' },
-                  {
-                    _id: hasLocation.ref._id,
-                    type: 'Spatial',
-                    role: '',
-                  },
-                ],
-                taxonomyTermLabel: 'hasLocation',
-              };
-              await updateReference(professionHasLocationRef);
-            }
-
-            const sponsorshipEpiscopalSeeInRef = {
-              items: [
-                { _id: sponsorshipEvent._id, type: 'Event' },
-                {
-                  _id: hasLocation.ref._id,
-                  type: 'Spatial',
-                  role: '',
-                },
-              ],
-              taxonomyTermLabel: 'hasLocation',
-            };
-            await updateReference(sponsorshipEpiscopalSeeInRef);
-          }
-        }
+        ];
       }
+      nativePlace = await saveOrganisation(nativePlaceData, userId);
+    }
+    // add relationship to native place
+    if (nativePlace !== null) {
+      const nativePlaceRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: nativePlace._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: 'wasNativeOf',
+      };
+      await updateReference(nativePlaceRef);
+    }
+
+    // dates
+    // 7) Birth event
+    const dob = cellOutput(row[masterCsvKeys[15]]);
+    if (dob !== '') {
+      await addEvent({
+        label: 'Born',
+        eventType: birthEventType,
+        eventTaxonomyTerm: 'wasStatusOf',
+        userId,
+        person,
+        temporalCell: dob,
+      });
+    }
+
+    // 8) Death event
+    const dod = cellOutput(row[masterCsvKeys[19]]);
+    if (dod !== '') {
+      await addEvent({
+        label: 'Deceased',
+        eventType: deathEventType,
+        eventTaxonomyTerm: 'wasStatusOf',
+        userId,
+        person,
+        temporalCell: dod,
+      });
+    }
+
+    // 9) Person's Father
+    const fatherFirstName = cellOutput(row[masterCsvKeys[24]]);
+    const fatherLastName = cellOutput(row[masterCsvKeys[23]]);
+    if (fatherFirstName !== '' || fatherLastName !== '') {
+      const { fatherFName, fatherMName } = firstNameParse(fatherFirstName);
+      const fatherData = {
+        firstName: fatherFName,
+        middleName: fatherMName,
+        lastName: fatherLastName,
+        label: personLabel(fatherFName, fatherMName, fatherLastName),
+        personType: 'Laity',
+        status: 'private',
+      };
+      const newFather = new Person(fatherData);
+      const savedFather = await newFather.save(userId);
+      const father = savedFather.data;
+      const fatherRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: father._id, type: 'Person', role: '' },
+        ],
+        taxonomyTermLabel: 'isSonOf',
+      };
+      await updateReference(fatherRef);
+    }
+
+    // 10) Person's Mother
+    const motherFirstName = cellOutput(row[masterCsvKeys[26]]);
+    const motherAltLastName = cellOutput(row[masterCsvKeys[25]]);
+    if (motherFirstName !== '') {
+      const { motherFName, motherMName } = firstNameParse(motherFirstName);
+      const motherData = {
+        firstName: motherFName,
+        middleName: motherMName,
+        lastName: fatherLastName,
+        label: personLabel(motherFName, motherMName, fatherLastName),
+        personType: 'Laity',
+        status: 'private',
+      };
+      if (motherAltLastName !== '') {
+        const motherAppellation = personLabel(
+          motherFName,
+          '',
+          motherAltLastName
+        );
+        const maidenName = {
+          appellation: motherAppellation,
+          firstName: motherFName,
+          lastName: motherAltLastName,
+        };
+        motherData.alternateAppellations = [maidenName];
+      }
+      const newMother = new Person(motherData);
+      const savedMother = await newMother.save(userId);
+      const mother = savedMother.data;
+      const motherRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: mother._id, type: 'Person', role: '' },
+        ],
+        taxonomyTermLabel: 'isSonOf',
+      };
+      await updateReference(motherRef);
+    }
+
+    // 11) Student of
+    const studentOfCell = cellOutput(row[masterCsvKeys[27]]);
+    let studentOfOrg = null;
+    if (studentOfCell !== '') {
+      studentOfOrg = await findOrganisation({ label: studentOfCell });
+      if (studentOfOrg === null) {
+        studentOfOrg = saveOrganisation({ label: studentOfCell }, userId);
+      }
+      const studentOfRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: studentOfOrg._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: 'wasStudentOf',
+      };
+      await updateReference(studentOfRef);
+    }
+
+    // 12a) residence
+    const residenceCell = cellOutput(row[masterCsvKeys[29]]);
+    const residenceTypeCell = cellOutput(row[masterCsvKeys[30]]);
+    const locationOfResidenceCell = cellOutput(row[masterCsvKeys[31]]);
+    const dateOfResidenceCell = cellOutput(row[masterCsvKeys[32]]);
+    if (residenceCell !== '') {
+      // organisation
+      let residenceOrg = await findOrganisation({
+        label: residenceCell,
+        type: residenceTypeCell,
+      });
+      if (residenceOrg === null) {
+        residenceOrg = saveOrganisation(
+          { label: residenceCell, type: residenceTypeCell },
+          userId
+        );
+      }
+      await addEvent({
+        label: 'Residence',
+        eventType: residenceEventType,
+        eventTaxonomyTerm: 'WasMaintainedBy',
+        userId,
+        person,
+        organisation: residenceOrg,
+        spatialCell: locationOfResidenceCell,
+        temporalCell: dateOfResidenceCell,
+      });
+
+      // 12b) was resident
+      const dbresidencePersonRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: residenceOrg._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: 'wasResidentOf',
+      };
+      await updateReference(dbresidencePersonRef);
+    }
+
+    // 13) ordination
+    const ordination = cellOutput(row[masterCsvKeys[33]]);
+    const ordinationDate = cellOutput(row[masterCsvKeys[34]]);
+    if (ordination !== '' && (ordination === 'Y' || ordination === 'Yes')) {
+      await addEvent({
+        label: 'Ordination',
+        eventType: ordinationEventType,
+        userId,
+        person,
+        temporalCell: ordinationDate,
+      });
+    }
+
+    // 14) matriculation
+    const matriculationDateCell = cellOutput(row[masterCsvKeys[35]]);
+    if (matriculationDateCell !== '') {
+      const locationOfUniversityCell = cellOutput(row[masterCsvKeys[28]]);
+      await addEvent({
+        label: 'Matriculation',
+        eventType: matriculationEventType,
+        userId,
+        person,
+        organisation: studentOfOrg,
+        spatialCell: locationOfUniversityCell,
+        temporalCell: matriculationDateCell,
+      });
+    }
+
+    // 15) Registration
+    const registration = cellOutput(row[masterCsvKeys[36]]);
+    if (registration !== '') {
+      const registrationSpatialCell = cellOutput(row[masterCsvKeys[28]]);
+      const registrationDateCell = cellOutput(row[masterCsvKeys[37]]);
+      await addEvent({
+        label: registration,
+        eventType: registrationEventType,
+        eventTaxonomyTerm: 'hadRegistrant',
+        userId,
+        person,
+        organisation: studentOfOrg,
+        spatialCell: registrationSpatialCell,
+        temporalCell: registrationDateCell,
+      });
+    }
+
+    // 16) Masters of Art
+    const maDateCell = cellOutput(row[masterCsvKeys[38]]);
+    if (maDateCell !== '') {
+      const maSpatialCell = cellOutput(row[masterCsvKeys[28]]);
+      await addEvent({
+        label: 'Masters of Art',
+        eventType: maEventType,
+        eventTaxonomyTerm: 'hasRecipient',
+        userId,
+        person,
+        spatialCell: maSpatialCell,
+        temporalCell: maDateCell,
+      });
+    }
+
+    // 17) Program of Study 2
+    const pos2 = cellOutput(row[masterCsvKeys[39]]);
+    if (pos2 !== '') {
+      const pos2Type = pos2.split(' ')[0];
+      const pos2EventType = await eventTypeId(pos2Type);
+      const locationOfUniversityCell = cellOutput(row[masterCsvKeys[28]]);
+      const pos2DateCell = cellOutput(row[masterCsvKeys[40]]);
+
+      await addEvent({
+        label: pos2,
+        eventType: pos2EventType,
+        eventTaxonomyTerm: 'hasRecipient',
+        userId,
+        person,
+        organisation: studentOfOrg,
+        spatialCell: locationOfUniversityCell,
+        temporalCell: pos2DateCell,
+      });
+    }
+
+    // 18) Program of Study 3
+    const pos3 = cellOutput(row[masterCsvKeys[41]]);
+    if (pos3 !== '') {
+      const pos3Type = pos3.split(' ')[0];
+      const pos3EventType = await eventTypeId(pos3Type);
+      const locationOfUniversityCell = cellOutput(row[masterCsvKeys[28]]);
+      const pos3DateCell = cellOutput(row[masterCsvKeys[42]]);
+
+      await addEvent({
+        label: pos3,
+        eventType: pos3EventType,
+        eventTaxonomyTerm: 'hasRecipient',
+        userId,
+        person,
+        organisation: studentOfOrg,
+        spatialCell: locationOfUniversityCell,
+        temporalCell: pos3DateCell,
+      });
+    }
+
+    // 19) Program of Study 4
+    const pos4 = cellOutput(row[masterCsvKeys[43]]);
+    if (pos4 !== '') {
+      const pos4Type = pos4.split(' ')[0];
+      const pos4EventType = await eventTypeId(pos4Type);
+      const locationOfUniversityCell = cellOutput(row[masterCsvKeys[28]]);
+      const pos4DateCell = cellOutput(row[masterCsvKeys[44]]);
+
+      await addEvent({
+        label: pos4,
+        eventType: pos4EventType,
+        eventTaxonomyTerm: 'hasRecipient',
+        userId,
+        person,
+        organisation: studentOfOrg,
+        spatialCell: locationOfUniversityCell,
+        temporalCell: pos4DateCell,
+      });
+    }
+
+    // 20) Student of
+    const otherCollegeCell = cellOutput(row[masterCsvKeys[47]]);
+    let otherCollege = null;
+    if (otherCollegeCell !== '') {
+      otherCollege = await findOrganisation({ label: otherCollegeCell });
+      const otherCollegeRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: otherCollege._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: 'wasStudentOf',
+      };
+      await updateReference(otherCollegeRef);
+    }
+
+    // 21) Program of Study Other
+    const otherPoS = cellOutput(row[masterCsvKeys[49]]);
+    if (otherPoS !== '') {
+      const otherPoSSpatialCell = cellOutput(row[masterCsvKeys[48]]);
+      const otherPoSSDateCell = cellOutput(row[masterCsvKeys[51]]);
+
+      await addEvent({
+        label: otherPoS,
+        eventType: posEventType,
+        eventTaxonomyTerm: 'wasStudiedBy',
+        userId,
+        person,
+        organisation: otherCollege,
+        spatialCell: otherPoSSpatialCell,
+        temporalCell: otherPoSSDateCell,
+      });
+    }
+
+    // 22) Award Other
+    const awardOther = cellOutput(row[masterCsvKeys[50]]);
+    if (awardOther !== '') {
+      const awardOtherType = awardOther.split(' ')[0];
+      const awardOtherEventType = await eventTypeId(awardOtherType);
+      const awardOtherSpatialCell = cellOutput(row[masterCsvKeys[48]]);
+      const awardOtherDateCell = cellOutput(row[masterCsvKeys[51]]);
+
+      await addEvent({
+        label: awardOther,
+        eventType: awardOtherEventType,
+        eventTaxonomyTerm: 'hasRecipient',
+        userId,
+        person,
+        organisation: otherCollege,
+        spatialCell: awardOtherSpatialCell,
+        temporalCell: awardOtherDateCell,
+      });
+    }
+
+    // 23) Other College 2
+    const otherCollege2Cell = cellOutput(row[masterCsvKeys[52]]);
+    let otherCollege2 = null;
+    if (otherCollege2Cell !== '') {
+      otherCollege2 = await findOrganisation({ label: otherCollege2Cell });
+      const otherCollege2Ref = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: otherCollege2._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: 'wasStudentOf',
+      };
+      await updateReference(otherCollege2Ref);
+    }
+
+    // 24) Other College 2 Attendance
+    if (otherCollege2Cell !== '') {
+      const otherCollege2AttendanceSpatialCell = cellOutput(
+        row[masterCsvKeys[53]]
+      );
+      const otherCollege2AttendanceDateCell = cellOutput(
+        row[masterCsvKeys[54]]
+      );
+      await addEvent({
+        label: 'Student',
+        eventType: attendanceEventType,
+        eventTaxonomyTerm: 'wasStatusOf',
+        userId,
+        person,
+        organisation: otherCollege2,
+        spatialCell: otherCollege2AttendanceSpatialCell,
+        temporalCell: otherCollege2AttendanceDateCell,
+      });
+    }
+
+    // 25) Ordination
+    const ordination2Cell = cellOutput(row[masterCsvKeys[60]]);
+    if (ordination2Cell !== '') {
+      const ordination2SpatialCell = cellOutput(row[masterCsvKeys[62]]);
+      const ordination2DateCell = cellOutput(row[masterCsvKeys[61]]);
+      await addEvent({
+        label: 'Ordination',
+        eventType: ordinationEventType,
+        eventRole: ordination2Cell,
+        userId,
+        person,
+        spatialCell: ordination2SpatialCell,
+        temporalCell: ordination2DateCell,
+      });
+    }
+
+    // 26) Membership
+    const membershipCell = cellOutput(row[masterCsvKeys[67]]);
+    if (membershipCell !== '') {
+      const membershipSpatial = cellOutput(row[masterCsvKeys[69]]);
+      const membershipTemporal = cellOutput(row[masterCsvKeys[68]]);
+      const membershipOrganisation = await findOrganisation({
+        label: membershipCell,
+      });
+      await addEvent({
+        label: 'Member',
+        eventType: membershipEventType,
+        userId,
+        person,
+        organisation: membershipOrganisation,
+        spatialCell: membershipSpatial,
+        temporalCell: membershipTemporal,
+      });
+    }
+
+    // 27) Membership (Organisation)
+    const membershipOrgCell = cellOutput(row[masterCsvKeys[70]]);
+    let membershipOrg = null;
+    if (membershipOrgCell !== '') {
+      membershipOrg = await findOrganisation({ label: membershipOrgCell });
+      const membershipOrgRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: membershipOrg._id, type: 'Organisation', role: '' },
+        ],
+        taxonomyTermLabel: 'wasMemberOf',
+      };
+      await updateReference(membershipOrgRef);
+    }
+
+    // 28) Was serving asEvent
+    const servingAsCell = cellOutput(row[masterCsvKeys[71]]);
+    if (servingAsCell !== '') {
+      const servingAsOrgCell = cellOutput(row[masterCsvKeys[73]]);
+      const servingAsOrgType = cellOutput(row[masterCsvKeys[74]]);
+      const servingAsOrg = await findOrganisation({
+        label: servingAsOrgCell,
+        type: servingAsOrgType,
+      });
+      const servingAsSpatial = cellOutput(row[masterCsvKeys[75]]);
+      const servingAsTemporal = cellOutput(row[masterCsvKeys[72]]);
+      await addEvent({
+        label: servingAsCell,
+        labelCell: servingAsCell,
+        eventType: wasServingAsEventType,
+        eventRole: servingAsCell,
+        userId,
+        person,
+        organisation: servingAsOrg,
+        servingAsSpatial,
+        servingAsTemporal,
+      });
+    }
+
+    // 29) Resource
+    const resourceCell = cellOutput(row[masterCsvKeys[77]]);
+    if (resourceCell !== '') {
+      const resourceRef = {
+        items: [
+          { _id: person._id, type: 'Person', role: '' },
+          { _id: resource._id, type: 'Resource', role: '' },
+        ],
+        taxonomyTermLabel: 'isReferencedIn',
+      };
+      await updateReference(resourceRef);
     }
   }
 
@@ -1054,7 +1327,8 @@ const ingest = async () => {
 
 const letterKey = () => {
   const letter = argv.letter.toLowerCase() || '';
-  const alphabet = 'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z';
+  const alphabet =
+    'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az,ba,bb,bc,bd,be,bf,bg,bh,bi,bj,bk,bl,bm,bn,bo,bp,bq,br,bs,bt,bu,bv,bw,bx,by,bz';
   const letters = alphabet.split(',');
   console.log(letters.indexOf(letter));
   process.exit();
@@ -1068,4 +1342,7 @@ if (argv._.includes('ingest')) {
 }
 if (argv._.includes('key')) {
   letterKey();
+}
+if (argv._.includes('check')) {
+  check();
 }
