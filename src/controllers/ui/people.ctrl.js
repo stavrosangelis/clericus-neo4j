@@ -64,8 +64,8 @@ const getPeople = async (req, resp) => {
     if (params.optionalMatch !== '') {
       optionalMatchQuery = params.optionalMatch;
     }
-    let query = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    let queryCount = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN count(distinct n) as c`;
+    const query = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
+    const queryCount = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN count(distinct n) as c`;
     let data = await getPeopleQuery(query, queryCount, params.limit);
     if (data.error) {
       resp.json({
