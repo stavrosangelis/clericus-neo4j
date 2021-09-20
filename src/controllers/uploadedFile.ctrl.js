@@ -4,11 +4,33 @@ const Canvas = require('canvas');
 const fs = require('fs');
 const mimeType = require('mime-types');
 const formidable = require('formidable');
+const { SERVERURL, UPLOADSPATH, ARCHIVEPATH } = process.env;
+
+const returnPaths = (item) => {
+  const paths = [];
+  if (typeof item.type === 'undefined' || item.type === 'image') {
+    paths.push({
+      path: `${SERVERURL}uploads/${item.year}/${item.month}/images/${item.hashedName}`,
+      pathType: 'source',
+    });
+    paths.push({
+      path: `${SERVERURL}uploads/${item.year}/${item.month}/thumbnails/${item.hashedName}`,
+      pathType: 'thumbnail',
+    });
+  }
+  if (item.type === 'import') {
+    paths.push({
+      path: `${ARCHIVEPATH}/imports/${item.year}/${item.month}/${item.hashedName}`,
+    });
+  }
+  return paths;
+};
 
 class UploadedFile {
   constructor({
     _id = null,
     filename = null,
+    type = 'image',
     year = 0,
     month = 0,
     hashedName,
@@ -23,6 +45,7 @@ class UploadedFile {
       this._id = _id;
     }
     this.filename = filename;
+    this.type = type;
     this.year = year;
     this.month = month;
     this.hashedName = hashedName;
@@ -75,17 +98,7 @@ class UploadedFile {
     for (let key in node) {
       this[key] = node[key];
     }
-    let paths = [
-      {
-        path: `${process.env.SERVERURL}uploads/${this.year}/${this.month}/images/${this.hashedName}`,
-        pathType: 'source',
-      },
-      {
-        path: `${process.env.SERVERURL}uploads/${this.year}/${this.month}/thumbnails/${this.hashedName}`,
-        pathType: 'thumbnail',
-      },
-    ];
-    this.paths = paths;
+    this.paths = returnPaths(this);
   }
 
   async save(userId) {
@@ -108,7 +121,9 @@ class UploadedFile {
       }
       this.updatedBy = userId;
       this.updatedAt = now;
-
+      if (typeof this.type === 'undefined') {
+        this.type = 'image';
+      }
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
       let query = '';
@@ -136,18 +151,7 @@ class UploadedFile {
           let key = record.keys[0];
           let resultRecord = record.toObject()[key];
           resultRecord = helpers.outputRecord(resultRecord);
-
-          let paths = [
-            {
-              path: `${process.env.SERVERURL}uploads/${resultRecord.year}/${resultRecord.month}/images/${resultRecord.hashedName}`,
-              pathType: 'source',
-            },
-            {
-              path: `${process.env.SERVERURL}uploads/${resultRecord.year}/${resultRecord.month}/thumbnails/${resultRecord.hashedName}`,
-              pathType: 'thumbnail',
-            },
-          ];
-          resultRecord.paths = paths;
+          resultRecord.paths = returnPaths(resultRecord);
           output = { error: false, status: true, data: resultRecord, msg: [] };
         }
         return output;
@@ -193,16 +197,22 @@ class UploadedFile {
       return output;
     }
     // 1. load file to get details
-    let file = new UploadedFile({ _id: this._id });
+    const file = new UploadedFile({ _id: this._id });
     await file.load();
 
     // 2. delete files from disk
-    let fullsize = `${process.env.UPLOADSPATH}uploads/${file.year}/${file.month}/images/${file.hashedName}`;
-    let thumbnail = `${process.env.UPLOADSPATH}uploads/${file.year}/${file.month}/thumbnails/${file.hashedName}`;
-    this.unlinkFile(fullsize);
-    this.unlinkFile(thumbnail);
+    if (file.type === 'image') {
+      const fullsize = `${UPLOADSPATH}uploads/${file.year}/${file.month}/images/${file.hashedName}`;
+      const thumbnail = `${UPLOADSPATH}uploads/${file.year}/${file.month}/thumbnails/${file.hashedName}`;
+      this.unlinkFile(fullsize);
+      this.unlinkFile(thumbnail);
+    }
+    if (file.type === 'import') {
+      const filePath = `${ARCHIVEPATH}/imports/${file.year}/${file.month}/${file.hashedName}`;
+      this.unlinkFile(filePath);
+    }
 
-    let query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} DELETE n`;
+    const query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} DELETE n`;
     let deleteRecord = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
@@ -238,61 +248,40 @@ class UploadedFile {
 {"status":true,"data":{"data":[{"createdAt":"2020-01-27T15:55:23.499Z","templatePosition":"","label":"Top Article","_id":"2822","updatedAt":"2020-01-27T17:55:15.742Z","systemLabels":["Article"]},{"createdAt":"2020-01-27T17:43:44.578Z","label":"Bottom Article","templatePosition":"bottom","updatedAt":"2020-01-27T17:43:44.578Z","_id":"2683","systemLabels":["Article"]}]},"error":[],"msg":"Query results"}
 */
 const getUploadedFiles = async (req, resp) => {
-  let parameters = req.query;
-  let filename = '';
-  let page = 0;
-  let orderField = 'filename';
-  let queryPage = 0;
+  const parameters = req.query;
+  const filename = parameters.filename || '';
+  const type = parameters.type || '';
+  const page = Number(parameters.page) || 0;
+  const queryPage = page > 0 ? page - 1 : 0;
+  const orderField = parameters.orderField || 'filename';
+  const orderDesc = parameters.orderDesc || false;
+  const limit = Number(parameters.limit) || 25;
   let queryOrder = '';
-  let limit = 25;
-
-  let query = '';
   let queryParams = '';
-  if (typeof parameters.filename !== 'undefined') {
-    filename = parameters.filename;
-    if (filename !== '') {
-      queryParams += "toLower(n.filename) =~ toLower('.*" + filename + ".*') ";
-    }
+
+  if (filename !== '') {
+    queryParams += `toLower(n.filename) =~ toLower('.*${filename}.*') `;
   }
 
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
+  if (type !== '') {
+    queryParams += `toLower(n.type) =~ toLower('${type}') `;
   }
+
   if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
+    queryOrder = `ORDER BY n.${orderField}`;
+    if (orderDesc) {
       queryOrder += ' DESC';
     }
   }
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
-  let currentPage = page;
-  if (page === 0) {
-    currentPage = 1;
-  }
-  let skip = limit * queryPage;
+
+  const currentPage = page === 0 ? 1 : page;
+  const skip = limit * queryPage;
   if (queryParams !== '') {
-    queryParams = 'WHERE ' + queryParams;
+    queryParams = `WHERE ${queryParams}`;
   }
 
-  query =
-    'MATCH (n:UploadedFile) ' +
-    queryParams +
-    ' RETURN n ' +
-    queryOrder +
-    ' SKIP ' +
-    skip +
-    ' LIMIT ' +
-    limit;
-  let data = await getUploadedFilesQuery(query, queryParams, limit);
+  const query = `MATCH (n:UploadedFile) ${queryParams}  RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+  const data = await getUploadedFilesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({
       status: false,
@@ -301,7 +290,7 @@ const getUploadedFiles = async (req, resp) => {
       msg: data.error.message,
     });
   } else {
-    let responseData = {
+    const responseData = {
       currentPage: currentPage,
       data: data.nodes,
       totalItems: data.count,
@@ -343,17 +332,7 @@ const getUploadedFilesQuery = async (query, queryParams, limit) => {
     });
 
   let nodesOutput = nodes.map((node) => {
-    let paths = [
-      {
-        path: `${process.env.SERVERURL}uploads/${node.year}/${node.month}/images/${node.hashedName}`,
-        pathType: 'source',
-      },
-      {
-        path: `${process.env.SERVERURL}uploads/${node.year}/${node.month}/thumbnails/${node.hashedName}`,
-        pathType: 'thumbnail',
-      },
-    ];
-    node.paths = paths;
+    node.paths = returnPaths(node);
     return node;
   });
   let totalPages = Math.ceil(count / limit);
@@ -413,7 +392,7 @@ Content-Type: image/jpeg
 {"status":true,"data":{"image":"http://localhost:5100/2020/2/images/fac02fb4bfcaabccd3653dc5a5e68e0b.jpg","thumbnail":"http://localhost:5100/2020/2/thumbnails/fac02fb4bfcaabccd3653dc5a5e68e0b.jpg"},"error":false,"msg":""}
 */
 const postUploadedFile = async (req, resp) => {
-  let data = await parseFormDataPromise(req);
+  const data = await parseFormDataPromise(req);
   if (Object.keys(data.file).length === 0) {
     resp.json({
       status: false,
@@ -423,7 +402,7 @@ const postUploadedFile = async (req, resp) => {
     });
     return false;
   }
-  let uploadedFile = data.file.file;
+  const uploadedFile = data.file.file;
   const allowedExtensions = ['jpg', 'jpeg', 'gif', 'png'];
   let extension = mimeType.extension(uploadedFile.type);
   if (extension === 'jpeg') {
@@ -440,7 +419,7 @@ const postUploadedFile = async (req, resp) => {
     };
     return resp.json(output);
   }
-  let hashedName = helpers.hashFileName(uploadedFile.name) + '.' + extension;
+  const hashedName = `${helpers.hashFileName(uploadedFile.name)}.${extension}`;
   let newDimensions = null;
   if (typeof data.dimensions !== 'undefined') {
     newDimensions = data.dimensions;
@@ -474,7 +453,7 @@ const postUploadedFile = async (req, resp) => {
       }
     }
 
-    let thumbnailsDir = `${process.env.UPLOADSPATH}/uploads/${year}/${month}/thumbnails/`;
+    let thumbnailsDir = `${UPLOADSPATH}/uploads/${year}/${month}/thumbnails/`;
     thumbnailPath = `${thumbnailsDir}${hashedName}`;
 
     await createThumbnail(
@@ -542,7 +521,7 @@ const uploadFile = async (uploadedFile = null, hashedName = '') => {
     return false;
   }
   // patch for the case when the archive path is in a different drive
-  let tempPath = process.env.ARCHIVEPATH + 'temp/' + hashedName;
+  let tempPath = ARCHIVEPATH + 'temp/' + hashedName;
   await fs.copyFileSync(uploadedFile.path, tempPath);
   uploadedFile.path = tempPath;
 
@@ -551,8 +530,8 @@ const uploadFile = async (uploadedFile = null, hashedName = '') => {
   let year = date.getFullYear();
 
   let sourcePath = uploadedFile.path;
-  let imagesDir = `${process.env.UPLOADSPATH}/uploads/${year}/${month}/images/`;
-  let thumbnailsDir = `${process.env.UPLOADSPATH}/uploads/${year}/${month}/thumbnails/`;
+  let imagesDir = `${UPLOADSPATH}/uploads/${year}/${month}/images/`;
+  let thumbnailsDir = `${UPLOADSPATH}/uploads/${year}/${month}/thumbnails/`;
   let targetPath = `${imagesDir}${hashedName}`;
   uploadedFile.path = targetPath;
 

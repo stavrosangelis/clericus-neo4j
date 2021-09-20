@@ -157,7 +157,9 @@ const saveDate = async (dateParam = '', userId) => {
   if (endDate !== null) {
     queryEndDate = `AND n.endDate="${endDate}" `;
   }
-  const query = `MATCH (n:Temporal) WHERE n.startDate="${startDate}" ${queryEndDate} RETURN n`;
+  const query = dateParam.label.includes('c')
+    ? `MATCH (n:Temporal) WHERE n.label="${dateParam.label}" AND n.startDate="${startDate}" ${queryEndDate} RETURN n`
+    : `MATCH (n:Temporal) WHERE n.startDate="${startDate}" ${queryEndDate} RETURN n`;
   let temporal = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
@@ -702,7 +704,7 @@ const ingest = async () => {
   const posEventType = await eventTypeId('ProgramOfStudy');
   const attendanceEventType = await eventTypeId('Attendance');
   const membershipEventType = await eventTypeId('Membership');
-  const wasServingAsEventType = await eventTypeId('wasServingAs');
+  const wasServingAsEventType = await eventTypeId('wasServingAsEvent');
 
   const resourceQuery = `MATCH (n:Resource) WHERE toLower(n.label) =~ toLower('.*Prosopography of Irish Clerics in the Universities of Paris and Toulouse, 1573-1792.*') RETURN n`;
   const resource = await session
@@ -719,11 +721,26 @@ const ingest = async () => {
       console.log(error);
     });
 
+  const uoPThumbQuery = `MATCH (n:Resource) WHERE toLower(n.label) =~ toLower('.*University of Paris Coat of Arms.png*') RETURN n`;
+  const uoPThumb = await session
+    .writeTransaction((tx) => tx.run(uoPThumbQuery, {}))
+    .then((result) => {
+      const records = result.records;
+      if (records.length > 0) {
+        const record = records[0].toObject();
+        const outputRecord = helpers.outputRecord(record.n);
+        return outputRecord;
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+
   for (let i = 0; i < masterCsv.length; i += 1) {
-    /* if (i + 2 < 1520) {
+    /* if (i + 2 < 1321) {
       continue;
     }
-    if (i + 2 > 1520) {
+    if (i + 2 > 1321) {
       break;
     } */
     const row = masterCsv[i];
@@ -757,6 +774,7 @@ const ingest = async () => {
       alternateFirstName2,
       alternateFirstNameLangValue2
     );
+
     let person = {};
     if (dbId !== '') {
       person = await loadPerson(dbId);
@@ -792,6 +810,9 @@ const ingest = async () => {
           person.alternateAppelations.push(alternateAppellation);
         }
       }
+      const newPerson = new Person(person);
+      const savedPerson = await newPerson.save(userId);
+      person = savedPerson.data;
     } else {
       // load person details
       const personData = {
@@ -808,7 +829,6 @@ const ingest = async () => {
       const savedPerson = await newPerson.save(userId);
       person = savedPerson.data;
     }
-
     // 5) Column I (Diocese)
     const dioceseCell = cellOutput(row[masterCsvKeys[8]]);
     const dioceseDBID = cellOutput(row[masterCsvKeys[9]]);
@@ -980,6 +1000,17 @@ const ingest = async () => {
         taxonomyTermLabel: 'wasStudentOf',
       };
       await updateReference(studentOfRef);
+      // link to thumbnail
+      if (studentOfCell === 'University of Paris') {
+        const studentOfThumbRef = {
+          items: [
+            { _id: person._id, type: 'Person', role: '' },
+            { _id: uoPThumb._id, type: 'Resource', role: '' },
+          ],
+          taxonomyTermLabel: 'hasRepresentationObject',
+        };
+        await updateReference(studentOfThumbRef);
+      }
     }
 
     // 12a) residence
@@ -1051,9 +1082,9 @@ const ingest = async () => {
 
     // 15) Registration
     const registration = cellOutput(row[masterCsvKeys[36]]);
+    const registrationDateCell = cellOutput(row[masterCsvKeys[37]]);
     if (registration !== '') {
       const registrationSpatialCell = cellOutput(row[masterCsvKeys[28]]);
-      const registrationDateCell = cellOutput(row[masterCsvKeys[37]]);
       await addEvent({
         label: registration,
         eventType: registrationEventType,
@@ -1256,6 +1287,7 @@ const ingest = async () => {
       await addEvent({
         label: 'Member',
         eventType: membershipEventType,
+        eventTaxonomyTerm: 'wasStatusOf',
         userId,
         person,
         organisation: membershipOrganisation,
@@ -1290,16 +1322,18 @@ const ingest = async () => {
       });
       const servingAsSpatial = cellOutput(row[masterCsvKeys[75]]);
       const servingAsTemporal = cellOutput(row[masterCsvKeys[72]]);
+
       await addEvent({
         label: servingAsCell,
         labelCell: servingAsCell,
         eventType: wasServingAsEventType,
+        eventTaxonomyTerm: 'wasHeldBy',
         eventRole: servingAsCell,
         userId,
         person,
         organisation: servingAsOrg,
-        servingAsSpatial,
-        servingAsTemporal,
+        spatialCell: servingAsSpatial,
+        temporalCell: servingAsTemporal,
       });
     }
 

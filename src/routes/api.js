@@ -31,6 +31,7 @@ const taxonomyTermController = require('../controllers/taxonomyTerm.ctrl');
 const temporalController = require('../controllers/temporal.ctrl');
 const toolsParseController = require('../controllers/tools/meta-parse.ctrl');
 const toolsIngestionController = require('../controllers/tools/prepare-ingestion.ctrl');
+const importController = require('../controllers/import.ctrl');
 const toolsDiocesesLocationsController = require('../controllers/tools/dioceses-locations.ctrl');
 const uploadedFileController = require('../controllers/uploadedFile.ctrl');
 const userController = require('../controllers/user.ctrl');
@@ -499,6 +500,22 @@ server.get(
   auth.checkAdminToken,
   toolsIngestionController.patchRotate
 );
+// import
+server.get('/imports', auth.checkAdminToken, importController.getImports);
+server.get('/import', auth.checkAdminToken, importController.getImport);
+server.put('/import', auth.checkAdminToken, importController.putImport);
+server.delete('/import', auth.checkAdminToken, importController.deleteImport);
+server.delete(
+  '/import-file-delete',
+  auth.checkAdminToken,
+  importController.deleteImportFile
+);
+server.post(
+  '/import-file-upload',
+  auth.checkAdminToken,
+  importController.uploadedFile
+);
+
 server.get(
   '/parse-class-piece',
   auth.checkAdminToken,
