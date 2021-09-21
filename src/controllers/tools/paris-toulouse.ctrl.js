@@ -737,12 +737,12 @@ const ingest = async () => {
     });
 
   for (let i = 0; i < masterCsv.length; i += 1) {
-    /* if (i + 2 < 1321) {
+    if (i + 2 < 630) {
       continue;
     }
-    if (i + 2 > 1321) {
+    if (i + 2 > 630) {
       break;
-    } */
+    }
     const row = masterCsv[i];
     const dbId = cellOutput(row[masterCsvKeys[0]]);
 
@@ -923,7 +923,8 @@ const ingest = async () => {
     const fatherFirstName = cellOutput(row[masterCsvKeys[24]]);
     const fatherLastName = cellOutput(row[masterCsvKeys[23]]);
     if (fatherFirstName !== '' || fatherLastName !== '') {
-      const { fatherFName, fatherMName } = firstNameParse(fatherFirstName);
+      const { firstName: fatherFName, middleName: fatherMName } =
+        firstNameParse(fatherFirstName);
       const fatherData = {
         firstName: fatherFName,
         middleName: fatherMName,
@@ -949,7 +950,8 @@ const ingest = async () => {
     const motherFirstName = cellOutput(row[masterCsvKeys[26]]);
     const motherAltLastName = cellOutput(row[masterCsvKeys[25]]);
     if (motherFirstName !== '') {
-      const { motherFName, motherMName } = firstNameParse(motherFirstName);
+      const { firstName: motherFName, middleName: motherMName } =
+        firstNameParse(motherFirstName);
       const motherData = {
         firstName: motherFName,
         middleName: motherMName,
