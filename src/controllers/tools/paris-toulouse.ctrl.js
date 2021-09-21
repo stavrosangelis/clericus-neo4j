@@ -737,12 +737,12 @@ const ingest = async () => {
     });
 
   for (let i = 0; i < masterCsv.length; i += 1) {
-    if (i + 2 < 630) {
+    /* if (i + 2 < 630) {
       continue;
     }
     if (i + 2 > 630) {
       break;
-    }
+    } */
     const row = masterCsv[i];
     const dbId = cellOutput(row[masterCsvKeys[0]]);
 
