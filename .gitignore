@@ -20,8 +20,8 @@
 
 # passwords and sensitive data
 /tools/Clericus-f242153b0bef.json
-/server/config/.private.key
-/server/config/.public.key
+/src/config/.private.key
+/src/config/.public.key
 
 # environment variables
 .env.production
