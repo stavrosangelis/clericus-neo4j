@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.64.16",
+  "version": "0.64.18",
   "author": "Stavros Angelis",
   "license": "ISC",
   "description": "This is the Clericus API using neo4j as a database",

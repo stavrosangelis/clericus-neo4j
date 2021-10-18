@@ -1004,16 +1004,11 @@ const queryTexts = async (req, resp) => {
   });
 };
 
-const countWordType = async (word, type) => {
-  let queryWord = helpers.escapeRegExp(word);
-  let session = driver.session();
-  let query =
-    'MATCH (n:Person) WHERE toLower(n.' +
-    type +
-    ") =~ toLower('.*" +
-    queryWord +
-    ".*') RETURN count(*) AS count";
-  let count = await session
+const countWordType = async (word = '', type) => {
+  const queryWord = helpers.escapeRegExp(word).toLowerCase();
+  const session = driver.session();
+  const query = `MATCH (n:Person) WHERE EXISTS(n.${type}) AND toLower(n.${type}) =~ '.*${queryWord}.*' RETURN count(*) AS count`;
+  const count = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();

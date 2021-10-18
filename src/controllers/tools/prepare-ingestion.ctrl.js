@@ -204,19 +204,18 @@ const classPieceIdentifyDuplicates = async (req, resp) => {
     let queryParams = '';
     let firstName = '';
     let lastName = '';
-    if (typeof face.firstName !== 'undefined') {
-      firstName = face.firstName.toLowerCase();
+    if (typeof face.firstName !== 'undefined' && face.firstName !== '') {
+      firstName = helpers.escapeRegExp(face.firstName).toLowerCase();
       if (firstName !== '') {
-        queryParams =
-          "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
+        queryParams = `EXISTS(n.firstName) AND toLower(n.firstName) =~ toLower('.*${firstName}.*') `;
       }
     }
-    if (typeof face.lastName !== 'undefined') {
-      lastName = face.lastName.toLowerCase();
+    if (typeof face.lastName !== 'undefined' && face.lastName !== '') {
+      lastName = helpers.escapeRegExp(face.lastName).toLowerCase();
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams = "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
+      queryParams = `EXISTS(n.lastName) AND toLower(n.lastName) =~ toLower('.*${lastName}.*') `;
     }
     if (queryParams !== '') {
       queryParams = 'WHERE ' + queryParams;
