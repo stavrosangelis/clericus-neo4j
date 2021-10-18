@@ -32,7 +32,7 @@ const metaParseClassPiece = async (req, resp) => {
 
   let fileName = path.parse(file).name;
   let dirPath = `${resourcesPath}images/processed/compressed/`;
-  let outputDir = `${resourcesPath}output/${fileName}`;
+  let outputDir = `${resourcesPath}output/${fileName}/`;
   let outputThumbnailsDir = `${resourcesPath}output/${fileName}/thumbnails/`;
   let outputThumbnailsPathDir = `${serverURL}output/${fileName}/thumbnails/`;
   let srcPath = dirPath + file;
