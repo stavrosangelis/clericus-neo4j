@@ -8,6 +8,8 @@ const articleController = require('../controllers/article.ctrl');
 const articleCategoryController = require('../controllers/articleCategory.ctrl');
 const authController = require('../controllers/authentication.ctrl');
 const cvisionController = require('../controllers/tools/computer-vision.ctrl');
+const dataCleaningController = require('../controllers/dataCleaning.ctrl');
+const jobsController = require('../controllers/jobs.ctrl');
 const ocrController = require('../controllers/tools/ocr.ctrl');
 const contactFormsController = require('../controllers/contactForms.ctrl');
 const dashboardController = require('../controllers/dashboard.ctrl');
@@ -32,6 +34,7 @@ const temporalController = require('../controllers/temporal.ctrl');
 const toolsParseController = require('../controllers/tools/meta-parse.ctrl');
 const toolsIngestionController = require('../controllers/tools/prepare-ingestion.ctrl');
 const importController = require('../controllers/import.ctrl');
+const importRulesController = require('../controllers/importRules.ctrl');
 const toolsDiocesesLocationsController = require('../controllers/tools/dioceses-locations.ctrl');
 const uploadedFileController = require('../controllers/uploadedFile.ctrl');
 const userController = require('../controllers/user.ctrl');
@@ -515,6 +518,38 @@ server.post(
   auth.checkAdminToken,
   importController.uploadedFile
 );
+server.put(
+  '/import-plan-relation',
+  auth.checkAdminToken,
+  importController.putImportPlanRelation
+);
+server.delete(
+  '/import-plan-relation',
+  auth.checkAdminToken,
+  importController.deleteImportPlanRelation
+);
+
+// import rules
+server.get(
+  '/import-plan-rules',
+  auth.checkAdminToken,
+  importRulesController.getImportRules
+);
+server.get(
+  '/import-plan-rule',
+  auth.checkAdminToken,
+  importRulesController.getImportRule
+);
+server.put(
+  '/import-plan-rule',
+  auth.checkAdminToken,
+  importRulesController.putImportRule
+);
+server.delete(
+  '/import-plan-rule',
+  auth.checkAdminToken,
+  importRulesController.deleteImportRule
+);
 
 server.get(
   '/parse-class-piece',
@@ -573,6 +608,41 @@ server.get(
   auth.checkAdminToken,
   cvisionController.ingestionFromCsv
 );
+
+// data cleaning
+server.get(
+  '/data-cleaning',
+  auth.checkAdminToken,
+  dataCleaningController.getDataCleaning
+);
+server.put(
+  '/data-cleaning-instance',
+  auth.checkAdminToken,
+  dataCleaningController.putInstance
+);
+server.get(
+  '/data-cleaning-instance',
+  auth.checkAdminToken,
+  dataCleaningController.getInstance
+);
+server.delete(
+  '/data-cleaning-instance',
+  auth.checkAdminToken,
+  dataCleaningController.deleteInstance
+);
+server.get(
+  '/data-cleaning-unique',
+  auth.checkAdminToken,
+  dataCleaningController.getUnique
+);
+server.get(
+  '/data-cleaning-db-entries',
+  auth.checkAdminToken,
+  dataCleaningController.getDBentries
+);
+
+// jobs
+server.get('/jobs', auth.checkAdminToken, jobsController.getJobs);
 
 // ocr
 server.get('/ocr-meath', auth.checkAdminToken, ocrController.ocrDocumentsDir);

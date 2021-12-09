@@ -1,7 +1,5 @@
 const driver = require('../../config/db-driver');
 const helpers = require('../../helpers');
-const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
-
 /**
 * @api {get} /temporals Get temporals
 * @apiName get temporals
@@ -185,74 +183,36 @@ http://localhost:5100/api/temporal?_id=2514
 {"status":true,"data":{"_id":"2514","label":"00s","startDate":"1990","endDate":"1999","format":"","createdBy":"260","createdAt":"2020-01-17T10:07:49.237Z","updatedBy":"260","updatedAt":"2020-01-17T10:07:49.237Z","events":[]},"error":[],"msg":"Query results"}
 */
 const getTemporal = async (req, resp) => {
-  let parameters = req.query;
+  const parameters = req.query;
   if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+    return resp.json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let _id = parameters._id;
-  let session = driver.session();
-  let query = 'MATCH (n:Temporal) WHERE id(n)=' + _id + ' return n';
-  let temporal = await session
+  const { _id } = parameters;
+  const session = driver.session();
+  const query = `MATCH (n:Temporal) WHERE id(n)=${_id} RETURN n`;
+  const temporal = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();
-      let records = result.records;
+      const records = result.records;
       if (records.length > 0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
+        const record = records[0].toObject();
+        const outputRecord = helpers.outputRecord(record.n);
         return outputRecord;
       }
+      return null;
     })
     .catch((error) => {
       console.log(error);
     });
-  if (typeof temporal !== 'undefined') {
-    let events = await helpers.loadRelations(_id, 'Temporal', 'Event', true);
-    let organisations = await helpers.loadRelations(
-      _id,
-      'Event',
-      'Organisation',
-      true
-    );
-    let people = await helpers.loadRelations(
-      _id,
-      'Temporal',
-      'Person',
-      true,
-      null,
-      'rn.lastName'
-    );
-    let resources = await helpers.loadRelations(
-      _id,
-      'Temporal',
-      'Resource',
-      true
-    );
-
-    // get classpiece resource type id
-    let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
-    await classpieceSystemType.load();
-    let classpieces = [];
-    let systemType = classpieceSystemType._id;
-    for (let i in resources) {
-      let resource = resources[i];
-      if (resource.ref.systemType === systemType) {
-        classpieces.push(resource);
-        resources.splice(i, 1);
-      }
-    }
-
+  if (temporal !== null) {
+    const events = await helpers.loadRelations(_id, 'Temporal', 'Event', true);
     temporal.events = events;
-    temporal.organisations = organisations;
-    temporal.people = people;
-    temporal.resources = resources;
-    temporal.classpieces = classpieces;
 
     resp.json({
       status: true,

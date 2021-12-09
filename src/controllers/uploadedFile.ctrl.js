@@ -18,11 +18,6 @@ const returnPaths = (item) => {
       pathType: 'thumbnail',
     });
   }
-  if (item.type === 'import') {
-    paths.push({
-      path: `${ARCHIVEPATH}/imports/${item.year}/${item.month}/${item.hashedName}`,
-    });
-  }
   return paths;
 };
 
@@ -98,7 +93,9 @@ class UploadedFile {
     for (let key in node) {
       this[key] = node[key];
     }
-    this.paths = returnPaths(this);
+    if (this.paths.length === 0) {
+      this.paths = returnPaths(this);
+    }
   }
 
   async save(userId) {
@@ -207,9 +204,14 @@ class UploadedFile {
       this.unlinkFile(fullsize);
       this.unlinkFile(thumbnail);
     }
-    if (file.type === 'import') {
-      const filePath = `${ARCHIVEPATH}/imports/${file.year}/${file.month}/${file.hashedName}`;
-      this.unlinkFile(filePath);
+    if (file.paths.length > 0) {
+      for (let i = 0; i < file.paths.length; i += 1) {
+        let dir = file.paths[i];
+        if (typeof dir === 'string') {
+          dir = JSON.parse(dir);
+        }
+        this.unlinkFile(dir.path);
+      }
     }
 
     const query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} DELETE n`;

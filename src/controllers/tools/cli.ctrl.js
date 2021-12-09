@@ -135,8 +135,8 @@ const parseCsv = async () => {
     'Cathedral city',
     'Corrected organisation label',
   ];
-  var csv = await new Promise((resolve) => {
-    let results = [];
+  const csv = await new Promise((resolve) => {
+    const results = [];
     fs.createReadStream(path)
       .pipe(csvParser(headers))
       .on('data', (data) => results.push(data))
@@ -5725,9 +5725,8 @@ const mergeLaySureties = async () => {
       dataItem['Alternate appellation'] = alternateAppellation;
       dataItem['Place name updated'] = placeNameUpdated;
       dataItem['Location Type'] = locationType;
-      dataItem[
-        'Place name alternate appellation'
-      ] = placeNameAlternateAppellation;
+      dataItem['Place name alternate appellation'] =
+        placeNameAlternateAppellation;
       dataItem['County'] = county;
       dataItem['Diocese'] = diocese;
       dataItem['Title (honorific prefix)'] = titleHonorificPrefix;
@@ -5791,9 +5790,8 @@ const mergeLaySureties = async () => {
         if (existingLine['Place name alternate appellation'] !== '') {
           existingLine['Place name alternate appellation'] += ';';
         }
-        existingLine[
-          'Place name alternate appellation'
-        ] += placeNameAlternateAppellation;
+        existingLine['Place name alternate appellation'] +=
+          placeNameAlternateAppellation;
       }
       if (!existingLine['County'].includes(county)) {
         if (existingLine['County'] !== '') {

@@ -4,8 +4,9 @@ const fs = require('fs');
 const mimeType = require('mime-types');
 const formidable = require('formidable');
 const readXlsxFile = require('read-excel-file/node');
+const csvParser = require('csv-parser');
 const { UploadedFile } = require('./uploadedFile.ctrl');
-
+const { Job } = require('./jobs.ctrl');
 const { ARCHIVEPATH } = process.env;
 
 const parseFormDataPromise = (req) => {
@@ -23,7 +24,22 @@ const parseFormDataPromise = (req) => {
   });
 };
 
-const uploadFile = async (uploadedFile = null, hashedName = '') => {
+const uploadFilePath = (importDataLabel = null) => {
+  const date = new Date();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  let path = `${ARCHIVEPATH}imports/${year}/${month}/`;
+  if (importDataLabel !== null && importDataLabel !== '') {
+    path += `${helpers.normalizeLabelId(importDataLabel)}/`;
+  }
+  return path;
+};
+
+const uploadFile = async (
+  uploadedFile = null,
+  hashedName = '',
+  importDataLabel = null
+) => {
   if (uploadedFile === null || hashedName === '') {
     return false;
   }
@@ -32,12 +48,8 @@ const uploadFile = async (uploadedFile = null, hashedName = '') => {
   await fs.copyFileSync(uploadedFile.path, tempPath);
   uploadedFile.path = tempPath;
 
-  const date = new Date();
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
-
   const sourcePath = uploadedFile.path;
-  const newDir = `${ARCHIVEPATH}/imports/${year}/${month}/`;
+  const newDir = uploadFilePath(importDataLabel);
   const targetPath = `${newDir}${hashedName}`;
   uploadedFile.path = targetPath;
 
@@ -69,18 +81,46 @@ const deleteUploadedFile = async (_id) => {
   await file.delete();
 };
 
-const parseUploadedFile = async (path = null) => {
-  if (path === null) {
+const parseUploadedFile = async ({
+  importData = null,
+  userId = null,
+  path = null,
+  extension = 'csv',
+}) => {
+  if (importData === null || path === null) {
     return false;
   }
-  const parsedFile = readXlsxFile(path).then((rows, errors) => {
-    if (errors) {
-      return errors;
+  const fileExists = await fs.existsSync(path);
+  if (fileExists) {
+    if (extension === 'csv') {
+      const csvHeaders = await new Promise((resolve, reject) => {
+        fs.createReadStream(path)
+          .pipe(csvParser())
+          .on('error', (error) => {
+            console.log(error);
+            reject(error);
+          })
+          .on('headers', (headers) => {
+            resolve(headers);
+          });
+      });
+      importData.columns = csvHeaders;
+      importData.columnsParsed = true;
+      const updatedImport = new Import(importData);
+      updatedImport.save(userId);
     } else {
-      return rows;
+      readXlsxFile(path).then((rows, errors) => {
+        if (errors) {
+          return errors;
+        } else {
+          importData.columns = rows[0];
+          importData.columnsParsed = true;
+          const updatedImport = new Import(importData);
+          updatedImport.save(userId);
+        }
+      });
     }
-  });
-  return parsedFile;
+  }
 };
 
 class Import {
@@ -89,6 +129,9 @@ class Import {
     label = '',
     uploadedFile = null,
     uploadedFileDetails = null,
+    columns = [],
+    columnsParsed = false,
+    relations = [],
     createdBy = null,
     createdAt = null,
     updatedBy = null,
@@ -106,6 +149,9 @@ class Import {
     if (uploadedFileDetails !== null) {
       this.uploadedFileDetails = uploadedFileDetails;
     }
+    this.columns = columns;
+    this.columnsParsed = columnsParsed;
+    this.relations = relations;
     this.createdBy = createdBy;
     this.createdAt = createdAt;
     this.updatedBy = updatedBy;
@@ -141,7 +187,7 @@ class Import {
       return false;
     }
     const session = driver.session();
-    const query = `MATCH (n:Import) WHERE id(n) = ${this._id} RETURN n`;
+    const query = `MATCH (n:Import) WHERE id(n)=${this._id} RETURN n`;
     const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
@@ -191,7 +237,6 @@ class Import {
 
       const nodeProperties = helpers.prepareNodeProperties(this);
       const params = helpers.prepareParams(this);
-
       let query = '';
       if (typeof this._id === 'undefined' || this._id === null) {
         query = `CREATE (n:Import ${nodeProperties}) RETURN n`;
@@ -226,9 +271,20 @@ class Import {
 
   async delete() {
     const session = driver.session();
-    // 1. delete related files
     await this.load();
-    if (this.uploadedFile !== null) {
+    // 1. delete related directory
+    if (
+      typeof this.uploadedFileDetails !== 'undefined' &&
+      this.uploadedFileDetails !== null
+    ) {
+      const { year, month } = this.uploadedFileDetails;
+
+      if (typeof year !== 'undefined' && month !== 'undefined') {
+        const dir = `${ARCHIVEPATH}imports/${year}/${month}/${helpers.normalizeLabelId(
+          this.label
+        )}`;
+        fs.rmdirSync(dir, { recursive: true });
+      }
       await deleteUploadedFile(this.uploadedFile);
     }
 
@@ -266,13 +322,12 @@ class Import {
  * @apiParam {string} [label] A string to match against the peoples' labels.
  * @apiParam {string} [orderField=label] The field to order the results by.
  */
-
 const getImports = async (req, resp) => {
   const parameters = req.query;
   const label = parameters.label || '';
   const page = Number(parameters.page) || 1;
   const orderField = parameters.orderField || 'label';
-  const queryPage = queryPage > 0 ? page - 1 : 0;
+  const queryPage = page - 1 > 0 ? page - 1 : 0;
   const limit = Number(parameters.limit) || 25;
   let queryParams = '';
   let queryOrder = '';
@@ -397,6 +452,154 @@ const getImport = async (req, resp) => {
   });
 };
 
+const saveDatacleaning = async (item = null, userId) => {
+  if (item === null) {
+    return false;
+  }
+  const session = driver.session();
+  // timestamps
+  const now = new Date().toISOString();
+  item.updatedBy = userId;
+  item.updatedAt = now;
+  if (item.rule !== null && typeof item.rule !== 'string') {
+    item.rule = JSON.stringify(item.rule);
+  }
+
+  const nodeProperties = helpers.prepareNodeProperties(item);
+  const params = helpers.prepareParams(item);
+
+  const query = `MATCH (n:DataCleaning) WHERE id(n)=${item._id} SET n=${nodeProperties} RETURN n`;
+  const resultPromise = await session
+    .run(query, params)
+    .then((result) => {
+      session.close();
+      const records = result.records;
+      let output = {
+        error: ['The record cannot be updated'],
+        status: false,
+        data: null,
+      };
+      if (records.length > 0) {
+        const record = records[0];
+        const key = record.keys[0];
+        const recordObj = record.toObject()[key];
+        const resultRecord = helpers.outputRecord(recordObj);
+        for (let key in resultRecord) {
+          item[key] = resultRecord[key];
+        }
+        output = { error: [], status: true, data: resultRecord };
+      }
+      return output;
+    })
+    .catch((error) => console.log(error));
+  return resultPromise;
+};
+
+const copyDataCleaning = async (
+  existingImportId = null,
+  newImportId = null,
+  userId
+) => {
+  if (existingImportId === null && newImportId === null) {
+    return false;
+  }
+  const session = driver.session();
+  const queryDataCleaningInstances = `MATCH (n:DataCleaning {importId: ${existingImportId}}) RETURN n`;
+  const nodesPromise = await session
+    .writeTransaction((tx) => tx.run(queryDataCleaningInstances, {}))
+    .then((result) => {
+      return result.records;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  const existingDataCleaningInstancesNodes =
+    helpers.normalizeRecordsOutput(nodesPromise);
+  for (let i = 0; i < existingDataCleaningInstancesNodes.length; i += 1) {
+    const existingDataCleaningInstancesNode =
+      existingDataCleaningInstancesNodes[i];
+    existingDataCleaningInstancesNode._id = null;
+    existingDataCleaningInstancesNode.importId = newImportId;
+
+    // 1. save new node
+    const newInstance = saveDatacleaning(
+      existingDataCleaningInstancesNode,
+      userId
+    );
+    // copy output
+  }
+};
+
+const copy = async (copyId = null, newId = null, userId) => {
+  if (copyId === null || newId === null) {
+    return null;
+  }
+  // load existing import
+  const existingImport = new Import({ _id: copyId });
+  await existingImport.load();
+
+  // load new import
+  const newImport = new Import({ _id: newId });
+  await newImport.load();
+
+  // copy uploaded file
+  const existingUploadedFile = existingImport.uploadedFileDetails || null;
+  if (existingUploadedFile !== null) {
+    const date = new Date();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+
+    const existingPath = JSON.parse(existingUploadedFile.paths).path;
+    const newDir = uploadFilePath(newImport.label);
+    const targetPath = `${newDir}${existingUploadedFile.hashedName}`;
+
+    // extract extension from file path
+    const pathParts = existingUploadedFile.hashedName.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    const mtype = mimeType.lookup(fileName);
+    const extension = mimeType.extension(mtype);
+
+    // create file dir
+    if (!fs.existsSync(newDir)) {
+      await fs.mkdirSync(newDir, { recursive: true }, (err) => {
+        console.log(err);
+      });
+    }
+
+    // copy file to new dir
+    await fs.copyFileSync(existingPath, targetPath);
+    const newPath = {
+      path: targetPath,
+    };
+    const newUploadedFileData = {
+      filename: existingUploadedFile.filename,
+      type: existingUploadedFile.type,
+      year,
+      month,
+      hashedName: existingUploadedFile.hashedName,
+      paths: [JSON.stringify(newPath)],
+      label: existingUploadedFile.label,
+    };
+    const newUploadedFile = new UploadedFile(newUploadedFileData);
+    const newFile = await newUploadedFile.save(userId);
+    // expand file columns
+    await parseUploadedFile({
+      importData: newImport,
+      userId,
+      path: targetPath,
+      extension,
+    });
+    const { _id: fileId } = newFile.data;
+    newImport.uploadedFile = fileId;
+    await newImport.save(userId);
+
+    // copy data cleaning
+    copyDataCleaning(existingImport._id, newImport.data._id, userId);
+  }
+
+  return existingImport;
+};
+
 /**
  * @api {put} /import Put import
  * @apiName put import
@@ -417,10 +620,17 @@ const putImport = async (req, resp) => {
     });
     return false;
   }
-  const { _id, label } = postData;
+  const { _id, label, copyId } = postData;
   const userId = req.decoded.id;
   const importData = new Import({ _id, label });
   const output = await importData.save(userId);
+  if (
+    typeof _id === 'undefined' &&
+    typeof copyId !== 'undefined' &&
+    copyId !== null
+  ) {
+    await copy(copyId, output.data._id, userId);
+  }
   resp.json(output);
 };
 
@@ -477,7 +687,12 @@ const deleteImportFile = async (req, resp) => {
   }
   const importData = new Import({ _id });
   await importData.load();
+  // delete file
   await deleteUploadedFile(importData.uploadedFile);
+
+  // delete job
+  const relatedJob = new Job({ relId: importData.uploadedFile });
+  await relatedJob.delete();
 
   importData.uploadedFile = null;
   importData.uploadedFileDetails = null;
@@ -503,6 +718,7 @@ Content-Type: image/jpeg
 */
 const uploadedFile = async (req, resp) => {
   const data = await parseFormDataPromise(req);
+  const userId = req.decoded.id;
   if (Object.keys(data.file).length === 0) {
     resp.json({
       status: false,
@@ -526,11 +742,16 @@ const uploadedFile = async (req, resp) => {
   await importData.load();
   if (importData.uploadedFile !== null) {
     await deleteUploadedFile(importData.uploadedFile);
+    if (importData.columnsParsed) {
+      importData.columnsParsed = false;
+      const updatedImport = new Import(importData);
+      await updatedImport.save(userId);
+    }
   }
 
-  const { file: uploadedFile } = data.file;
+  const { file: uploadedFileDetails } = data.file;
   const allowedExtensions = ['csv', 'xls', 'xlsx'];
-  const extension = mimeType.extension(uploadedFile.type);
+  const extension = mimeType.extension(uploadedFileDetails.type);
 
   if (allowedExtensions.indexOf(extension) === -1) {
     const output = {
@@ -543,29 +764,151 @@ const uploadedFile = async (req, resp) => {
     };
     return resp.json(output);
   }
-  const hashedName = `${helpers.hashFileName(uploadedFile.name)}.${extension}`;
+  const hashedName = `${helpers.hashFileName(
+    uploadedFileDetails.name
+  )}.${extension}`;
 
   // upload file
-  await uploadFile(uploadedFile, hashedName);
+  const importDataLabel = importData.label || null;
+  await uploadFile(uploadedFileDetails, hashedName, importDataLabel);
   const date = new Date();
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
+  const newDir = uploadFilePath(importDataLabel);
+  const targetPath = `${newDir}${hashedName}`;
 
   // store file reference to the db
-  const userId = req.decoded.id;
   const postData = {
-    filename: uploadedFile.name,
+    filename: uploadedFileDetails.name,
     year: year,
     month: month,
     hashedName: hashedName,
     type: 'import',
+    paths: [JSON.stringify({ path: targetPath })],
   };
   const newFile = new UploadedFile(postData);
   const output = await newFile.save(userId);
-  output.rows = await parseUploadedFile(output.paths[0].path);
+  output.rows = await parseUploadedFile({
+    importData,
+    userId,
+    path: targetPath,
+    extension,
+  });
+  console.log(importData);
   const { _id: fileId } = output.data;
   importData.uploadedFile = fileId;
   await importData.save(userId);
+  resp.json(output);
+};
+
+/**
+ * @api {put} /import-plan-relation Put import plan relation
+ * @apiName put import plan relation
+ * @apiGroup Imports
+ * @apiPermission admin
+ *
+ * @apiParam {String} importId The _id of the import.
+ * @apiParam {Number} index The index of the relation in the relations list. -1 for new relations.
+ * @apiParam {Object} relation An object that contains the relation data.
+ * @apiParamExample {json} Request-Example:
+ *  {
+ *    importId: "96991",
+ *    index: -1,
+ *    relation: {
+ *      relationLabel: "hasAffiliation",
+ *      srcId: "96995",
+ *      srcType: "Person",
+ *      targetId: "96994",
+ *      targetType: "Organisation"
+ *    }
+ *  }
+ */
+const putImportPlanRelation = async (req, resp) => {
+  const postData = req.body;
+  const { importId, index, relation } = postData;
+  if (
+    typeof importId === 'undefined' ||
+    importId === '' ||
+    typeof index === 'undefined' ||
+    index === '' ||
+    typeof relation === 'undefined'
+  ) {
+    let errorMsg = '';
+    if (typeof importId === 'undefined' || importId === '') {
+      errorMsg = 'The importId must not be empty';
+    }
+    if (typeof index === 'undefined' || index === '') {
+      errorMsg = 'The index must not be empty';
+    }
+    if (typeof relation === 'undefined') {
+      errorMsg = 'The relation must not be empty';
+    }
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: errorMsg,
+    });
+    return false;
+  }
+  const userId = req.decoded.id;
+  const importData = new Import({ _id: importId });
+  await importData.load();
+  const relations = importData.relations || [];
+  if (index === -1) {
+    relations.push(JSON.stringify(relation));
+  } else {
+    relations[index] = JSON.stringify(relation);
+  }
+  const output = await importData.save(userId);
+  resp.json(output);
+};
+
+/**
+ * @api {delete} /import-plan-relation Delete import plan relation
+ * @apiName delete import plan relation
+ * @apiGroup Imports
+ * @apiPermission admin
+ *
+ * @apiParam {String} importId The _id of the import.
+ * @apiParam {Number} index The index of the relation in the relations list.
+ * @apiParamExample {json} Request-Example:
+ *  {
+ *    importId: "96991",
+ *    index: 0,
+ *  }
+ */
+const deleteImportPlanRelation = async (req, resp) => {
+  const postData = req.body;
+  const { importId, index } = postData;
+  if (
+    typeof importId === 'undefined' ||
+    importId === '' ||
+    typeof index === 'undefined' ||
+    index === ''
+  ) {
+    let errorMsg = '';
+    if (typeof importId === 'undefined' || importId === '') {
+      errorMsg = 'The importId must not be empty';
+    }
+    if (typeof index === 'undefined' || index === '') {
+      errorMsg = 'The index must not be empty';
+    }
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: errorMsg,
+    });
+    return false;
+  }
+  const userId = req.decoded.id;
+  const importData = new Import({ _id: importId });
+  await importData.load();
+  const relations = importData.relations || [];
+  relations.splice(index, 1);
+  importData.relations = relations;
+  const output = await importData.save(userId);
   resp.json(output);
 };
 
@@ -577,4 +920,6 @@ module.exports = {
   deleteImport,
   deleteImportFile,
   uploadedFile,
+  putImportPlanRelation,
+  deleteImportPlanRelation
 };

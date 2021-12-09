@@ -273,48 +273,48 @@ const loadRelations = async (
   if (srcId === null || srcType === null) {
     return false;
   }
-  let session = driver.session();
-  let r = 'r';
-  let orderBy = 'ORDER BY id(r)';
-  if (sort !== null) {
-    orderBy = `ORDER BY ${sort}`;
-  }
-  if (relType !== null) {
-    r = `r:${relType}`;
-  }
+  const session = driver.session();
+  const r = relType !== null ? `r:${relType}` : 'r';
+  const orderBy = sort !== null ? `ORDER BY ${sort}` : 'ORDER BY id(r)';
   let query = `MATCH (n:${srcType})-[${r}]->(rn) WHERE id(n)=${srcId} return n, r, rn ${orderBy}`;
   if (status) {
-    query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
+    const sourceStatus =
+      srcType !== 'Temporal' && srcType !== 'Spatial'
+        ? `AND n.status='public'`
+        : '';
+    query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} ${sourceStatus}
     OPTIONAL MATCH (n)-[${r}]->(rn) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
   }
   if (targetType !== null) {
     query = `MATCH (n:${srcType})-[${r}]->(rn:${targetType}) WHERE id(n)=${srcId} return n, r, rn ORDER BY id(r)`;
-    if (status && targetType !== 'Temporal' && targetType !== 'Spatial') {
-      query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
-      OPTIONAL MATCH (n)-[${r}]->(rn:${targetType}) WHERE rn.status='public' return n, r, rn ${orderBy}`;
-    } else if (
-      status &&
-      (targetType === 'Temporal' || targetType !== 'Spatial')
-    ) {
-      query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
-      OPTIONAL MATCH (n)-[${r}]->(rn:${targetType}) return n, r, rn ${orderBy}`;
+    if (status) {
+      const sourceStatus =
+        srcType !== 'Temporal' && srcType !== 'Spatial'
+          ? `AND n.status='public'`
+          : '';
+      const targetStatus =
+        targetType !== 'Temporal' && targetType !== 'Spatial'
+          ? `WHERE rn.status='public'`
+          : '';
+      query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} ${sourceStatus}
+      OPTIONAL MATCH (n)-[${r}]->(rn:${targetType}) ${targetStatus} return n, r, rn ${orderBy}`;
     }
   }
-  let relations = await session
+  const relations = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then(async (result) => {
       session.close();
-      let records = result.records;
-      let relations = [];
+      const records = result.records;
+      const relations = [];
       for (let key in records) {
-        let record = records[key].toObject();
-        let sourceItem = outputRecord(record.n);
-        let relation = record.r;
+        const record = records[key].toObject();
+        const sourceItem = outputRecord(record.n);
+        const relation = record.r;
         prepareOutput(relation);
         let targetItem = null;
         if (record.rn !== null) {
           targetItem = outputRecord(record.rn);
-          let newRelation = await prepareRelation(
+          const newRelation = await prepareRelation(
             sourceItem,
             relation,
             targetItem
@@ -515,33 +515,99 @@ const msToTime = (s) => {
   return `${hrs}:${mins}:${secs}.${ms}`;
 };
 
+// temporal functions
+const getDaysInMonth = (m, y) => {
+  return new Date(y, m + 1, 0).getDate();
+};
+
+const splitMultiString = (value = '') => {
+  if (typeof value === 'string' && value !== '' && value.includes(';')) {
+    return value.split(';');
+  }
+  return [value];
+};
+
+const prepareDate = (date) => {
+  if (date === null) {
+    return null;
+  }
+  const parts = date.split(' - ');
+  const start = parts[0].trim();
+  const sParts = start.split('-');
+  let sy = sParts[0];
+  let sm = sParts[1];
+  let sd = sParts[2];
+  if (sy.includes('c.')) {
+    sy = sy.replace('c.', '');
+  }
+  if (sm === '??') {
+    sm = `01`;
+  }
+  if (sd === '??') {
+    sd = `01`;
+  }
+  const startDate = `${sd}-${sm}-${sy}`;
+  let endDate = null;
+  if (parts.length === 1) {
+    const lm = sParts[1] !== '??' ? sm : '12';
+    const ld = getDaysInMonth(lm, sy);
+    endDate = `${ld}-${lm}-${sy}`;
+  }
+  if (parts.length > 1) {
+    const lParts = parts[1].trim().split('-');
+    let ly = lParts[0];
+    let lm = lParts[1];
+    let ld = lParts[2];
+    if (ly.includes('c.')) {
+      ly = ly.replace('c.', '');
+    }
+    if (lm === '??') {
+      lm = `12`;
+    }
+    if (ld === '??') {
+      ld = getDaysInMonth(lm, ly);
+    }
+    endDate = `${ld}-${sm}-${sy}`;
+  }
+  let label = '';
+  if (!date.includes('?')) {
+    label = date;
+  } else {
+    label = date.replace(/-\?\?/g, '');
+  }
+  return { startDate, endDate, label };
+};
+
 module.exports = {
-  soundex: soundex,
-  hashFileName: hashFileName,
-  imageIptc: imageIptc,
-  imageExif: imageExif,
-  imgDimensions: imgDimensions,
-  prepareNodeProperties: prepareNodeProperties,
-  prepareOutput: prepareOutput,
-  prepareParams: prepareParams,
-  normalizeRecordsOutput: normalizeRecordsOutput,
-  normalizeGraphRecordsOutput: normalizeGraphRecordsOutput,
-  normalizeRelationsOutput: normalizeRelationsOutput,
-  readJSONFile: readJSONFile,
-  outputRecord: outputRecord,
-  outputRelation: outputRelation,
-  outputPaths: outputPaths,
-  normalizeLabelId: normalizeLabelId,
-  lowerCaseOnlyFirst: lowerCaseOnlyFirst,
-  capitalCaseOnlyFirst: capitalCaseOnlyFirst,
-  isUpperCase: isUpperCase,
-  loadRelations: loadRelations,
-  parseRequestData: parseRequestData,
-  escapeRegExp: escapeRegExp,
-  prepareRelation: prepareRelation,
-  addslashes: addslashes,
-  stripslashes: stripslashes,
-  temporalEvents: temporalEvents,
-  eventsFromTypes: eventsFromTypes,
-  msToTime: msToTime,
+  soundex,
+  hashFileName,
+  imageIptc,
+  imageExif,
+  imgDimensions,
+  prepareNodeProperties,
+  prepareOutput,
+  prepareParams,
+  normalizeRecordsOutput,
+  normalizeGraphRecordsOutput,
+  normalizeRelationsOutput,
+  readJSONFile,
+  outputRecord,
+  outputRelation,
+  outputPaths,
+  normalizeLabelId,
+  lowerCaseOnlyFirst,
+  capitalCaseOnlyFirst,
+  isUpperCase,
+  loadRelations,
+  parseRequestData,
+  escapeRegExp,
+  prepareRelation,
+  addslashes,
+  stripslashes,
+  temporalEvents,
+  eventsFromTypes,
+  msToTime,
+  getDaysInMonth,
+  splitMultiString,
+  prepareDate,
 };

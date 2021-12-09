@@ -891,6 +891,252 @@
   },
   {
     "type": "delete",
+    "url": "/data-cleaning-instance",
+    "title": "Get Data cleaning / disambiguation",
+    "name": "delete_data-cleaning_instance",
+    "group": "DataCleanings",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the data cleaning instance for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dataCleaning.ctrl.js",
+    "groupTitle": "DataCleanings"
+  },
+  {
+    "type": "get",
+    "url": "/data-cleaning",
+    "title": "Get Data cleaning / disambiguation",
+    "name": "get_data-cleaning",
+    "group": "DataCleanings",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>A unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the data cleaning / disambiguations labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "type",
+            "description": "<p>A string to match against the data cleaning / disambiguations type.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "importId",
+            "description": "<p>A string to match against the data cleaning / disambiguation related _id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "completed",
+            "description": "<p>The jobs' status.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "_id",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n  \"status\": true,\n  \"data\": [],\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dataCleaning.ctrl.js",
+    "groupTitle": "DataCleanings"
+  },
+  {
+    "type": "get",
+    "url": "/data-cleaning-instance",
+    "title": "Get Data cleaning / disambiguation",
+    "name": "get_data-cleaning_instance",
+    "group": "DataCleanings",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested data cleaning instance.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dataCleaning.ctrl.js",
+    "groupTitle": "DataCleanings"
+  },
+  {
+    "type": "get",
+    "url": "/data-cleaning-unique",
+    "title": "Get Data cleaning / disambiguation unique values",
+    "name": "get_data-cleaning_unique_values",
+    "group": "DataCleanings",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested import.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\"error\":[],\"status\":true,\"data\":{\"createdAt\":\"2021-11-09T12:13:46.110Z\",\"updatedBy\":\"53930\",\"importId\":\"93912\",\"createdBy\":\"53930\",\"rule\":\"{\\\"type\\\":\\\"unique\\\",\\\"columns\\\":[{\\\"value\\\":8,\\\"label\\\":\\\"[I] Diocese\\\"}],\\\"entityType\\\":\\\"\\\"}\",\"_id\":\"93958\",\"label\":\"date unique\",\"completed\":false,\"type\":\"unique\",\"updatedAt\":\"2021-11-09T12:14:03.991Z\"}}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dataCleaning.ctrl.js",
+    "groupTitle": "DataCleanings"
+  },
+  {
+    "type": "get",
+    "url": "/data-cleaning-db-entries",
+    "title": "Get Data cleaning / disambiguation compare with values",
+    "name": "get_data-cleaning_unique_values",
+    "group": "DataCleanings",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested import.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n  \"status\": true,\n  \"data\": [\n    [null, \"O'Byrne\", \"O'Beirne\", \"Denis\", \"Dionysius\", \"Latin\", null, null,  null, null, null, null, null, null, \"L. W. B. Brockliss and Patrick Ferté (eds), 'Prosopography of Irish Clerics in the Universities of Paris and Toulouse, 1573-1792'\"],\n    [null, \"Brady\", null, \"Philip\", \"Philippus\", \"Latin\", null, null, \"Kilmore\", 737, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, \"University of Paris\", \"Paris\", null, null, null, null, null, null, null, \"Faculty of Law\", \"1703-10-??\", null, \"Bachelors in Canon Law\", \"1704-12-12\", \"Licentiate in Canon Law\", \"1705-08-29\", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, \"L. W. B. Brockliss and Patrick Ferté (eds), 'Prosopography of Irish Clerics in the Universities of Paris and Toulouse, 1573-1792'\"],\n  ],\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dataCleaning.ctrl.js",
+    "groupTitle": "DataCleanings"
+  },
+  {
+    "type": "put",
+    "url": "/data-cleaning-instance",
+    "title": "Put Data cleaning /",
+    "name": "put_data-cleaning_instance",
+    "group": "DataCleanings",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the import. This should be undefined|null|blank in the creation of a new import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>The label of the new import.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dataCleaning.ctrl.js",
+    "groupTitle": "DataCleanings"
+  },
+  {
+    "type": "delete",
     "url": "/entity",
     "title": "Delete entity",
     "name": "delete_entity",
@@ -1299,10 +1545,24 @@
         "Parameter": [
           {
             "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>An event unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "string",
             "optional": true,
             "field": "label",
             "description": "<p>A string to match against the events labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "eventType",
+            "optional": true,
+            "field": "eventType",
+            "description": "<p>An eventType _id .</p>"
           },
           {
             "group": "Parameter",
@@ -1524,6 +1784,455 @@
     "version": "0.0.0",
     "filename": "src/controllers/event.ctrl.js",
     "groupTitle": "Events"
+  },
+  {
+    "type": "delete",
+    "url": "/import-rule",
+    "title": "Delete import rule",
+    "name": "delete_import_rule",
+    "group": "Import_rules",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import rule for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importRules.ctrl.js",
+    "groupTitle": "Import_rules"
+  },
+  {
+    "type": "get",
+    "url": "/import-rule",
+    "title": "Get import rule",
+    "name": "get_import_rule",
+    "group": "Import_rules",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested import rule.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importRules.ctrl.js",
+    "groupTitle": "Import_rules"
+  },
+  {
+    "type": "get",
+    "url": "/import-rules",
+    "title": "Get import rules",
+    "name": "get_import_rules",
+    "group": "Import_rules",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "importId",
+            "description": "<p>An import unique _id.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importRules.ctrl.js",
+    "groupTitle": "Import_rules"
+  },
+  {
+    "type": "put",
+    "url": "/import-rule",
+    "title": "Put import rule",
+    "name": "put_import_rule",
+    "group": "Import_rules",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the import rule. This should be undefined|null|blank in the creation of a new import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>The label of the new import rule.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "rule",
+            "description": "<p>An array containing the import rule details.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "importId",
+            "description": "<p>The _id of the an associated import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "completed",
+            "description": "<p>If the rule execution has completed or not.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importRules.ctrl.js",
+    "groupTitle": "Import_rules"
+  },
+  {
+    "type": "delete",
+    "url": "/import",
+    "title": "Delete import",
+    "name": "delete_import",
+    "group": "Imports",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/import.ctrl.js",
+    "groupTitle": "Imports"
+  },
+  {
+    "type": "delete",
+    "url": "/import-file-delete",
+    "title": "Delete import file",
+    "name": "delete_import_file",
+    "group": "Imports",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import file for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/import.ctrl.js",
+    "groupTitle": "Imports"
+  },
+  {
+    "type": "get",
+    "url": "/imports",
+    "title": "Get imports",
+    "name": "get_imports",
+    "group": "Imports",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>A unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the peoples' labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "label",
+            "description": "<p>The field to order the results by.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/import.ctrl.js",
+    "groupTitle": "Imports"
+  },
+  {
+    "type": "put",
+    "url": "/import",
+    "title": "Put import",
+    "name": "put_import",
+    "group": "Imports",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the import. This should be undefined|null|blank in the creation of a new import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "label",
+            "description": "<p>The label of the new import.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/import.ctrl.js",
+    "groupTitle": "Imports"
+  },
+  {
+    "type": "put",
+    "url": "/import-plan-relation",
+    "title": "Put import plan relation",
+    "name": "put_import_plan_relation",
+    "group": "Imports",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "importId",
+            "description": "<p>The _id of the import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "Number",
+            "optional": false,
+            "field": "index",
+            "description": "<p>The index of the relation in the relations list. -1 for new relations.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "Object",
+            "optional": false,
+            "field": "relation",
+            "description": "<p>An object that contains the relation data.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Request-Example:",
+          "content": "{\n  importId: \"96991\",\n  index: -1,\n  relation: {\n    relationLabel: \"hasAffiliation\",\n    srcId: \"96995\",\n    srcType: \"Person\",\n    targetId: \"96994\",\n    targetType: \"Organisation\"\n  }\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/import.ctrl.js",
+    "groupTitle": "Imports"
+  },
+  {
+    "type": "post",
+    "url": "/import-file-upload",
+    "title": "Upload file to an import",
+    "name": "upload_file_to_an_import",
+    "group": "Imports",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "formData",
+            "optional": true,
+            "field": "file",
+            "description": "<p>A form data object with the name &quot;file&quot; containing the filename and the file blob.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "Content-Disposition: form-data; name=\"file\"; filename=\"some-file.csv\"\nContent-Type: image/jpeg",
+        "type": "formData"
+      }
+    ],
+    "version": "0.0.0",
+    "filename": "src/controllers/import.ctrl.js",
+    "groupTitle": "Imports"
+  },
+  {
+    "type": "get",
+    "url": "/jobs",
+    "title": "Get jobs",
+    "name": "get_jobs",
+    "group": "Jobs",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>A unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the jobs' labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "type",
+            "description": "<p>A string to match against the jobs' type.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "relId",
+            "description": "<p>A string to match against the jobs' related _id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "completed",
+            "description": "<p>The jobs' status.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "_id",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n  \"status\": true,\n  \"data\": [],\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/jobs.ctrl.js",
+    "groupTitle": "Jobs"
   },
   {
     "type": "get",
@@ -2184,6 +2893,13 @@
         "Parameter": [
           {
             "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>A unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "string",
             "optional": true,
             "field": "label",
@@ -2498,6 +3214,13 @@
     "parameter": {
       "fields": {
         "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>A unique _id.</p>"
+          },
           {
             "group": "Parameter",
             "type": "string",
@@ -3362,6 +4085,13 @@
         "Parameter": [
           {
             "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>An unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "string",
             "optional": true,
             "field": "label",
@@ -3373,6 +4103,13 @@
             "optional": true,
             "field": "systemType",
             "description": "<p>A system type id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "resourceType",
+            "description": "<p>A resource Type label.</p>"
           },
           {
             "group": "Parameter",
@@ -4363,6 +5100,13 @@
         "Parameter": [
           {
             "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>A unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
             "type": "string",
             "optional": true,
             "field": "label",
@@ -4372,8 +5116,22 @@
             "group": "Parameter",
             "type": "string",
             "optional": true,
+            "field": "country",
+            "description": "<p>A country to match against the spatials' countries.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "locationType",
+            "description": "<p>A locationType to match against the spatials' locationTypes.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
             "field": "orderField",
-            "defaultValue": "firstName",
+            "defaultValue": "label",
             "description": "<p>The field to order the results by.</p>"
           },
           {
@@ -5898,8 +6656,15 @@
             "group": "Parameter",
             "type": "string",
             "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the usergroup's label.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
             "field": "orderField",
-            "defaultValue": "firstName",
+            "defaultValue": "label",
             "description": "<p>The field to order the results by.</p>"
           },
           {
@@ -6102,6 +6867,13 @@
             "group": "Parameter",
             "type": "string",
             "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the users' first and last name.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
             "field": "orderField",
             "defaultValue": "firstName",
             "description": "<p>The field to order the results by.</p>"
@@ -6129,6 +6901,13 @@
             "field": "limit",
             "defaultValue": "25",
             "description": "<p>The number of results per page</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "usergroup",
+            "optional": true,
+            "field": "string",
+            "description": "<p>A string with the label of the corresponding usergroup</p>"
           }
         ]
       }
@@ -6272,5 +7051,28 @@
     "version": "0.0.0",
     "filename": "src/controllers/user.ctrl.js",
     "groupTitle": "Users"
+  },
+  {
+    "type": "get",
+    "url": "/import",
+    "title": "Get import",
+    "name": "get_import",
+    "group": "imports",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested import.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/import.ctrl.js",
+    "groupTitle": "imports"
   }
 ]
