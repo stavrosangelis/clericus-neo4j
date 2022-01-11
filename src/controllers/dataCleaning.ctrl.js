@@ -10,7 +10,7 @@ const {
   prepareParams,
   splitMultiString,
 } = require('../helpers');
-const { Import } = require('./import.ctrl');
+const { ImportPlan } = require('./importPlan.ctrl');
 const mimeType = require('mime-types');
 const readXlsxFile = require('read-excel-file/node');
 const csvParser = require('csv-parser');
@@ -593,7 +593,7 @@ const getUnique = async (req, resp) => {
   const instance = new DataCleaning({ _id });
   await instance.load();
 
-  const importData = new Import({ _id: instance.importId });
+  const importData = new ImportPlan({ _id: instance.importId });
   await importData.load();
 
   const paths = importData.uploadedFileDetails.paths[0];
@@ -764,7 +764,7 @@ const getDBentries = async (req, resp) => {
   const instance = new DataCleaning({ _id });
   await instance.load();
 
-  const importData = new Import({ _id: instance.importId });
+  const importData = new ImportPlan({ _id: instance.importId });
   await importData.load();
 
   const paths = importData.uploadedFileDetails.paths[0];

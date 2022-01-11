@@ -106,18 +106,19 @@ class Resource {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Resource) WHERE id(n)=' + this._id + ' return n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Resource) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
           return outputRecord;
         }
+        return null;
       })
       .catch((error) => {
         console.log(error);
@@ -150,14 +151,14 @@ class Resource {
     }
 
     // relations
-    let events = await helpers.loadRelations(this._id, 'Resource', 'Event');
-    let organisations = await helpers.loadRelations(
+    const events = await helpers.loadRelations(this._id, 'Resource', 'Event');
+    const organisations = await helpers.loadRelations(
       this._id,
       'Resource',
       'Organisation'
     );
-    let people = await helpers.loadRelations(this._id, 'Resource', 'Person');
-    let resources = await helpers.loadRelations(
+    const people = await helpers.loadRelations(this._id, 'Resource', 'Person');
+    const resources = await helpers.loadRelations(
       this._id,
       'Resource',
       'Resource'
@@ -166,6 +167,55 @@ class Resource {
     this.organisations = organisations;
     this.people = people;
     this.resources = resources;
+  }
+
+  async loadUnpopulated() {
+    if (this._id === null) {
+      return false;
+    }
+    const session = driver.session();
+    const query = `MATCH (n:Resource) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        const { records } = result;
+        if (records.length > 0) {
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    for (let key in node) {
+      this[key] = node[key];
+      if (key === 'paths' && node[key].length > 0) {
+        let paths = [];
+        for (let akey in node[key]) {
+          let path = JSON.parse(node[key][akey]);
+          paths.push(path);
+        }
+        this[key] = paths;
+      }
+      if (key === 'metadata') {
+        let metadata = JSON.parse(node[key]);
+        if (typeof metadata === 'string') {
+          metadata = JSON.parse(metadata);
+        }
+        this.metadata = metadata;
+      }
+      if (key === 'alternateLabels' && node[key].length > 0) {
+        let newAlternateLabels = [];
+        for (let akey in node[key]) {
+          let alternateLabel = JSON.parse(node[key][akey]);
+          newAlternateLabels.push(alternateLabel);
+        }
+        this[key] = newAlternateLabels;
+      }
+    }
   }
 
   async save(userId) {
@@ -220,7 +270,7 @@ class Resource {
           nodeProperties +
           ' RETURN n';
       }
-      let resultPromise = await session.run(query, params).then((result) => {
+      const resultPromise = await session.run(query, params).then((result) => {
         session.close();
         let records = result.records;
         let output = {

@@ -63,18 +63,19 @@ class Spatial {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Spatial) WHERE id(n)=' + this._id + ' return n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Spatial) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
           return outputRecord;
-        } else return {};
+        }
+        return null;
       })
       .catch((error) => {
         console.log(error);
@@ -83,14 +84,40 @@ class Spatial {
       this[key] = node[key];
     }
     // relations
-    let events = await helpers.loadRelations(this._id, 'Spatial', 'Event');
-    let organisations = await helpers.loadRelations(
+    const events = await helpers.loadRelations(this._id, 'Spatial', 'Event');
+    const organisations = await helpers.loadRelations(
       this._id,
       'Spatial',
       'Organisation'
     );
     this.events = events;
     this.organisations = organisations;
+  }
+
+  async loadUnpopulated() {
+    if (this._id === null) {
+      return false;
+    }
+    const session = driver.session();
+    const query = `MATCH (n:Spatial) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        const { records } = result;
+        if (records.length > 0) {
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+        return null;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    for (let key in node) {
+      this[key] = node[key];
+    }
   }
 
   async countRelations() {

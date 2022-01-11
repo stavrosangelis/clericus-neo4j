@@ -13,7 +13,7 @@ class ImportRule {
     _id = null,
     label = null,
     rule = null,
-    importId = null,
+    importPlanId = null,
     completed = false,
     createdBy = null,
     createdAt = null,
@@ -27,7 +27,7 @@ class ImportRule {
       this.label = label.trim();
     }
     this.rule = rule;
-    this.importId = importId;
+    this.importPlanId = importPlanId;
     this.completed = completed;
     this.createdBy = createdBy;
     this.createdAt = createdAt;
@@ -211,13 +211,13 @@ const getQuery = async (query, queryParams, limit) => {
  * @apiName get import rules
  * @apiGroup Import rules
  *
- * @apiParam {_id} [importId] An import unique _id.
+ * @apiParam {importPlanId} [_id] An import unique _id.
  */
 const getImportRules = async (req, resp) => {
   const parameters = req.query;
   const _id = parameters._id || null;
   const label = parameters.label || null;
-  const importId = parameters.importId || null;
+  const importPlanId = parameters.importPlanId || null;
   const completed = parameters.completed || null;
   const orderField = parameters.orderField || 'createdAt';
   const orderDesc = parameters.orderDesc || null;
@@ -233,11 +233,11 @@ const getImportRules = async (req, resp) => {
     if (label !== null && label !== '') {
       queryParams += `toLower(n.label) =~ toLower('.*${addslashes(label)}.*') `;
     }
-    if (importId !== null && importId !== '') {
+    if (importPlanId !== null && importPlanId !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams += `n.importId = "${importId}" `;
+      queryParams += `n.importPlanId = "${importPlanId}" `;
     }
     if (completed !== null && completed !== '') {
       if (queryParams !== '') {
@@ -322,7 +322,7 @@ const getImportRule = async (req, resp) => {
  * @apiParam {string} [_id] The _id of the import rule. This should be undefined|null|blank in the creation of a new import.
  * @apiParam {string} [label] The label of the new import rule.
  * @apiParam {array} [rule] An array containing the import rule details.
- * @apiParam {string} [importId] The _id of the an associated import.
+ * @apiParam {string} [importPlanId] The _id of the an associated import.
  * @apiParam {boolean} [completed] If the rule execution has completed or not.
  */
 const putImportRule = async (req, resp) => {

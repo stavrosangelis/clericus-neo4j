@@ -58,19 +58,31 @@ class Person {
 
   personLabel(props) {
     let label = '';
-    if (props.firstName !== null) {
+    if (
+      typeof props.firstName !== 'undefined' &&
+      props.firstName !== null &&
+      props.firstName !== ''
+    ) {
       if (label !== '') {
         label += ' ';
       }
       label += props.firstName.trim();
     }
-    if (props.middleName !== null) {
+    if (
+      typeof props.middleName !== 'undefined' &&
+      props.middleName !== null &&
+      props.middleName !== ''
+    ) {
       if (label !== '') {
         label += ' ';
       }
       label += props.middleName.trim();
     }
-    if (props.lastName !== null) {
+    if (
+      typeof props.lastName !== 'undefined' &&
+      props.lastName !== null &&
+      props.lastName !== ''
+    ) {
       if (label !== '') {
         label += ' ';
       }
@@ -82,11 +94,16 @@ class Person {
 
   normalizeAppelations(alternateAppelations) {
     let appelations = alternateAppelations.map((appelation) => {
+      const {
+        firstName = null,
+        middleName = null,
+        lastName = null,
+      } = appelation;
       if (appelation.label === '') {
         appelation.label = this.personLabel({
-          firstName: appelation.firstName,
-          middleName: appelation.middleName,
-          lastName: appelation.lastName,
+          firstName,
+          middleName,
+          lastName,
         });
       }
       return appelation;
@@ -215,18 +232,19 @@ class Person {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Person) WHERE id(n)=' + this._id + ' return n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Person) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
           return outputRecord;
         }
+        return null;
       })
       .catch((error) => {
         console.log(error);
@@ -243,14 +261,18 @@ class Person {
       }
     }
     // relations
-    let events = await helpers.loadRelations(this._id, 'Person', 'Event');
-    let organisations = await helpers.loadRelations(
+    const events = await helpers.loadRelations(this._id, 'Person', 'Event');
+    const organisations = await helpers.loadRelations(
       this._id,
       'Person',
       'Organisation'
     );
-    let people = await helpers.loadRelations(this._id, 'Person', 'Person');
-    let resources = await helpers.loadRelations(this._id, 'Person', 'Resource');
+    const people = await helpers.loadRelations(this._id, 'Person', 'Person');
+    const resources = await helpers.loadRelations(
+      this._id,
+      'Person',
+      'Resource'
+    );
     this.events = events;
     this.organisations = organisations;
     this.people = people;
@@ -299,12 +321,15 @@ class Person {
       let newAppelations = [];
       if (this.alternateAppelations.length > 0) {
         for (let key in this.alternateAppelations) {
-          const alternateAppelation = this.alternateAppelations[key];
+          let alternateAppelation = this.alternateAppelations[key];
           if (
             typeof alternateAppelation.appelation === 'undefined' ||
             alternateAppelation.appelation === ''
           ) {
             let newAltAppelation = '';
+            if (typeof alternateAppelation === 'string') {
+              alternateAppelation = JSON.parse(alternateAppelation);
+            }
             if (
               alternateAppelation.firstName !== 'undefined' &&
               alternateAppelation.firstName !== ''

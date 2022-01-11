@@ -49,16 +49,16 @@ class Event {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Event) WHERE id(n)=' + this._id + ' RETURN n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Event) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result || [];
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
           return outputRecord;
         }
       });
@@ -68,22 +68,49 @@ class Event {
     }
 
     // relations
-    let events = await helpers.loadRelations(this._id, 'Event', 'Event');
-    let organisations = await helpers.loadRelations(
+    const events = await helpers.loadRelations(this._id, 'Event', 'Event');
+    const organisations = await helpers.loadRelations(
       this._id,
       'Event',
       'Organisation'
     );
-    let people = await helpers.loadRelations(this._id, 'Event', 'Person');
-    let resources = await helpers.loadRelations(this._id, 'Event', 'Resource');
-    let temporal = await helpers.loadRelations(this._id, 'Event', 'Temporal');
-    let spatial = await helpers.loadRelations(this._id, 'Event', 'Spatial');
+    const people = await helpers.loadRelations(this._id, 'Event', 'Person');
+    const resources = await helpers.loadRelations(
+      this._id,
+      'Event',
+      'Resource'
+    );
+    const temporal = await helpers.loadRelations(this._id, 'Event', 'Temporal');
+    const spatial = await helpers.loadRelations(this._id, 'Event', 'Spatial');
     this.events = events;
     this.organisations = organisations;
     this.people = people;
     this.resources = resources;
     this.temporal = temporal;
     this.spatial = spatial;
+  }
+
+  async loadUnpopulated() {
+    if (this._id === null) {
+      return false;
+    }
+    const session = driver.session();
+    const query = `MATCH (n:Event) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        const { records } = result || [];
+        if (records.length > 0) {
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
+          return outputRecord;
+        }
+      });
+    // assign results to class values
+    for (let key in node) {
+      this[key] = node[key];
+    }
   }
 
   async save(userId) {
@@ -105,7 +132,6 @@ class Event {
       }
       this.updatedBy = userId;
       this.updatedAt = now;
-
       let nodeProperties = helpers.prepareNodeProperties(this);
       let params = helpers.prepareParams(this);
 
@@ -428,7 +454,7 @@ const getEvent = async (req, resp) => {
 {"status":true,"data":{"createdAt":"2020-01-14T14:48:31.753Z","updatedBy":"260","createdBy":"260","description":"test event descriptiomn","label":"Test event","eventType":"293","updatedAt":"2020-01-14T14:48:31.753Z","_id":"2255"},"error":[],"msg":"Query results"}
 */
 const putEvent = async (req, resp) => {
-  let postData = req.body;
+  const postData = req.body;
   if (Object.keys(postData).length === 0) {
     resp.json({
       status: false,
@@ -438,13 +464,14 @@ const putEvent = async (req, resp) => {
     });
     return false;
   }
-  let userId = req.decoded.id;
-  let event = new Event(postData);
-  let output = await event.save(userId);
+  const userId = req.decoded.id;
+  const event = new Event(postData);
+  const output = await event.save(userId);
+  const { status, data, error } = output;
   resp.json({
-    status: output.status,
-    data: output.data,
-    error: output.error,
+    status,
+    data,
+    error,
     msg: 'Query results',
   });
 };

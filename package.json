@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.65.0",
+  "version": "0.65.2",
   "author": "Stavros Angelis",
   "license": "ISC",
   "description": "This is the Clericus API using neo4j as a database",
@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "argon2": "^0.24.1",
-    "axios": "^0.21.1",
+    "axios": "^0.24.0",
     "bluebird": "^3.7.2",
     "body-parser": "^1.19.0",
     "canvas": "^2.6.1",
@@ -62,7 +62,6 @@
     "eslint-config-strongloop": "^2.1.0",
     "eslint-plugin-prettier": "^3.3.1",
     "minami": "^1.2.3",
-    "nyc": "^15.1.0",
     "prettier": "^2.2.1",
     "supertest": "^4.0.2"
   },

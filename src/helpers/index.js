@@ -175,7 +175,9 @@ const outputRecord = (record) => {
   prepareOutput(record);
   const output = Object.assign({}, record.properties);
   output.label = stripslashes(output.label);
-  output._id = record.identity;
+  if (typeof output._id === 'undefined') {
+    output._id = record.identity;
+  }
   delete output.identity;
   return output;
 };

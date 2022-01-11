@@ -69,18 +69,19 @@ class Organisation {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Organisation) WHERE id(n)=' + this._id + ' return n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Organisation) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
           return outputRecord;
         }
+        return null;
       });
     for (let key in node) {
       this[key] = node[key];
@@ -95,23 +96,27 @@ class Organisation {
     }
 
     // relations
-    let events = await helpers.loadRelations(this._id, 'Organisation', 'Event');
-    let organisations = await helpers.loadRelations(
+    const events = await helpers.loadRelations(
+      this._id,
+      'Organisation',
+      'Event'
+    );
+    const organisations = await helpers.loadRelations(
       this._id,
       'Organisation',
       'Organisation'
     );
-    let people = await helpers.loadRelations(
+    const people = await helpers.loadRelations(
       this._id,
       'Organisation',
       'Person'
     );
-    let resources = await helpers.loadRelations(
+    const resources = await helpers.loadRelations(
       this._id,
       'Organisation',
       'Resource'
     );
-    let spatial = await helpers.loadRelations(
+    const spatial = await helpers.loadRelations(
       this._id,
       'Organisation',
       'Spatial'
@@ -127,18 +132,19 @@ class Organisation {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Organisation) WHERE id(n)=' + this._id + ' return n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Organisation) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
+          const record = records[0].toObject();
+          const outputRecord = helpers.outputRecord(record.n);
           return outputRecord;
         }
+        return null;
       });
     for (let key in node) {
       this[key] = node[key];

@@ -33,7 +33,7 @@ const taxonomyTermController = require('../controllers/taxonomyTerm.ctrl');
 const temporalController = require('../controllers/temporal.ctrl');
 const toolsParseController = require('../controllers/tools/meta-parse.ctrl');
 const toolsIngestionController = require('../controllers/tools/prepare-ingestion.ctrl');
-const importController = require('../controllers/import.ctrl');
+const importPlanController = require('../controllers/importPlan.ctrl');
 const importRulesController = require('../controllers/importRules.ctrl');
 const toolsDiocesesLocationsController = require('../controllers/tools/dioceses-locations.ctrl');
 const uploadedFileController = require('../controllers/uploadedFile.ctrl');
@@ -504,29 +504,60 @@ server.get(
   toolsIngestionController.patchRotate
 );
 // import
-server.get('/imports', auth.checkAdminToken, importController.getImports);
-server.get('/import', auth.checkAdminToken, importController.getImport);
-server.put('/import', auth.checkAdminToken, importController.putImport);
-server.delete('/import', auth.checkAdminToken, importController.deleteImport);
+server.get(
+  '/import-plans',
+  auth.checkAdminToken,
+  importPlanController.getImportPlans
+);
+server.get(
+  '/import-plan',
+  auth.checkAdminToken,
+  importPlanController.getImportPlan
+);
+server.put(
+  '/import-plan',
+  auth.checkAdminToken,
+  importPlanController.putImportPlan
+);
+server.delete(
+  '/import-plan',
+  auth.checkAdminToken,
+  importPlanController.deleteImportPlan
+);
+server.get(
+  '/import-plan-preview-results',
+  auth.checkAdminToken,
+  importPlanController.getImportPreviewResults
+);
 server.delete(
   '/import-file-delete',
   auth.checkAdminToken,
-  importController.deleteImportFile
+  importPlanController.deleteImportPlanFile
 );
 server.post(
   '/import-file-upload',
   auth.checkAdminToken,
-  importController.uploadedFile
+  importPlanController.uploadedFile
 );
 server.put(
   '/import-plan-relation',
   auth.checkAdminToken,
-  importController.putImportPlanRelation
+  importPlanController.putImportPlanRelation
 );
 server.delete(
   '/import-plan-relation',
   auth.checkAdminToken,
-  importController.deleteImportPlanRelation
+  importPlanController.deleteImportPlanRelation
+);
+server.put(
+  '/import-plan-ingest',
+  auth.checkAdminToken,
+  importPlanController.putImportPlanIngest
+);
+server.get(
+  '/import-plan-status',
+  auth.checkAdminToken,
+  importPlanController.getImportPlanStatus
 );
 
 // import rules
