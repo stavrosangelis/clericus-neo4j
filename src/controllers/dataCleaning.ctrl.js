@@ -40,7 +40,7 @@ class DataCleaning {
     label = '',
     type = '',
     output = null,
-    importId = null,
+    importPlanId = null,
     rule = null,
     completed = false,
     createdBy = null,
@@ -58,8 +58,8 @@ class DataCleaning {
     if (output !== null) {
       this.output = output;
     }
-    if (importId !== null) {
-      this.importId = importId;
+    if (importPlanId !== null) {
+      this.importPlanId = importPlanId;
     }
     this.rule = rule;
     this.completed = completed;
@@ -220,7 +220,7 @@ class DataCleaning {
 * @apiParam {_id} [_id] A unique _id.
 * @apiParam {string} [label] A string to match against the data cleaning / disambiguations labels.
 * @apiParam {string} [type] A string to match against the data cleaning / disambiguations type.
-* @apiParam {string} [importId] A string to match against the data cleaning / disambiguation related _id.
+* @apiParam {string} [importPlanId] A string to match against the data cleaning / disambiguation related _id.
 * @apiParam {boolean} [completed] The jobs' status.
 * @apiParam {string} [orderField=_id] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
@@ -239,7 +239,7 @@ const getDataCleaning = async (req, resp) => {
   const _id = parameters._id || null;
   const label = parameters.label || null;
   const type = parameters.type || null;
-  const importId = parameters.importId || null;
+  const importPlanId = parameters.importPlanId || null;
   const completed = parameters.completed || null;
   const orderField = parameters.orderField || '_id';
   const orderDesc = parameters.orderDesc || null;
@@ -261,11 +261,11 @@ const getDataCleaning = async (req, resp) => {
       }
       queryParams += `n.type = "${type}" `;
     }
-    if (importId !== null && importId !== '') {
+    if (importPlanId !== null && importPlanId !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams += `n.importId = "${importId}" `;
+      queryParams += `n.importPlanId = "${importPlanId}" `;
     }
     if (completed !== null && completed !== '') {
       if (queryParams !== '') {
@@ -563,7 +563,7 @@ const mergeArrayValues = (array, key) => {
 *
 * @apiParam {string} _id The _id of the requested import.
 * @apiSuccessExample {json} Success-Response:
-{"error":[],"status":true,"data":{"createdAt":"2021-11-09T12:13:46.110Z","updatedBy":"53930","importId":"93912","createdBy":"53930","rule":"{\"type\":\"unique\",\"columns\":[{\"value\":8,\"label\":\"[I] Diocese\"}],\"entityType\":\"\"}","_id":"93958","label":"date unique","completed":false,"type":"unique","updatedAt":"2021-11-09T12:14:03.991Z"}}
+{"error":[],"status":true,"data":{"createdAt":"2021-11-09T12:13:46.110Z","updatedBy":"53930","importPlanId":"93912","createdBy":"53930","rule":"{\"type\":\"unique\",\"columns\":[{\"value\":8,\"label\":\"[I] Diocese\"}],\"entityType\":\"\"}","_id":"93958","label":"date unique","completed":false,"type":"unique","updatedAt":"2021-11-09T12:14:03.991Z"}}
 */
 const getUnique = async (req, resp) => {
   const parameters = req.query;
@@ -593,7 +593,7 @@ const getUnique = async (req, resp) => {
   const instance = new DataCleaning({ _id });
   await instance.load();
 
-  const importData = new ImportPlan({ _id: instance.importId });
+  const importData = new ImportPlan({ _id: instance.importPlanId });
   await importData.load();
 
   const paths = importData.uploadedFileDetails.paths[0];
@@ -764,7 +764,7 @@ const getDBentries = async (req, resp) => {
   const instance = new DataCleaning({ _id });
   await instance.load();
 
-  const importData = new ImportPlan({ _id: instance.importId });
+  const importData = new ImportPlan({ _id: instance.importPlanId });
   await importData.load();
 
   const paths = importData.uploadedFileDetails.paths[0];

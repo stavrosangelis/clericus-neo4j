@@ -1264,10 +1264,10 @@ const getImportPreviewResults = async (req, resp) => {
   delete importPlanData.uploadedFile;
   delete importPlanData.uploadedFileDetails;
   return resp.json({
-    status: false,
+    status: true,
     data: importPlanData,
-    error: true,
-    msg: 'Please select a valid id to continue.',
+    error: false,
+    msg: 'Import plan preview loaded successfully',
   });
 };
 
