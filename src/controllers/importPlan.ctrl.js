@@ -130,9 +130,18 @@ const parseUploadedFile = async ({
     } else {
       readXlsxFile(path).then((rows, errors) => {
         if (errors) {
+          console.log(errors);
           return errors;
         } else {
-          importData.columns = rows[0];
+          const columns = [];
+          const headers = rows[0];
+          for (const key in headers) {
+            const header = headers[key];
+            if (header !== null) {
+              columns.push(header);
+            }
+          }
+          importData.columns = columns;
           importData.columnsParsed = true;
           const updatedImportPlan = new ImportPlan(importData);
           updatedImportPlan.save(userId);
@@ -815,7 +824,11 @@ const parseColumn = (col, row, temporal = false) => {
         value = `${prefix} ${value}`;
       }
       if (temporal) {
-        value = prepareDate(value);
+        if (typeof value === 'string') {
+          value = prepareDate(value);
+        } else {
+          value = '';
+        }
       }
       if (col.property === '_id') {
         if (!isNaN(value)) {
@@ -1959,7 +1972,10 @@ const addStoredEntitiesRelations = async (
         }
       }
     }
-    if (customSource._id !== 'undefined') {
+    if (
+      typeof customSource._id !== 'undefined' &&
+      typeof entity._id !== 'undefined'
+    ) {
       const ref = {
         items: [
           {
@@ -2101,6 +2117,7 @@ const ingestImportPlanData = async (importPlanId, userId) => {
     importPlanData._id,
     userId
   );
+  return true;
 };
 /**
  * @api {put} /import-plan-ingest Start ingestion according to import plan
@@ -2110,7 +2127,7 @@ const ingestImportPlanData = async (importPlanId, userId) => {
  *
  * @apiParam {string} _id The id of the import plan.
  **/
-const putImportPlanIngest = (req, resp) => {
+const putImportPlanIngest = async (req, resp) => {
   const parameters = req.body;
   const { _id = null } = parameters;
   if (_id === null || _id === '') {
@@ -2122,13 +2139,43 @@ const putImportPlanIngest = (req, resp) => {
     });
   }
   const userId = req.decoded.id;
-  ingestImportPlanData(_id, userId);
-  return resp.json({
-    status: true,
-    data: [],
-    error: false,
-    msg: 'Ingestion started successfully',
-  });
+  const importPlanData = new ImportPlan({ _id: _id });
+  await importPlanData.load();
+  let status = true;
+  if (
+    typeof importPlanData.ingestionStatus !== 'undefined' &&
+    typeof importPlanData.ingestionStatus > 0
+  ) {
+    status = false;
+  }
+  if (status) {
+    ingestImportPlanData(_id, userId);
+    return resp.json({
+      status: status,
+      data: [],
+      error: false,
+      msg: 'Ingestion started successfully',
+    });
+  } else {
+    let msg = '';
+    if (importPlanData.ingestionStatus === 1) {
+      msg = 'The ingestion process has already started.';
+    }
+    if (importPlanData.ingestionStatus === 2) {
+      msg =
+        'The Ingestion process has already completed and cannot be executed again.';
+    }
+    if (importPlanData.ingestionStatus === 3) {
+      msg =
+        'The Ingestion process has already completed with an error and cannot be executed again.';
+    }
+    return resp.json({
+      status: status,
+      data: [],
+      error: true,
+      msg,
+    });
+  }
 };
 
 /**
