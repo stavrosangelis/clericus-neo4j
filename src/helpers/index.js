@@ -537,8 +537,8 @@ const prepareDate = (date) => {
   const start = parts[0].trim();
   const sParts = start.split('-');
   let sy = sParts[0];
-  let sm = sParts[1];
-  let sd = sParts[2];
+  let sm = sParts[1] || '??';
+  let sd = sParts[2] || '??';
   if (sy.includes('c.')) {
     sy = sy.replace('c.', '');
   }
@@ -549,33 +549,38 @@ const prepareDate = (date) => {
     sd = `01`;
   }
   const startDate = `${sd}-${sm}-${sy}`;
+  let label = startDate;
   let endDate = null;
-  if (parts.length === 1) {
-    const lm = sParts[1] !== '??' ? sm : '12';
-    const ld = getDaysInMonth(lm, sy);
-    endDate = `${ld}-${lm}-${sy}`;
-  }
-  if (parts.length > 1) {
-    const lParts = parts[1].trim().split('-');
-    let ly = lParts[0];
-    let lm = lParts[1];
-    let ld = lParts[2];
-    if (ly.includes('c.')) {
-      ly = ly.replace('c.', '');
-    }
-    if (lm === '??') {
-      lm = `12`;
-    }
-    if (ld === '??') {
-      ld = getDaysInMonth(lm, ly);
-    }
-    endDate = `${ld}-${sm}-${sy}`;
-  }
-  let label = '';
-  if (!date.includes('?')) {
-    label = date;
+  if (!isNaN(sParts[0]) && !isNaN(sParts[1]) && !isNaN(sParts[2])) {
+    endDate = startDate;
   } else {
-    label = date.replace(/-\?\?/g, '');
+    if (parts.length === 1) {
+      const lm = sParts[1] !== '??' ? sm : '12';
+      const ld = getDaysInMonth(lm, sy);
+      endDate = `${ld}-${lm}-${sy}`;
+    }
+    if (parts.length > 1) {
+      const lParts = parts[1].trim().split('-');
+      let ly = lParts[0];
+      let lm = lParts[1];
+      let ld = lParts[2];
+      if (ly.includes('c.')) {
+        ly = ly.replace('c.', '');
+      }
+      if (lm === '??') {
+        lm = `12`;
+      }
+      if (ld === '??') {
+        ld = getDaysInMonth(lm, ly);
+      }
+      endDate = `${ld}-${sm}-${sy}`;
+    }
+
+    if (!date.includes('?')) {
+      label = date;
+    } else {
+      label = date.replace(/-\?\?/g, '');
+    }
   }
   return { startDate, endDate, label };
 };

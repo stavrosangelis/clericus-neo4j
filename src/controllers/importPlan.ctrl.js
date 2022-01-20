@@ -804,7 +804,7 @@ const parseColumn = (col, row, temporal = false) => {
           ? data[col.value]
           : '';
     }
-    if (value !== '') {
+    if (value !== null && value !== '') {
       if (
         typeof col.regexp !== 'undefined' &&
         col.regexp !== '' &&
@@ -856,6 +856,8 @@ const parseEvents = async (value, rows = []) => {
       const newValue = parseColumn(value.columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
+      } else if (value.columns[v].type === 'condition') {
+        data.push({ condition: false });
       }
     }
     const eventData = {};
@@ -902,6 +904,8 @@ const parseOrganisations = async (value, rows = []) => {
       const newValue = parseColumn(value.columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
+      } else if (value.columns[v].type === 'condition') {
+        data.push({ condition: false });
       }
     }
     const organisationsData = {};
@@ -951,6 +955,8 @@ const parsePersons = async (value, rows = []) => {
       const newValue = parseColumn(value.columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
+      } else if (value.columns[v].type === 'condition') {
+        data.push({ condition: false });
       }
     }
     const personData = {};
@@ -994,6 +1000,8 @@ const parseResources = async (value, rows = []) => {
       const newValue = parseColumn(value.columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
+      } else if (value.columns[v].type === 'condition') {
+        data.push({ condition: false });
       }
     }
     const resourcesData = {};
@@ -1040,6 +1048,8 @@ const parseSpatials = async (value, rows = []) => {
       const newValue = parseColumn(value.columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
+      } else if (value.columns[v].type === 'condition') {
+        data.push({ condition: false });
       }
     }
     const spatialsData = {};
@@ -1086,6 +1096,8 @@ const parseTemporals = async (value, rows = []) => {
       const newValue = parseColumn(value.columns[v], row, true);
       if (newValue !== null) {
         data.push(newValue);
+      } else if (value.columns[v].type === 'condition') {
+        data.push({ condition: false });
       }
     }
     const temporalsData = {};
@@ -1181,28 +1193,6 @@ const parseRules = async (rules, rows) => {
   }
   return output;
 };
-
-/* const loadImportPlanIngestionProgressData = async (_id) => {
-  const session = driver.session();
-  const query = `MATCH (n:ImportPlan) WHERE id(n)=${_id} RETURN id(n) AS _id, n.label AS label, n.ingestionStatus AS ingestionStatus, n.ingestionProgress AS ingestionProgress, n.ingestionCompleteMessage AS ingestionCompleteMessage, n.ingestionStartedAt AS ingestionStartedAt, n.ingestionCompletedAt AS ingestionCompletedAt`;
-  const data =
-    (await session
-      .writeTransaction((tx) => tx.run(query, {}))
-      .then((result) => {
-        session.close();
-        const { records } = result;
-        if (records.length > 0) {
-          const record = records[0].toObject();
-          record._id = record._id.toString();
-          return record;
-        }
-        return null;
-      })
-      .catch((error) => {
-        console.log(error);
-      })) || null;
-  return data;
-}; */
 
 const loadImportPlanRules = async (_id) => {
   const session = driver.session();
