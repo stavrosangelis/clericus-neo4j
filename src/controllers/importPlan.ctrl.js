@@ -1,3 +1,5 @@
+const util = require('util');
+// console.log(util.inspect(myObject, false, null, true));
 const driver = require('../config/db-driver');
 const {
   addslashes,
@@ -27,6 +29,15 @@ const { updateReference } = require('./references.ctrl');
 const TaxonomyTerm = require('./taxonomyTerm.ctrl').TaxonomyTerm;
 
 const { ARCHIVEPATH } = process.env;
+
+/*
+ * A simple function to compare two arrays and see if they have common values
+ */
+const arrayIntersect = (array1 = [], array2 = []) => {
+  const intersect = array1.find((i) => array2.indexOf(i) > -1) || null;
+  const result = intersect !== null ? true : false;
+  return result;
+};
 
 const parseFormDataPromise = (req) => {
   return new Promise((resolve) => {
@@ -352,12 +363,14 @@ class ImportPlan {
       typeof this.uploadedFileDetails !== 'undefined' &&
       this.uploadedFileDetails !== null
     ) {
-      const { year, month } = this.uploadedFileDetails;
+      const { uploadedFileDetails = null } = this;
 
-      if (typeof year !== 'undefined' && month !== 'undefined') {
-        const dir = `${ARCHIVEPATH}imports/${year}/${month}/${normalizeLabelId(
-          this.label
-        )}`;
+      if (uploadedFileDetails !== null) {
+        const filePath = JSON.parse(uploadedFileDetails.paths[0]).path;
+        const pathParts = filePath.split('/');
+        const index = pathParts.length;
+        pathParts.splice(index - 1, 1);
+        const dir = pathParts.join('/');
         fs.rmdirSync(dir, { recursive: true });
       }
       await deleteUploadedFile(this.uploadedFile);
@@ -373,7 +386,17 @@ class ImportPlan {
       .catch((error) => {
         console.log(error);
       });
-    // 3. delete node
+    // 3. delete related rules
+    const querydr = `MATCH (n:ImportRule {importPlanId: "${this._id}"}) DELETE n`;
+    await session
+      .writeTransaction((tx) => tx.run(querydr, {}))
+      .then((result) => {
+        return result;
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+    // 4. delete node
     const query = `MATCH (n:ImportPlan) WHERE id(n)=${this._id} DELETE n`;
     const deleteRecord = await session
       .writeTransaction((tx) => tx.run(query, {}))
@@ -573,6 +596,7 @@ const saveDatacleaning = async (item = null, userId) => {
 const copyDataCleaning = async (
   existingImportPlanId = null,
   newImportPlanId = null,
+  newImportPlanFolderName = null,
   userId
 ) => {
   if (existingImportPlanId === null && newImportPlanId === null) {
@@ -588,32 +612,132 @@ const copyDataCleaning = async (
     .catch((error) => {
       console.log(error);
     });
+  const date = new Date();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
   const existingDataCleaningInstancesNodes =
     normalizeRecordsOutput(nodesPromise);
   for (let i = 0; i < existingDataCleaningInstancesNodes.length; i += 1) {
     const existingDataCleaningInstancesNode =
       existingDataCleaningInstancesNodes[i];
     existingDataCleaningInstancesNode._id = null;
-    existingDataCleaningInstancesNode.importId = newImportPlanId;
+    existingDataCleaningInstancesNode.importPlanId = newImportPlanId;
 
-    // 1. save new node
-    const newInstance = saveDatacleaning(
-      existingDataCleaningInstancesNode,
-      userId
-    );
-    console.log(newInstance);
-    // copy output
+    // 1. duplicate output file
+    const existingOutput = existingDataCleaningInstancesNode.output;
+    const pathParts = existingOutput.split('/');
+    const index = pathParts.length;
+    const fileName = pathParts[index - 1];
+    pathParts.splice(index - 4, 5);
+    let newDir = `${pathParts.join(
+      '/'
+    )}/${year}/${month}/${newImportPlanFolderName}`;
+    if (!fs.existsSync(newDir)) {
+      await fs.mkdirSync(newDir, { recursive: true }, (err) => {
+        console.log(err);
+      });
+    }
+    const targetPath = `${newDir}/${fileName}`;
+    // copy file
+    await fs.copyFileSync(existingOutput, targetPath);
+    existingDataCleaningInstancesNode.output = targetPath;
+    // 2. save new node
+    await saveDatacleaning(existingDataCleaningInstancesNode, userId);
   }
 };
 
-const copy = async (copyId = null, newId = null, userId) => {
+const createNewImportPlanRule = async ({
+  label = null,
+  rule = null,
+  importPlanId = null,
+  completed = false,
+  userId = null,
+}) => {
+  const newRule = {};
+  const session = driver.session();
+  const now = new Date().toISOString();
+
+  newRule.createdBy = userId;
+  newRule.createdAt = now;
+  newRule.updatedBy = userId;
+  newRule.updatedAt = now;
+  newRule.label = label;
+  newRule.rule = rule;
+  newRule.importPlanId = importPlanId;
+  newRule.completed = completed;
+  const nodeProperties = prepareNodeProperties(newRule);
+  const params = prepareParams(newRule);
+  const query = `CREATE (n:ImportRule ${nodeProperties}) RETURN n`;
+  const output = await session
+    .run(query, params)
+    .then((result) => {
+      session.close();
+      const records = result.records;
+      if (records.length > 0) {
+        const record = records[0];
+        const key = record.keys[0];
+        const recordObj = record.toObject()[key];
+        return outputRecord(recordObj);
+      }
+      return null;
+    })
+    .catch((error) => {
+      session.close();
+      console.log(error);
+    });
+  return output;
+};
+
+const copyImportPlanRulesNRelations = async (
+  importPlanId = null,
+  newImportPlanId = null,
+  relations = [],
+  userId
+) => {
+  if (importPlanId === null || newImportPlanId === null) {
+    return false;
+  }
+  const rules = await loadImportPlanRules(importPlanId);
+  if (rules.length > 0) {
+    const rulesPair = [];
+    const rulesCopy = [...rules];
+    for (let i = 0; i < rulesCopy.length; i += 1) {
+      const rule = rulesCopy[i];
+      rule.importPlanId = newImportPlanId;
+      const newRule = await createNewImportPlanRule({
+        label: rule.label,
+        rule: rule.rule,
+        importPlanId: newImportPlanId,
+        completed: rule.completed,
+        userId,
+      });
+      rulesPair.push({ old: rule._id, new: newRule._id });
+    }
+    if (relations.length > 0) {
+      const newRelations = [];
+      for (let j = 0; j < relations.length; j += 1) {
+        const r = JSON.parse(relations[j]);
+        const newSrcId = rulesPair.find((p) => p.old === r.srcId).new;
+        const newTargetId = rulesPair.find((p) => p.old === r.targetId).new;
+        r.srcId = newSrcId;
+        r.targetId = newTargetId;
+        newRelations.push(JSON.stringify(r));
+      }
+      const importPlan = new ImportPlan({ _id: newImportPlanId });
+      await importPlan.load();
+      importPlan.relations = newRelations;
+      await importPlan.save(userId);
+    }
+  }
+};
+
+const copyImportPlan = async (copyId = null, newId = null, userId) => {
   if (copyId === null || newId === null) {
     return null;
   }
   // load existing import
   const existingImportPlan = new ImportPlan({ _id: copyId });
   await existingImportPlan.load();
-
   // load new import
   const newImportPlan = new ImportPlan({ _id: newId });
   await newImportPlan.load();
@@ -626,7 +750,11 @@ const copy = async (copyId = null, newId = null, userId) => {
     const year = date.getFullYear();
 
     const existingPath = JSON.parse(existingUploadedFile.paths).path;
-    const newDir = uploadFilePath(newImportPlan.label);
+    let newDir = uploadFilePath(newImportPlan.label);
+    if (fs.existsSync(newDir)) {
+      newDir = newDir.substr(0, newDir.length - 1);
+      newDir += '-copy/';
+    }
     const targetPath = `${newDir}${existingUploadedFile.hashedName}`;
 
     // extract extension from file path
@@ -665,15 +793,29 @@ const copy = async (copyId = null, newId = null, userId) => {
       path: targetPath,
       extension,
     });
+    // update new import plan data
     const { _id: fileId } = newFile.data;
     newImportPlan.uploadedFile = fileId;
     await newImportPlan.save(userId);
 
     // copy data cleaning
-    copyDataCleaning(existingImportPlan._id, newImportPlan.data._id, userId);
+    await copyDataCleaning(
+      existingImportPlan._id,
+      newImportPlan._id,
+      normalizeLabelId(newImportPlan.label),
+      userId
+    );
+    // copy import plan rules
+    await copyImportPlanRulesNRelations(
+      existingImportPlan._id,
+      newImportPlan._id,
+      existingImportPlan.relations,
+      userId
+    );
   }
+  await newImportPlan.load();
 
-  return existingImportPlan;
+  return newImportPlan;
 };
 
 /**
@@ -705,7 +847,7 @@ const putImportPlan = async (req, resp) => {
     typeof copyId !== 'undefined' &&
     copyId !== null
   ) {
-    await copy(copyId, output.data._id, userId);
+    await copyImportPlan(copyId, output.data._id, userId);
   }
   resp.json(output);
 };
@@ -1138,7 +1280,10 @@ const parseTemporals = async (value, rows = []) => {
   }
   return temporals;
 };
-
+/*
+ * The parseRule function
+ * output example: similar to parseRules
+ */
 const parseRule = async (value = null, rows = []) => {
   if (value !== null && typeof value.rule !== 'undefined') {
     const rule = JSON.parse(value.rule);
@@ -1169,6 +1314,121 @@ const parseRule = async (value = null, rows = []) => {
   return null;
 };
 
+/**
+ * The parseRules function splits the rules to their entities and parse them separately by invocing the parseRule function
+ * output example:
+ * {
+  events: [
+    Event {
+      label: 'Address',
+      description: null,
+      eventType: '72761',
+      status: 'private',
+      createdBy: null,
+      createdAt: null,
+      updatedBy: null,
+      updatedAt: null,
+      row: 0,
+      refId: '98181'
+    },
+  ],
+  organisations: [
+    Organisation {
+      _id: '97201',
+      label: 'Ballyara',
+      labelSoundex: 'B460',
+      description: '',
+      organisationType: 'Townland',
+      status: 'public',
+      alternateAppelations: [],
+      createdBy: '532',
+      createdAt: '2021-11-16T19:16:23.936Z',
+      updatedBy: '532',
+      updatedAt: '2021-11-16T19:16:23.936Z',
+      row: 1,
+      refId: '98182'
+    },
+  ],
+  people: [
+    Person {
+      honorificPrefix: [],
+      firstName: 'Walter',
+      middleName: null,
+      lastName: 'Nicholsan',
+      label: 'Walter Nicholsan',
+      fnameSoundex: null,
+      lnameSoundex: null,
+      description: null,
+      personType: 'Clergy',
+      status: 'private',
+      alternateAppelations: [],
+      createdBy: null,
+      createdAt: null,
+      updatedBy: null,
+      updatedAt: null,
+      row: 1,
+      refId: '98180'
+    },
+  ],
+  resources: [
+    Resource {
+      _id: '97498',
+      label: "St. Kieran's College Kilkenny Student List, c.1782-1945",
+      alternateLabels: [],
+      description: '',
+      fileName: null,
+      metadata: {},
+      originalLocation: '',
+      paths: [],
+      resourceType: null,
+      systemType: '22853',
+      uploadedFile: null,
+      status: 'private',
+      createdBy: '532',
+      createdAt: '2021-11-22T16:49:38.016Z',
+      updatedBy: '532',
+      updatedAt: '2021-11-22T16:49:38.016Z',
+      row: 1,
+      refId: '98198'
+    },
+  ],
+  spatials: [
+    Spatial {
+      _id: '54571',
+      label: 'Kilkenny',
+      streetAddress: '',
+      locality: '',
+      region: 'The Municipal District of Kilkenny City',
+      postalCode: '',
+      country: 'Ireland',
+      latitude: '52.6510216',
+      longitude: '-7.2484948',
+      locationType: 'City',
+      note: '',
+      rawData: null,
+      createdBy: '53930',
+      createdAt: '2020-07-12T18:15:04.263Z',
+      updatedBy: '532',
+      updatedAt: '2021-01-14T21:19:54.596Z',
+      row: 2,
+      refId: '98196'
+    },
+  ],
+  temporals: [
+    Temporal {
+      label: '1936',
+      startDate: '01-01-1936',
+      endDate: '31-12-1936',
+      format: null,
+      createdBy: null,
+      createdAt: null,
+      updatedBy: null,
+      updatedAt: null,
+      row: 16,
+      refId: '98190'
+    },
+  ]
+ */
 const parseRules = async (rules, rows) => {
   const length = rules.length;
   const output = {
@@ -1524,11 +1784,13 @@ const uniqueOrganisations = (organisations) => {
   const length = organisations.length;
   for (let i = 0; i < length; i += 1) {
     const item = organisations[i];
-    if (item.row === 0) {
+    const { row, refId } = item;
+    if (row === 0) {
       continue;
     }
-    if (typeof item.rows === 'undefined') {
-      item.rows = [item.row];
+    const ref = { row, refIds: [refId] };
+    if (typeof item.refs === 'undefined') {
+      item.refs = [ref];
     }
     const find =
       items.find(
@@ -1541,7 +1803,19 @@ const uniqueOrganisations = (organisations) => {
       items.push(item);
     } else {
       const index = items.indexOf(find);
-      items[index].rows.push(item.row);
+      const existing = items[index];
+      const refIndex = existing.refs.findIndex((r) => r.row === row);
+      if (refIndex === -1) {
+        existing.refs.push(ref);
+      } else {
+        const refIdIndex =
+          existing.refs[refIndex].refIds.find(
+            (rid) => rid.indexOf(refId) > -1
+          ) || false;
+        if (!refIdIndex) {
+          existing.refs[refIndex].refIds.push(refId);
+        }
+      }
     }
   }
   return items;
@@ -1552,11 +1826,13 @@ const uniqueResources = (recources) => {
   const length = recources.length;
   for (let i = 0; i < length; i += 1) {
     const item = recources[i];
-    if (item.row === 0) {
+    const { row, refId } = item;
+    if (row === 0) {
       continue;
     }
-    if (typeof item.rows === 'undefined') {
-      item.rows = [item.row];
+    const ref = { row, refIds: [refId] };
+    if (typeof item.refs === 'undefined') {
+      item.refs = [ref];
     }
     const find =
       items.find(
@@ -1569,7 +1845,19 @@ const uniqueResources = (recources) => {
       items.push(item);
     } else {
       const index = items.indexOf(find);
-      items[index].rows.push(item.row);
+      const existing = items[index];
+      const refIndex = existing.refs.findIndex((r) => r.row === row);
+      if (refIndex === -1) {
+        existing.refs.push(ref);
+      } else {
+        const refIdIndex =
+          existing.refs[refIndex].refIds.find(
+            (rid) => rid.indexOf(refId) > -1
+          ) || false;
+        if (!refIdIndex) {
+          existing.refs[refIndex].refIds.push(refId);
+        }
+      }
     }
   }
   return items;
@@ -1580,18 +1868,32 @@ const uniqueSpatials = (spatials) => {
   const length = spatials.length;
   for (let i = 0; i < length; i += 1) {
     const item = spatials[i];
-    if (item.row === 0) {
+    const { row, refId } = item;
+    if (row === 0) {
       continue;
     }
-    if (typeof item.rows === 'undefined') {
-      item.rows = [item.row];
+    const ref = { row, refIds: [refId] };
+    if (typeof item.refs === 'undefined') {
+      item.refs = [ref];
     }
     const find = items.find((s) => s.label === item.label) || null;
     if (find === null) {
       items.push(item);
     } else {
       const index = items.indexOf(find);
-      items[index].rows.push(item.row);
+      const existing = items[index];
+      const refIndex = existing.refs.findIndex((r) => r.row === row);
+      if (refIndex === -1) {
+        existing.refs.push(ref);
+      } else {
+        const refIdIndex =
+          existing.refs[refIndex].refIds.find(
+            (rid) => rid.indexOf(refId) > -1
+          ) || false;
+        if (!refIdIndex) {
+          existing.refs[refIndex].refIds.push(refId);
+        }
+      }
     }
   }
   return items;
@@ -1602,18 +1904,32 @@ const uniqueTemporals = (temporals) => {
   const length = temporals.length;
   for (let i = 0; i < length; i += 1) {
     const item = temporals[i];
-    if (item.row === 0) {
+    const { row, refId } = item;
+    if (row === 0) {
       continue;
     }
-    if (typeof item.rows === 'undefined') {
-      item.rows = [item.row];
+    const ref = { row, refIds: [refId] };
+    if (typeof item.refs === 'undefined') {
+      item.refs = [ref];
     }
     const find = items.find((t) => t.label === item.label) || null;
     if (find === null) {
       items.push(item);
     } else {
       const index = items.indexOf(find);
-      items[index].rows.push(item.row);
+      const existing = items[index];
+      const refIndex = existing.refs.findIndex((r) => r.row === row);
+      if (refIndex === -1) {
+        existing.refs.push(ref);
+      } else {
+        const refIdIndex =
+          existing.refs[refIndex].refIds.find(
+            (rid) => rid.indexOf(refId) > -1
+          ) || false;
+        if (!refIdIndex) {
+          existing.refs[refIndex].refIds.push(refId);
+        }
+      }
     }
   }
   return items;
@@ -1622,86 +1938,141 @@ const uniqueTemporals = (temporals) => {
 const uniqueEvents = (events, spatials, temporals, relations) => {
   const items = [];
   const length = events.length;
+  // loop through items to determine if they are unique or duplicates
   for (let i = 0; i < length; i += 1) {
     const item = events[i];
-    if (item.row === 0) {
+    const { row, refId } = item;
+    if (row === 0) {
       continue;
     }
-    const itemSrcRelations = relations.filter((r) => r.srcId === item.refId);
-    const itemTargetRelations = relations.filter(
-      (r) => r.targetId === item.refId
-    );
-    const itemRelations = [...itemSrcRelations, ...itemTargetRelations];
-
-    const itemSrcSpatialRelations = itemRelations.filter(
-      (r) => r.srcType === 'Spatial'
-    );
-    const itemSrcSpatialRefs = itemSrcSpatialRelations.map((i) => i.srcId);
-
-    const itemTargetSpatialRelations = itemRelations.filter(
-      (r) => r.targetType === 'Spatial'
-    );
-    const itemTargetSpatialRefs = itemTargetSpatialRelations.map(
-      (i) => i.targetId
-    );
-    const itemSpatialRefs = [...itemSrcSpatialRefs, ...itemTargetSpatialRefs];
-
-    const itemSrcTemporalRelations = itemRelations.filter(
-      (r) => r.srcType === 'Temporal'
-    );
-    const itemSrcTemporalRefs = itemSrcTemporalRelations.map((i) => i.srcId);
-    const itemTargetTemporalRelations = itemRelations.filter(
-      (r) => r.targetType === 'Temporal'
-    );
-    const itemTargetTemporalRefs = itemTargetTemporalRelations.map(
-      (i) => i.targetId
-    );
-    const itemTemporalRefs = [
-      ...itemSrcTemporalRefs,
-      ...itemTargetTemporalRefs,
-    ];
-
-    const itemRowSpatials = spatials.filter(
-      (s) => s.rows.indexOf(item.row) > -1
-    );
-    const itemRowTemporals = temporals.filter(
-      (t) => t.rows.indexOf(item.row) > -1
-    );
+    const ref = { row, refIds: [refId] };
+    if (typeof item.refs === 'undefined') {
+      item.refs = [ref];
+    }
+    // load item refs in memory and select the refIds for the right row
+    const rowRefs = item.refs.find((r) => r.row === row).refIds || [];
+    const itemSpatialRefs = relations
+      .filter(
+        (r) =>
+          (rowRefs.indexOf(r.srcId) > -1 && r.targetType === 'Spatial') ||
+          (rowRefs.indexOf(r.targetId) > -1 && r.srcType === 'Spatial')
+      )
+      .map((s) => {
+        if (s.srcType === 'Spatial') {
+          return s.srcId;
+        }
+        if (s.targetType === 'Spatial') {
+          return s.targetId;
+        }
+      });
+    const itemTemporalRefs = relations
+      .filter(
+        (r) =>
+          (rowRefs.indexOf(r.srcId) > -1 && r.targetType === 'Temporal') ||
+          (rowRefs.indexOf(r.targetId) > -1 && r.srcType === 'Temporal')
+      )
+      .map((t) => {
+        if (t.srcType === 'Temporal') {
+          return t.srcId;
+        }
+        if (t.targetType === 'Temporal') {
+          return t.targetId;
+        }
+      });
+    // identify spatials from the same row
+    const itemRowSpatials = spatials.filter((s) => {
+      const findRow = s.refs.find((sr) => sr.row === row) || false;
+      return findRow;
+    });
+    // identify temporals from the same row
+    const itemRowTemporals = temporals.filter((t) => {
+      const findRow = t.refs.find((tr) => tr.row === row) || false;
+      return findRow;
+    });
 
     const itemSpatials =
       itemSpatialRefs.length > 0 && itemRowSpatials.length > 0
-        ? itemRowSpatials.filter((s) => itemSpatialRefs.indexOf(s.refId) > -1)
+        ? itemRowSpatials.filter((s) => {
+            const refIds = s.refs.find((r) => r.row === row).refIds || [];
+            if (refIds.length === 0) {
+              return false;
+            } else {
+              const hasRef = arrayIntersect(itemSpatialRefs, refIds);
+              return hasRef;
+            }
+          })
         : [];
     const itemTemporals =
       itemTemporalRefs.length > 0 && itemRowTemporals.length > 0
-        ? itemRowTemporals.filter((t) => itemTemporalRefs.indexOf(t.refId) > -1)
+        ? itemRowTemporals.filter((t) => {
+            const refIds = t.refs.find((r) => r.row === row).refIds || [];
+            if (refIds.length === 0) {
+              return false;
+            } else {
+              const hasRef = arrayIntersect(itemTemporalRefs, refIds);
+              return hasRef;
+            }
+          })
         : [];
+
     item.itemSpatials = itemSpatials;
     item.itemTemporals = itemTemporals;
+
     const find =
       items.find((e) => {
-        if (
-          (e.itemSpatials.length > 0 &&
-            itemSpatials.length > 0 &&
-            e.itemSpatials[0].label === itemSpatials[0].label) ||
-          (e.itemTemporals.length > 0 &&
-            itemTemporals.length > 0 &&
-            e.itemTemporals.label === itemTemporals.label &&
-            e.label === item.label &&
-            e.eventType === item.eventType)
-        ) {
-          return true;
+        let match = false;
+        let matchItem = false;
+        let matchSpatial = false;
+        let matchTemporal = false;
+        if (e.label === item.label && e.eventType === item.eventType) {
+          matchItem = true;
         }
-        return false;
+        if (
+          (itemSpatials.length === 0 && e.itemSpatials.length === 0) ||
+          (itemSpatials.length > 0 &&
+            e.itemSpatials.length > 0 &&
+            e.itemSpatials[0].label === itemSpatials[0].label)
+        ) {
+          for (let is = 0; is < e.itemSpatials.length; is += 1) {
+            const eItemSpatial = e.itemSpatials[is];
+            const findSpatial =
+              itemSpatials.find((fis) => fis.label === eItemSpatial.label) ||
+              false;
+            if (findSpatial) {
+              matchSpatial = true;
+            }
+          }
+        }
+        if (
+          (e.itemTemporals.length === 0 && itemTemporals.length === 0) ||
+          (e.itemTemporals.length === 1 &&
+            itemTemporals.length === 1 &&
+            e.itemTemporals[0].label === itemTemporals[0].label)
+        ) {
+          matchTemporal = true;
+        }
+        if (matchItem && matchSpatial && matchTemporal) {
+          match = true;
+        }
+        return match;
       }) || null;
     if (find === null) {
       items.push(item);
     } else {
       const index = items.indexOf(find);
-      if (typeof items[index].rows === 'undefined') {
-        items[index].rows = [];
+      const existing = items[index];
+      const refIndex = existing.refs.findIndex((r) => r.row === row);
+      if (refIndex === -1) {
+        existing.refs.push(ref);
+      } else {
+        const refIdIndex =
+          existing.refs[refIndex].refIds.find(
+            (rid) => rid.indexOf(refId) > -1
+          ) || false;
+        if (!refIdIndex) {
+          existing.refs[refIndex].refIds.push(refId);
+        }
       }
-      items[index].rows.push(item.row);
     }
   }
   return items;
@@ -1738,7 +2109,13 @@ const ingestItems = async (items, type, userId) => {
       typeof newItemData.data !== 'undefined' ? newItemData.data : newItemData;
     newItem.row = item.row;
     newItem.refId = item.refId;
-    newItem.rows = item.rows || [item.row];
+    if (typeof item.refs !== 'undefined') {
+      newItem.refs = item.refs;
+    } else {
+      const ref = { row: item.row, refIds: [item.refId] };
+      newItem.refs = [ref];
+    }
+    newItem.itemType = type;
     output.push(newItem);
   }
   return output;
@@ -1877,6 +2254,7 @@ const addStoredEntitiesRelations = async (
   const importPlan = new ImportPlan({ _id: importPlanId });
   await importPlan.load();
 
+  // first we flatten all entities into one array
   const flatEntities = [
     ...entities.events,
     ...entities.organisations,
@@ -1886,29 +2264,64 @@ const addStoredEntitiesRelations = async (
     ...entities.temporals,
   ];
   const length = flatEntities.length;
-  const rLength = relations.length;
   let ingestionProgress = length;
   const totalProgress = length * 2;
   const customSource = flatEntities.find((e) => e.refId === 'custom');
+
+  // we loop through the new entities array
+  let cons2 = 0;
   for (let i = 0; i < length; i += 1) {
     const entity = flatEntities[i];
-    let entityType = 'Event';
-    const rowRelatedEntities = [];
-    entity.rows.forEach((r) => {
-      const sameRowEntities = flatEntities.filter(
-        (e) => e.rows.indexOf(r) > -1
-      );
-      sameRowEntities.forEach((e) => rowRelatedEntities.push(e));
+    const { row, itemType } = entity;
+
+    // load entity refs in memory and select the refIds for the right row
+    const rowRefs = entity.refs.find((r) => r.row === row).refIds || [];
+    const entityRels = relations.filter(
+      (r) => rowRefs.indexOf(r.srcId) > -1 || rowRefs.indexOf(r.targetId) > -1
+    );
+    const entityRefs = entityRels.map((s) => {
+      if (s.srcType === itemType) {
+        return s.targetId;
+      }
+      if (s.targetType === itemType) {
+        return s.srcId;
+      }
     });
+
+    const entityRowItems = flatEntities.filter((s) => {
+      const findRow = s.refs.find((sr) => sr.row === row) || false;
+      return findRow;
+    });
+    const entityItems =
+      entityRefs.length > 0 && entityRowItems.length > 0
+        ? entityRowItems.filter((s) => {
+            const refIds = s.refs.find((r) => r.row === row).refIds || [];
+            if (refIds.length === 0) {
+              return false;
+            } else {
+              const hasRef = arrayIntersect(entityRefs, refIds);
+              return hasRef;
+            }
+          })
+        : [];
+    // loop through the associated relations array
+    const rLength = entityRels.length;
     for (let j = 0; j < rLength; j += 1) {
-      const rel = relations[j];
+      const rel = entityRels[j];
       const { srcId, srcType, targetId, targetType, relationLabel } = rel;
-      if (srcId === entity.refId) {
+      // check if entity is the source entity of the relation
+      if (srcType === itemType) {
         const src = entity;
-        entityType = srcType;
-        const targets = rowRelatedEntities.filter(
-          (rre) => rre.refId === targetId
-        );
+
+        // select target items from entities of the same row
+        const targets = entityItems.filter((ei) => {
+          const findRow =
+            ei.refs.find(
+              (rreref) => rreref.refIds.indexOf(targetId.toString()) > -1
+            ) || false;
+          return findRow;
+        });
+        // loop through target entities and add relation
         const tLength = targets.length;
         for (let k = 0; k < tLength; k += 1) {
           const target = targets[k];
@@ -1932,12 +2345,25 @@ const addStoredEntitiesRelations = async (
             await updateReference(ref);
           }
         }
-      }
-      if (targetId === entity.refId) {
+      } else if (targetType === itemType) {
         const target = entity;
-        entityType = targetType;
-        const sources = rowRelatedEntities.filter((rre) => rre.refId === srcId);
+        // select source items from entities of the same row
+        const sources = entityItems.filter((ei) => {
+          const findRow =
+            ei.refs.find(
+              (rreref) => rreref.refIds.indexOf(srcId.toString()) > -1
+            ) || false;
+          return findRow;
+        });
+        if (cons2 === 0) {
+          cons2 = 1;
+          console.log('');
+          console.log('sources');
+          console.log(util.inspect(sources, false, null, true));
+        }
+
         const sLength = sources.length;
+        // loop through source entities and add relation
         for (let k = 0; k < sLength; k += 1) {
           const src = sources[k];
           if (
@@ -1974,7 +2400,7 @@ const addStoredEntitiesRelations = async (
           },
           {
             _id: entity._id,
-            type: entityType,
+            type: itemType,
           },
         ],
         taxonomyTermLabel: 'isRelatedTo',
@@ -2004,6 +2430,9 @@ const addStoredEntitiesRelations = async (
   console.log('completed');
 };
 
+/*
+ * The ingestImportPlanData function handles all the ingestion of an import plan
+ */
 const ingestImportPlanData = async (importPlanId, userId) => {
   // load import data to memory
   const importPlanData = new ImportPlan({ _id: importPlanId });
@@ -2015,26 +2444,36 @@ const ingestImportPlanData = async (importPlanId, userId) => {
   await copy.save(userId);
   await importPlanData.load();
 
+  // load import plan rules and add them to the object
   importPlanData.rules = await loadImportPlanRules(importPlanId);
   const filepath = JSON.parse(importPlanData?.uploadedFileDetails?.paths[0]);
   const { path = null } = filepath;
   let parsedRules = {};
   let rowsNum = 0;
+  // check to see if there is an excel/csv file attached to the import plan
   if (path !== null) {
     const fileExists = await fs.existsSync(path);
     if (fileExists) {
       const mtype = mimeType.lookup(path);
       const extension = mimeType.extension(mtype);
       const rowsData = await loadFileData(path, extension);
-      const outputRows = rowsData.map((r, i) => ({ key: i, data: r }));
-      rowsNum = rowsData.length;
+      const outputRows = [];
+      const rowsLength = rowsData.length;
+      for (let i = 0; i < rowsLength; i += 1) {
+        const r = rowsData[i];
+        if (i > 0) {
+          outputRows.push({ key: i, data: r });
+        }
+      }
+      rowsNum = outputRows.length;
 
+      // prepare the rules
       parsedRules = await parseRules(importPlanData.rules, outputRows);
     }
   }
   // create a relation reference to this ingestion for each entity
   const importResourceRows = [];
-  for (let i = 1; i < rowsNum; i += 1) {
+  for (let i = 0; i < rowsNum; i += 1) {
     importResourceRows.push(i);
   }
   const documentSystemTypeRef = new TaxonomyTerm({ labelId: 'Document' });
@@ -2065,12 +2504,17 @@ const ingestImportPlanData = async (importPlanId, userId) => {
   resources.push(importResource);
   const spatials = uniqueSpatials(parsedRules.spatials);
   const temporals = uniqueTemporals(parsedRules.temporals);
+  const eventsRelations =
+    relations.filter(
+      (r) => r.srcType === 'Event' || r.targetType === 'Event'
+    ) || [];
   const events = uniqueEvents(
     parsedRules.events,
     spatials,
     temporals,
-    relations
+    eventsRelations
   );
+
   entities.events = events;
   entities.organisations = organisations;
   entities.people = parsedRules.people;
@@ -2078,6 +2522,7 @@ const ingestImportPlanData = async (importPlanId, userId) => {
   entities.spatials = spatials;
   entities.temporals = temporals;
   importPlanData.entities = entities;
+  console.log('entities de-duplicated and prepared for ingestion');
 
   parsedRules = null;
   importPlanData.columns = null;
@@ -2132,13 +2577,15 @@ const putImportPlanIngest = async (req, resp) => {
   const importPlanData = new ImportPlan({ _id: _id });
   await importPlanData.load();
   let status = true;
+  // check if ingestion has already started and prevent execution
   if (
     typeof importPlanData.ingestionStatus !== 'undefined' &&
-    typeof importPlanData.ingestionStatus > 0
+    Number(importPlanData.ingestionStatus) > 0
   ) {
     status = false;
   }
   if (status) {
+    // execute ingestion
     ingestImportPlanData(_id, userId);
     return resp.json({
       status: status,

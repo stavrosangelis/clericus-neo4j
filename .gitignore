@@ -26,6 +26,7 @@
 # environment variables
 .env.production
 .env.development
+.env.development.ssl
 .env.develserver
 
 # nyc coverage reports
@@ -35,3 +36,8 @@
 /backup-container-4.txt
 /recreate-api.txt
 /download-archive.txt
+
+# local ssl cert
+/src/cert
+
+/export-import-plan.txt
