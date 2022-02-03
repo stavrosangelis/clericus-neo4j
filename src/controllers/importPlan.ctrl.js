@@ -1,4 +1,4 @@
-const util = require('util');
+// const util = require('util');
 // console.log(util.inspect(myObject, false, null, true));
 const driver = require('../config/db-driver');
 const {
@@ -2268,8 +2268,7 @@ const addStoredEntitiesRelations = async (
   const totalProgress = length * 2;
   const customSource = flatEntities.find((e) => e.refId === 'custom');
 
-  // we loop through the new entities array
-  let cons2 = 0;
+  // loop through the new entities array
   for (let i = 0; i < length; i += 1) {
     const entity = flatEntities[i];
     const { row, itemType } = entity;
@@ -2355,12 +2354,6 @@ const addStoredEntitiesRelations = async (
             ) || false;
           return findRow;
         });
-        if (cons2 === 0) {
-          cons2 = 1;
-          console.log('');
-          console.log('sources');
-          console.log(util.inspect(sources, false, null, true));
-        }
 
         const sLength = sources.length;
         // loop through source entities and add relation

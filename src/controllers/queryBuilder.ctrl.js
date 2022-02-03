@@ -209,9 +209,12 @@ const outputDateValue = (value) => {
 const mainQueryBuilder = (main, nodeSymbol = 'n') => {
   let string = '';
   const temporalElements = ['startDate', 'endDate', 'createdAt', 'updatedAt'];
-  for (let i = 0; i < main.length; i += 1) {
+  const length = main.length;
+  for (let i = 0; i < length; i += 1) {
     const item = main[i];
+    const { elementLabel } = item;
     const value = helpers.addslashes(item.elementValue).trim();
+    console.log(item);
     const prevIndex = i - 1;
     const prevItem = main[prevIndex] || null;
     const nextIndex = i + 1;
@@ -231,22 +234,39 @@ const mainQueryBuilder = (main, nodeSymbol = 'n') => {
         string += ' (';
       }
     }
-    if (temporalElements.indexOf(item.elementLabel) === -1) {
+    if (temporalElements.indexOf(elementLabel) === -1) {
       switch (item.qualifier) {
         case 'contains': {
-          string += ` exists(${nodeSymbol}.${item.elementLabel}) AND toLower(${nodeSymbol}.${item.elementLabel}) =~ toLower(".*${value}.*") `;
+          if (elementLabel === '_id') {
+            string += ` id(${nodeSymbol}) =~ ".*${value}.*" `;
+          } else {
+            string += ` exists(${nodeSymbol}.${item.elementLabel}) AND toLower(${nodeSymbol}.${item.elementLabel}) =~ toLower(".*${value}.*") `;
+          }
+
           break;
         }
         case 'exact': {
-          string += ` exists(${nodeSymbol}.${item.elementLabel}) AND ${nodeSymbol}.${item.elementLabel} = "${value}" `;
+          if (elementLabel === '_id') {
+            string += ` id(${nodeSymbol}) = ${Number(value)} `;
+          } else {
+            string += ` exists(${nodeSymbol}.${item.elementLabel}) AND ${nodeSymbol}.${item.elementLabel} = "${value}" `;
+          }
           break;
         }
         case 'not_contains': {
-          string += ` exists(${nodeSymbol}.${item.elementLabel}) AND NOT toLower(${nodeSymbol}.${item.elementLabel}) =~ toLower(".*${value}.*") `;
+          if (elementLabel === '_id') {
+            string += ` NOT id(${nodeSymbol}) =~ ".*${value}.*" `;
+          } else {
+            string += ` exists(${nodeSymbol}.${item.elementLabel}) AND NOT toLower(${nodeSymbol}.${item.elementLabel}) =~ toLower(".*${value}.*") `;
+          }
           break;
         }
         case 'not_exact': {
-          string += ` exists(${nodeSymbol}.${item.elementLabel}) AND NOT ${nodeSymbol}.${item.elementLabel} = "${value}" `;
+          if (elementLabel === '_id') {
+            string += ` NOT id(${nodeSymbol}) = ${Number(value)} `;
+          } else {
+            string += ` exists(${nodeSymbol}.${item.elementLabel}) AND NOT ${nodeSymbol}.${item.elementLabel} = "${value}" `;
+          }
           break;
         }
         default: {
@@ -256,9 +276,7 @@ const mainQueryBuilder = (main, nodeSymbol = 'n') => {
     } else {
       const timestamps = ['createdAt', 'updatedAt'];
       const dateFormat =
-        timestamps.indexOf(item.elementLabel) === -1
-          ? 'dd-MM-yyyy'
-          : 'yyyy-MM-dd';
+        timestamps.indexOf(elementLabel) === -1 ? 'dd-MM-yyyy' : 'yyyy-MM-dd';
       let operator;
       switch (item.qualifier) {
         case 'exact': {
@@ -278,23 +296,13 @@ const mainQueryBuilder = (main, nodeSymbol = 'n') => {
         }
       }
       if (item.qualifier !== 'range') {
-        string += ` exists(${nodeSymbol}.${
-          item.elementLabel
-        }) AND date(datetime({epochmillis: apoc.date.parse(${nodeSymbol}.${
-          item.elementLabel
-        },"ms","${dateFormat}")})) ${operator} date(datetime({epochmillis: apoc.date.parse('${outputDateValue(
+        string += ` exists(${nodeSymbol}.${elementLabel}) AND date(datetime({epochmillis: apoc.date.parse(${nodeSymbol}.${elementLabel},"ms","${dateFormat}")})) ${operator} date(datetime({epochmillis: apoc.date.parse('${outputDateValue(
           item.elementStartValue
         )}',"ms","yyyy-MM-dd")})) `;
       } else {
-        string += ` exists(${nodeSymbol}.${
-          item.elementLabel
-        }) AND date(datetime({epochmillis: apoc.date.parse(${nodeSymbol}.${
-          item.elementLabel
-        },"ms","${dateFormat}")})) >= date(datetime({epochmillis: apoc.date.parse("${outputDateValue(
+        string += ` exists(${nodeSymbol}.${elementLabel}) AND date(datetime({epochmillis: apoc.date.parse(${nodeSymbol}.${elementLabel},"ms","${dateFormat}")})) >= date(datetime({epochmillis: apoc.date.parse("${outputDateValue(
           item.elementStartValue
-        )}","ms","yyyy-MM-dd")})) AND date(datetime({epochmillis: apoc.date.parse(${nodeSymbol}.${
-          item.elementLabel
-        },"ms","${dateFormat}")})) <= date(datetime({epochmillis: apoc.date.parse("${outputDateValue(
+        )}","ms","yyyy-MM-dd")})) AND date(datetime({epochmillis: apoc.date.parse(${nodeSymbol}.${elementLabel},"ms","${dateFormat}")})) <= date(datetime({epochmillis: apoc.date.parse("${outputDateValue(
           item.elementEndValue
         )}","ms","yyyy-MM-dd")})) `;
       }
@@ -316,7 +324,7 @@ const getNodes = async (params) => {
       ? ` ORDER BY n.${params.order} ${params.orderDirection}`
       : '';
   const query = `MATCH ${params.match} ${params.mainQuery} ${params.eventsQuery} ${params.organisationsQuery} ${params.peopleQuery} ${params.resourcesQuery} RETURN distinct n ${orderBy} SKIP ${params.skip} LIMIT ${params.limit}`;
-
+  console.log(query);
   const queryCount = `MATCH ${params.match} ${params.mainQuery} ${params.eventsQuery} ${params.organisationsQuery} ${params.peopleQuery} ${params.resourcesQuery} RETURN count(distinct n) as c`;
   const session = driver.session();
   const nodesPromise = await session
