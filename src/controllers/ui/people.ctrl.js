@@ -211,7 +211,8 @@ const getPerson = async (req, resp) => {
       'rn.lastName'
     );
     const resources = await loadRelations(_id, 'Person', 'Resource', true);
-    for (let i = 0; i < events.length; i++) {
+    const eventsLength = events.length;
+    for (let i = 0; i < eventsLength; i++) {
       const eventItem = events[i];
       eventItem.temporal = await loadRelations(
         eventItem.ref._id,
@@ -268,8 +269,16 @@ const getPerson = async (req, resp) => {
       }
     }
     events.sort((a, b) => {
-      const akey = a.temporal[0]?.ref?.startDate || null;
-      const bkey = b.temporal[0]?.ref?.startDate || null;
+      // set undefined dates to today to sort the items to the end of the array
+      const now = new Date();
+      const nd = now.getDate();
+      const nm = now.getMonth() + 1;
+      const ny = now.getFullYear();
+      const today = `${nd}-${nm}-${ny}`;
+      const akey = a.temporal[0]?.ref?.startDate || today;
+      const bkey = b.temporal[0]?.ref?.startDate || today;
+
+      // compare the date values to perform the sort
       if (akey !== null && bkey !== null) {
         const aParts = akey.split('-');
         const ad = aParts[0].length > 1 ? aParts[0] : `0${aParts[0]}`;
@@ -281,6 +290,7 @@ const getPerson = async (req, resp) => {
         const bm = bParts[1].length > 1 ? bParts[1] : `0${bParts[1]}`;
         const by = bParts[2];
         const bDate = moment(`${by}-${bm}-${bd}`);
+
         if (aDate.diff(bDate) > 0) {
           return 1;
         } else {
@@ -289,6 +299,7 @@ const getPerson = async (req, resp) => {
       }
       return 0;
     });
+
     person.events = events;
     person.organisations = organisations;
     person.people = people;
