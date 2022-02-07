@@ -464,4 +464,5 @@ module.exports = {
   getTaxonomy: getTaxonomy,
   putTaxonomy: putTaxonomy,
   deleteTaxonomy: deleteTaxonomy,
+  getTaxonomyTerms: getTaxonomyTerms,
 };

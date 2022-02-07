@@ -272,9 +272,15 @@ const getPerson = async (req, resp) => {
       const bkey = b.temporal[0]?.ref?.startDate || null;
       if (akey !== null && bkey !== null) {
         const aParts = akey.split('-');
-        const aDate = moment(`${aParts[2]}-${aParts[1]}-${aParts[0]}`);
+        const ad = aParts[0].length > 1 ? aParts[0] : `0${aParts[0]}`;
+        const am = aParts[1].length > 1 ? aParts[1] : `0${aParts[1]}`;
+        const ay = aParts[2];
+        const aDate = moment(`${ay}-${am}-${ad}`);
         const bParts = bkey.split('-');
-        const bDate = moment(`${bParts[2]}-${bParts[1]}-${bParts[0]}`);
+        const bd = bParts[0].length > 1 ? bParts[0] : `0${bParts[0]}`;
+        const bm = bParts[1].length > 1 ? bParts[1] : `0${bParts[1]}`;
+        const by = bParts[2];
+        const bDate = moment(`${by}-${bm}-${bd}`);
         if (aDate.diff(bDate) > 0) {
           return 1;
         } else {
