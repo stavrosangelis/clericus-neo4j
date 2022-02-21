@@ -1108,6 +1108,12 @@ const parsePersons = async (value, rows = []) => {
     for (let j = 0; j < dataLength; j += 1) {
       const dataItem = data[j];
       const key = Object.keys(dataItem)[0];
+      if (key === 'condition') {
+        hasConditions = true;
+      }
+      if (key === 'condition' && dataItem[key]) {
+        conditionsFullfilled = true;
+      }
       personData[key] = dataItem[key];
     }
     if (
@@ -1117,7 +1123,10 @@ const parsePersons = async (value, rows = []) => {
         personData.firstName !== '') ||
         (typeof personData.lastName !== 'undefined' &&
           personData.lastName !== null &&
-          personData.lastName !== ''))
+          personData.lastName !== '') ||
+        (typeof personData.label !== 'undefined' &&
+          personData.label !== null &&
+          personData.label !== ''))
     ) {
       const person = new Person(personData);
       if (typeof person._id !== 'undefined' && person._id !== null) {

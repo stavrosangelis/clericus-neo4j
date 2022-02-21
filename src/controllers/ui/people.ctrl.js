@@ -268,13 +268,13 @@ const getPerson = async (req, resp) => {
         resources.splice(i, 1);
       }
     }
+    // set undefined dates to today to sort the items to the end of the array
+    const now = new Date();
+    const nd = now.getDate();
+    const nm = now.getMonth() + 1;
+    const ny = now.getFullYear();
+    const today = `${nd}-${nm}-${ny}`;
     events.sort((a, b) => {
-      // set undefined dates to today to sort the items to the end of the array
-      const now = new Date();
-      const nd = now.getDate();
-      const nm = now.getMonth() + 1;
-      const ny = now.getFullYear();
-      const today = `${nd}-${nm}-${ny}`;
       const akey = a.temporal[0]?.ref?.startDate || today;
       const bkey = b.temporal[0]?.ref?.startDate || today;
 
