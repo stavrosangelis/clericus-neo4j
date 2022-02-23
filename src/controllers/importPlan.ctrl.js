@@ -1501,7 +1501,7 @@ const getImportPreviewResults = async (req, resp) => {
     return false;
   }
   if (rows.length === 0) {
-    rows = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    rows = [2];
   }
   rows = rows.map((r) => Number(r) - 1);
 
@@ -1756,15 +1756,15 @@ const putImportPlanRelation = async (req, resp) => {
  */
 const deleteImportPlanRelation = async (req, resp) => {
   const postData = req.body;
-  const { importId, index } = postData;
+  const { importPlanId, index } = postData;
   if (
-    typeof importId === 'undefined' ||
-    importId === '' ||
+    typeof importPlanId === 'undefined' ||
+    importPlanId === '' ||
     typeof index === 'undefined' ||
     index === ''
   ) {
     let errorMsg = '';
-    if (typeof importId === 'undefined' || importId === '') {
+    if (typeof importPlanId === 'undefined' || importPlanId === '') {
       errorMsg = 'The importId must not be empty';
     }
     if (typeof index === 'undefined' || index === '') {
@@ -1779,7 +1779,7 @@ const deleteImportPlanRelation = async (req, resp) => {
     return false;
   }
   const userId = req.decoded.id;
-  const importData = new ImportPlan({ _id: importId });
+  const importData = new ImportPlan({ _id: importPlanId });
   await importData.load();
   const relations = importData.relations || [];
   relations.splice(index, 1);
