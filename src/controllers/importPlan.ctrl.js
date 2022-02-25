@@ -1289,6 +1289,7 @@ const parseTemporals = async (value, rows = []) => {
   }
   return temporals;
 };
+
 /*
  * The parseRule function
  * output example: similar to parseRules
@@ -1324,7 +1325,7 @@ const parseRule = async (value = null, rows = []) => {
 };
 
 /**
- * The parseRules function splits the rules to their entities and parse them separately by invocing the parseRule function
+ * The parseRules function splits the rules to their entities and parse them separately by invoking the parseRule function
  * output example:
  * {
   events: [
@@ -2316,7 +2317,14 @@ const addStoredEntitiesRelations = async (
     const rLength = entityRels.length;
     for (let j = 0; j < rLength; j += 1) {
       const rel = entityRels[j];
-      const { srcId, srcType, targetId, targetType, relationLabel } = rel;
+      const {
+        srcId,
+        srcType,
+        targetId,
+        targetType,
+        relationLabel,
+        role = null,
+      } = rel;
       // check if entity is the source entity of the relation
       if (srcType === itemType) {
         const src = entity;
@@ -2350,6 +2358,13 @@ const addStoredEntitiesRelations = async (
               ],
               taxonomyTermLabel: relationLabel,
             };
+            if (
+              role !== null &&
+              typeof role.value !== 'undefined' &&
+              role.value !== ''
+            ) {
+              ref.items[0].role = role.value;
+            }
             await updateReference(ref);
           }
         }
@@ -2385,6 +2400,13 @@ const addStoredEntitiesRelations = async (
               ],
               taxonomyTermLabel: relationLabel,
             };
+            if (
+              role !== null &&
+              typeof role.value !== 'undefined' &&
+              role.value !== ''
+            ) {
+              ref.items[1].role = role.value;
+            }
             await updateReference(ref);
           }
         }

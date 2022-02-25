@@ -158,34 +158,30 @@ const updateReference = async (reference) => {
   if (taxonomyTerm._id === null) {
     return false;
   }
+  let srcItemRole = srcItem.role || '';
+  let targetItemRole = targetItem.role || '';
   let srcRole = '';
   let targetRole = '';
   if (
-    (typeof srcItem.role !== 'undefined' &&
-      srcItem.role !== '' &&
-      srcItem.role !== null) ||
-    (typeof targetItem.role !== 'undefined' &&
-      targetItem.role !== '' &&
-      targetItem.role !== null)
+    (srcItemRole !== null && srcItemRole !== '') ||
+    (targetItemRole !== '' && targetItemRole !== null)
   ) {
     if (
-      srcItem.role !== '' &&
-      (targetItem.role === '' ||
-        targetItem.role === 'null' ||
-        targetItem.role === null)
+      srcItemRole !== '' &&
+      (targetItemRole === '' || targetItemRole === null)
     ) {
-      targetItem.role = srcItem.role;
+      targetItemRole = srcItemRole;
     } else if (
-      targetItem.role !== '' &&
-      (srcItem.role === '' || srcItem.role === 'null' || srcItem.role === null)
+      targetItemRole !== '' &&
+      (srcItemRole === '' || srcItemRole === null)
     ) {
-      srcItem.role = targetItem.role;
+      srcItemRole = targetItemRole;
     }
-    srcRole = " SET r1={role:'" + srcItem.role + "'}";
-    targetRole = " SET r2={role:'" + targetItem.role + "'}";
+    srcRole = " SET r1={role:'" + srcItemRole + "'}";
+    targetRole = " SET r2={role:'" + targetItemRole + "'}";
     if (direction === 'to') {
-      srcRole = " SET r1={role:'" + targetItem.role + "'}";
-      targetRole = " SET r2={role:'" + srcItem.role + "'}";
+      srcRole = " SET r1={role:'" + targetItemRole + "'}";
+      targetRole = " SET r2={role:'" + srcItemRole + "'}";
     }
   }
   let query =

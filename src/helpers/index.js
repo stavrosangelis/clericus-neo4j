@@ -330,35 +330,31 @@ const loadRelations = async (
 };
 
 const prepareRelation = async (sourceItem, relation, targetItem) => {
-  let newProperty = {
+  const newProperty = {
     _id: relation.identity,
     term: {
       label: relation.type,
     },
     ref: targetItem,
   };
-  if (
-    typeof relation.properties.role !== 'undefined' &&
-    relation.properties.role !== null &&
-    relation.properties.role !== 'null'
-  ) {
-    let roleId = relation.properties.role;
-    let session = driver.session();
-    let query = 'MATCH (n:TaxonomyTerm) WHERE id(n)=' + roleId + ' return n';
-    let role =
-      (await session
-        .writeTransaction((tx) => tx.run(query, {}))
-        .then((result) => {
-          session.close();
-          let records = result.records;
-          if (records.length > 0) {
-            let record = records[0];
-            let key = record.keys[0];
-            let output = record.toObject()[key];
-            output = outputRecord(output);
-            return output;
-          }
-        })) || null;
+  const roleId = relation?.properties?.role || null;
+  if (roleId !== null && !Number.isNaN(roleId)) {
+    const session = driver.session();
+    const query = `MATCH (n:TaxonomyTerm) WHERE id(n)=${roleId} RETURN n`;
+    const role = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => {
+        session.close();
+        const { records = [] } = result;
+        if (records.length > 0) {
+          const record = records[0];
+          const key = record.keys[0];
+          let output = record.toObject()[key];
+          output = outputRecord(output);
+          return output;
+        }
+        return null;
+      });
     if (role !== null) {
       newProperty.term.role = role.labelId;
       newProperty.term.roleLabel = role.label;
