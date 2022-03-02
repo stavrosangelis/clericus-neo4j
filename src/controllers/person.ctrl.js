@@ -331,13 +331,15 @@ class Person {
               alternateAppelation = JSON.parse(alternateAppelation);
             }
             if (
-              alternateAppelation.firstName !== 'undefined' &&
+              typeof alternateAppelation.firstName !== 'undefined' &&
+              alternateAppelation.firstName !== null &&
               alternateAppelation.firstName !== ''
             ) {
               newAltAppelation += alternateAppelation.firstName;
             }
             if (
-              alternateAppelation.middleName !== 'undefined' &&
+              typeof alternateAppelation.middleName !== 'undefined' &&
+              alternateAppelation.middleName !== null &&
               alternateAppelation.middleName !== ''
             ) {
               if (newAltAppelation !== '') {
@@ -346,7 +348,8 @@ class Person {
               newAltAppelation += alternateAppelation.middleName;
             }
             if (
-              alternateAppelation.lastName !== 'undefined' &&
+              typeof alternateAppelation.lastName !== 'undefined' &&
+              alternateAppelation.lastName !== null &&
               alternateAppelation.lastName !== ''
             ) {
               if (newAltAppelation !== '') {
