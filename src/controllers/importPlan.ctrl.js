@@ -2325,6 +2325,10 @@ const addStoredEntitiesRelations = async (
         relationLabel,
         role = null,
       } = rel;
+      // avoid circular relations
+      if (srcId === targetId) {
+        continue;
+      }
       // check if entity is the source entity of the relation
       if (srcType === itemType) {
         const src = entity;
@@ -2343,7 +2347,8 @@ const addStoredEntitiesRelations = async (
           const target = targets[k];
           if (
             typeof src._id !== 'undefined' &&
-            typeof target._id !== 'undefined'
+            typeof target._id !== 'undefined' &&
+            src._id !== target._id
           ) {
             const ref = {
               items: [
@@ -2385,7 +2390,8 @@ const addStoredEntitiesRelations = async (
           const src = sources[k];
           if (
             typeof src._id !== 'undefined' &&
-            typeof target._id !== 'undefined'
+            typeof target._id !== 'undefined' &&
+            src._id !== target._id
           ) {
             const ref = {
               items: [
