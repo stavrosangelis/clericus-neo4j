@@ -1,3 +1,4 @@
+const moment = require('moment');
 const driver = require('../config/db-driver');
 const helpers = require('../helpers');
 
@@ -26,12 +27,39 @@ class Temporal {
     this.updatedAt = updatedAt;
   }
 
+  validDate(value) {
+    const format = 'DD-MM-YYYY';
+    return moment(value, format, true).isValid();
+  }
+
   validate() {
     let status = true;
     let errors = [];
     if (this.label === '') {
       status = false;
       errors.push({ field: 'label', msg: 'The label must not be empty' });
+    }
+    if (
+      this.startDate !== null &&
+      this.startDate !== '' &&
+      !this.validDate(this.startDate)
+    ) {
+      status = false;
+      errors.push({
+        field: 'startDate',
+        msg: 'The provided startDate is not well formed',
+      });
+    }
+    if (
+      this.endDate !== null &&
+      this.endDate !== '' &&
+      !this.validDate(this.endDate)
+    ) {
+      status = false;
+      errors.push({
+        field: 'endDate',
+        msg: 'The provided endDate is not well formed',
+      });
     }
     let msg = 'The record is valid';
     if (!status) {
@@ -125,13 +153,14 @@ class Temporal {
   }
 
   async save(userId) {
-    let validateTemporal = this.validate();
+    const validateTemporal = this.validate();
     if (!validateTemporal.status) {
       return validateTemporal;
     } else {
-      let session = driver.session();
+      const session = driver.session();
       let query = '';
       let params = {};
+
       // timestamps
       let now = new Date().toISOString();
       if (typeof this._id === 'undefined' || this._id === null) {
