@@ -2306,6 +2306,68 @@ const afterIngestion = async (req, resp) => {
   });
 };
 
+const resultToCsv = async (req, resp) => {
+  const readFile = promisify(fs.readFile);
+  const src = `${archivePath}documents/ocr-texts/output/189-text.json`;
+
+  const json = await readFile(src);
+  const jsonData = JSON.parse(json);
+  const results = jsonData.readResults[0];
+  const { lines } = results;
+  const words = [];
+  const { length: linesLength } = lines;
+  const rows = [];
+  for (let i = 0; i < linesLength; i += 1) {
+    const line = lines[i];
+    const { boundingBox } = line;
+    const y = boundingBox[1];
+    const height = boundingBox[5] - boundingBox[1];
+    line.y = y;
+    line.height = height;
+    words.push(line);
+    rows.push({ y, height });
+  }
+  // identify unique rows
+  const newRows = [];
+  const rowsLength = rows.length;
+  for (let i = 0; i < rowsLength; i += 1) {
+    const r = rows[i];
+    const { y, height } = r;
+    const halfHeight = height / 2;
+    const topBoundary = y - halfHeight;
+    const bottomBoundary = y + halfHeight;
+    const findRow =
+      newRows.find((r) => r.y > topBoundary && r.y < bottomBoundary) || null;
+    if (findRow === null) {
+      newRows.push(r);
+    }
+  }
+
+  // fetch row text
+  const resultRows = [];
+  const newRowsLength = newRows.length;
+  for (let i = 0; i < newRowsLength; i += 1) {
+    const nr = newRows[i];
+    const { y, height } = nr;
+    const halfHeight = height / 2;
+    const topBoundary = y - halfHeight;
+    const bottomBoundary = y + halfHeight;
+    const filterLines =
+      lines.filter(
+        (l) =>
+          l.boundingBox[1] > topBoundary && l.boundingBox[1] < bottomBoundary
+      ) || [];
+    const rowText = filterLines.map((t) => `"${t.text}"`).join(',');
+    resultRows.push(rowText);
+  }
+  resp.json({
+    status: true,
+    data: resultRows,
+    error: false,
+    msg: '',
+  });
+};
+
 module.exports = {
   parseClassPiece: parseClassPiece,
   imageExif: imageExif,
@@ -2317,4 +2379,5 @@ module.exports = {
   prepareForIngestion: prepareForIngestion,
   afterIngestion: afterIngestion,
   ingestionFromCsv: ingestionFromCsv,
+  resultToCsv: resultToCsv,
 };
