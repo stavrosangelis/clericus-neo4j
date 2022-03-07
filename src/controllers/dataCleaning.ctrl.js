@@ -738,10 +738,12 @@ const getDBentry = async (item = null, itemType = null) => {
 */
 const getDBentries = async (req, resp) => {
   const parameters = req.query;
-  const { columns: columnsParam } = parameters || [];
-  const { _id } = parameters || null;
+  const {
+    columns: columnsParam = [],
+    entityType = null,
+    _id = null,
+  } = parameters;
   const userId = req.decoded.id;
-  const { entityType } = parameters || null;
   if (_id === null) {
     resp.json({
       status: false,
@@ -899,6 +901,137 @@ const getDBentries = async (req, resp) => {
   });
 };
 
+const validDate = (value) => {
+  let valid = true;
+  const date = prepareDate(value) || false;
+  if (date !== null && date !== false) {
+    const { startDate, endDate = null } = date;
+    const sdChunks = startDate.split('-');
+    const sd = sdChunks[0];
+    const sm = sdChunks[1];
+    const sy = sdChunks[2];
+    if (sd.length !== 2 || Number(sd) > 31) {
+      valid = false;
+    }
+    if (sm.length !== 2 || Number(sm) > 12) {
+      valid = false;
+    }
+    if (sy.length !== 4) {
+      valid = false;
+    }
+    if (endDate !== null) {
+      const edChunks = endDate.split('-');
+      const ed = edChunks[0];
+      const em = sdChunks[1];
+      const ey = edChunks[2];
+      if (ed.length !== 2 || Number(ed) > 31) {
+        valid = false;
+      }
+      if (em.length !== 2 || Number(em) > 12) {
+        valid = false;
+      }
+      if (ey.length !== 4) {
+        valid = false;
+      }
+    }
+  } else {
+    valid = false;
+  }
+  return valid;
+};
+
+/**
+* @api {get} /data-cleaning-wf-dates Get Data cleaning / disambiguation compare dates against expected format and return if dates are well formatted
+* @apiName get data-cleaning well formatted dates
+* @apiGroup DataCleanings
+*
+* @apiParam {string} _id The _id of the requested import.
+* @apiSuccessExample {json} Success-Response:
+{
+  "status": true,
+  "data": [],
+  "error": [],
+  "msg": "Query results"
+}
+*/
+const getWFDates = async (req, resp) => {
+  const { query: parameters } = req;
+  const { columns: columnsParam = [], _id = null } = parameters;
+  const { id: userId = null } = req.decoded;
+  if (_id === null) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: 'Please select a valid _id to continue.',
+    });
+    return false;
+  }
+  if (columnsParam.length === 0) {
+    resp.json({
+      status: false,
+      data: [],
+      error: true,
+      msg: 'Please select one or more columns to continue.',
+    });
+    return false;
+  }
+  const columns = columnsParam.map((c) => JSON.parse(c));
+
+  const instance = new DataCleaning({ _id });
+  await instance.load();
+
+  const importData = new ImportPlan({ _id: instance.importPlanId });
+  await importData.load();
+
+  const paths = importData.uploadedFileDetails.paths[0];
+  const path = typeof paths === 'string' ? JSON.parse(paths).path : paths.path;
+  const dir = extractDirPath(path);
+
+  const rows = await loadDataRows(importData);
+  const outputRows = [];
+  const { length = 0 } = rows;
+  const { length: columnsLength = 0 } = columns;
+  for (let i = 0; i < length; i += 1) {
+    const row = rows[i];
+    const outputRow = [];
+    for (let c = 0; c < columnsLength; c += 1) {
+      const col = columns[c];
+      const colOutput = [];
+      const colValues =
+        row[col.value] !== '' ? splitMultiString(row[col.value]) : null;
+      colValues.forEach((colValue) => {
+        const valid = validDate(colValue);
+        colOutput.push({ column: col.value, value: colValue, valid });
+      });
+      outputRow.push(colOutput);
+    }
+    outputRows.push(outputRow);
+  }
+  // delete existing file if exists
+  const existingFilePath = instance.output || null;
+  if (existingFilePath !== null) {
+    unlinkFile(existingFilePath);
+  }
+  const outputPath = `${dir}/${hashFileName(instance.label)}.json`;
+  fs.writeFile(outputPath, JSON.stringify(outputRows), 'utf8', function (err) {
+    if (err) {
+      console.log(err);
+    }
+  });
+  instance.output = outputPath;
+  instance.completed = true;
+  const update = new DataCleaning(instance);
+  await update.save(userId);
+
+  resp.json({
+    status: true,
+    data: outputRows,
+    error: [],
+    msg: 'Query results',
+  });
+};
+
 module.exports = {
   DataCleaning,
   getDataCleaning,
@@ -907,4 +1040,5 @@ module.exports = {
   deleteInstance,
   getUnique,
   getDBentries,
+  getWFDates,
 };

@@ -409,9 +409,7 @@ const stripslashes = (str) => {
 };
 
 const temporalEvents = async (props, eventTypes) => {
-  let dateType = props.dateType;
-  let startDate = props.startDate;
-  let endDate = props.endDate;
+  const { dateType = '', startDate = '', endDate = '' } = props;
   let operator = '=';
   if (dateType === 'before') {
     operator = '<';
@@ -456,8 +454,8 @@ const temporalEvents = async (props, eventTypes) => {
           RETURN distinct id(e) as id`;
     }
   }
-  let session = driver.session();
-  let eventIds = await session
+  const session = driver.session();
+  const eventIds = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();
@@ -466,11 +464,11 @@ const temporalEvents = async (props, eventTypes) => {
     .catch((error) => {
       console.log(error);
     });
-  let output = [];
+  const output = [];
   for (let i = 0; i < eventIds.length; i++) {
-    let eventId = eventIds[i];
+    const eventId = eventIds[i];
     prepareOutput(eventId);
-    let _id = eventId.toObject()['id'];
+    const _id = eventId.toObject()['id'] || null;
     if (_id !== null) {
       output.push(_id);
     }
@@ -525,11 +523,15 @@ const splitMultiString = (value = '') => {
   return [value];
 };
 
-const prepareDate = (date) => {
-  if (date === null) {
+const prepareDate = (dateParam = null) => {
+  if (dateParam === null || dateParam === '') {
     return null;
   }
-  const parts = date.split(' - ');
+  const date = dateParam.toString();
+  const parts = date.split(' - ') || [];
+  if (parts.length === 0) {
+    return null;
+  }
   const start = parts[0].trim();
   const sParts = start.split('-');
   let sy = sParts[0];
@@ -571,7 +573,6 @@ const prepareDate = (date) => {
       }
       endDate = `${ld}-${sm}-${sy}`;
     }
-
     if (!date.includes('?')) {
       label = date;
     } else {

@@ -582,6 +582,7 @@ server.delete(
   importRulesController.deleteImportRule
 );
 
+server.get('/csv-test', auth.checkAdminToken, cvisionController.resultToCsv);
 server.get(
   '/parse-class-piece',
   auth.checkAdminToken,
@@ -670,6 +671,11 @@ server.get(
   '/data-cleaning-db-entries',
   auth.checkAdminToken,
   dataCleaningController.getDBentries
+);
+server.get(
+  '/data-cleaning-wf-dates',
+  auth.checkAdminToken,
+  dataCleaningController.getWFDates
 );
 
 // jobs
