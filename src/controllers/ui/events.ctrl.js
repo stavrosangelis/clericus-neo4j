@@ -22,24 +22,22 @@ const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 {"status":true,"data":{"currentPage":1,"data":[{"createdAt":"2020-01-14T14:48:31.753Z","updatedBy":"260","createdBy":"260","description":"test event description","label":"Test event","eventType":"293","updatedAt":"2020-01-14T14:48:31.753Z","_id":"2255","systemLabels":["Event"]}],"totalItems":"1","totalPages":1},"error":[],"msg":"Query results"}
 */
 const getEvents = async (req, resp) => {
-  let params = await getEventsPrepareQueryParams(req);
-  let responseData = {};
+  const params = await getEventsPrepareQueryParams(req);
   if (!params.returnResults) {
-    responseData = {
-      currentPage: 1,
-      data: [],
-      totalItems: 0,
-      totalPages: 1,
-    };
     return resp.json({
       status: true,
-      data: responseData,
+      data: {
+        currentPage: 1,
+        data: [],
+        totalItems: 0,
+        totalPages: 1,
+      },
       error: [],
       msg: 'Query results',
     });
   } else {
-    let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    let data = await getEventsQuery(
+    const query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
+    const data = await getEventsQuery(
       query,
       params.match,
       params.queryParams,
@@ -53,15 +51,14 @@ const getEvents = async (req, resp) => {
         msg: data.error.message,
       });
     } else {
-      let responseData = {
-        currentPage: params.currentPage,
-        data: data.nodes,
-        totalItems: data.count,
-        totalPages: data.totalPages,
-      };
       resp.json({
         status: true,
-        data: responseData,
+        data: {
+          currentPage: params.currentPage,
+          data: data.nodes,
+          totalItems: data.count,
+          totalPages: data.totalPages,
+        },
         error: [],
         msg: 'Query results',
       });
@@ -136,92 +133,76 @@ const getEventsQuery = async (query, match, queryParams, limit) => {
 };
 
 const getEventsPrepareQueryParams = async (req) => {
-  let parameters = req.query;
-  let label = '';
+  const { query: parameters } = req;
+  const {
+    events: eventTypes = [],
+    eventType = '',
+    label = '',
+    orderDesc = 'false',
+    orderField = 'label',
+  } = parameters;
+  let { limit = 25, page = 0, temporals = null } = parameters;
   let temporal = '';
   let spatial = '';
-  let eventType = '';
-  let page = 0;
-  let orderField = 'label';
-  let queryPage = 0;
+  page = Number(page);
+  let queryPage = page > 0 ? page - 1 : 0;
   let queryOrder = '';
-  let limit = 25;
+  limit = Number(limit);
   let returnResults = true;
 
   let match = '(n:Event)';
 
-  let queryParams = " n.status='public'";
+  let queryParams = " n.status='public' ";
 
-  if (typeof parameters.label !== 'undefined') {
-    label = parameters.label;
-    if (label !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
-      }
-      queryParams = "toLower(n.label) =~ toLower('.*" + label + ".*') ";
+  if (label !== '') {
+    if (queryParams !== '') {
+      queryParams += ' AND ';
     }
+    queryParams = `toLower(n.label) =~ toLower('.*${label}.*') `;
   }
 
   // temporal
-  if (typeof parameters.temporals !== 'undefined') {
-    let eventTypes = [];
+  if (temporals !== null) {
     let temporalEventIds = [];
-    if (typeof parameters.events !== 'undefined') {
-      eventTypes = parameters.events;
-    }
-    let temporals = parameters.temporals;
     if (typeof temporals === 'string') {
       temporals = JSON.parse(temporals);
     }
-    if (temporals.startDate !== '' && temporals.startDate !== null) {
+    const { startDate } = temporals;
+    if (startDate !== '' && startDate !== null) {
       temporalEventIds = await helpers.temporalEvents(temporals, eventTypes);
       if (temporalEventIds.length === 0) {
         returnResults = false;
       }
-    } else if (typeof eventTypes !== 'undefined') {
+    } else if (eventTypes.length > 0) {
       temporalEventIds = await helpers.eventsFromTypes(eventTypes);
     }
     if (temporalEventIds.length === 1) {
-      queryParams += `AND id(n)=${temporalEventIds[0]} `;
+      queryParams += ` AND id(n)=${temporalEventIds[0]} `;
     } else if (temporalEventIds.length > 1) {
-      queryParams += `AND id(n) IN [${temporalEventIds}] `;
+      queryParams += ` AND id(n) IN [${temporalEventIds}] `;
     }
   }
 
-  if (typeof parameters.eventType !== 'undefined') {
-    eventType = parameters.eventType;
-    if (eventType !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
-      }
-      queryParams += `toLower(n.eventType)= "${eventType}" `;
+  if (eventType !== '') {
+    if (queryParams !== '') {
+      queryParams += ' AND ';
     }
+    //  if eventType then load all children event types as well
+    const eventTypeTerm = new TaxonomyTerm({ _id: Number(eventType) });
+    const eventIds = await eventTypeTerm.loadChildrenIds();
+    const eventQueryIds = eventIds.map((i) => `"${i}"`);
+    queryParams += `n.eventType IN [${eventQueryIds}] `;
   }
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
+
   if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
+    queryOrder = `ORDER BY n.${orderField}`;
+    if (orderDesc === 'true') {
       queryOrder += ' DESC';
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
-  let currentPage = page;
-  if (page === 0) {
-    currentPage = 1;
-  }
-  let skip = limit * queryPage;
+  const currentPage = page !== 0 ? page : 1;
+  const skip = limit * queryPage;
 
   if (queryParams !== '') {
     if (temporal === '' && spatial === '') {

@@ -68,7 +68,6 @@ const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
     "msg": "Query results"
 }
 */
-
 const getClasspieces = async (req, resp) => {
   let params = await getClasspiecesPrepareQueryParams(req);
   let responseData = {};
@@ -405,16 +404,62 @@ const classpieceResources = async (
   return relations;
 };
 
+/**
+* @api {get} /classpieces-active-filters Classpieces active filters
+* @apiName classpieces active filters
+* @apiGroup Classpieces
+*
+* @apiParam {number} [page=1] The current page of results
+* @apiParam {number} [limit=50] The number of results per page
+* @apiParam {object} [temporals] An object to filter by date
+* @apiParam {string} [temporals[startDate]] A string containing a start date
+* @apiParam {string} [temporals[endDate]] An string containing an end date
+* @apiParam {string} [temporals[dateType]] An object to filter by date
+* @apiParamExample [temporals[startDate]]
+*   dd/mm/yyyy
+* @apiParamExample [temporals[endDate]]
+*   dd/mm/yyyy
+* @apiParamExample {json} Request-Example:
+*     {
+*       page: 1,
+*       limit: 50,
+*       temporals: {
+*         startDate:"28/2/2022",
+*         endDate:"7/3/2022",
+*         dateType:"range"
+*       }
+*     }
+*
+* @apiExample {request} Example:
+* https://clericus.ie/api/classpieces-active-filters?page=1&limit=50&temporals=%7B%22startDate%22:%22%22,%22endDate%22:%22%22,%22dateType%22:%22exact%22%7D
+*
+* @apiSuccessExample {json} Success-Response:
+* {
+    "status": true,
+    "data": {
+        "events": [
+            "35050",
+            "529"
+        ],
+        "organisations": [
+            "22795",
+            "71977"
+        ]
+    },
+    "error": [],
+    "msg": "Query results"
+}
+*/
 const getClasspiecesActiveFilters = async (req, resp) => {
-  let params = await getClasspiecesPrepareQueryParams(req);
-  let session = driver.session();
-  let itemsIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
-  let itemsIdsResults = await session
+  const params = await getClasspiecesPrepareQueryParams(req);
+  const session = driver.session();
+  const itemsIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
+  const itemsIdsResults = await session
     .writeTransaction((tx) => tx.run(itemsIdsQuery, {}))
     .then((result) => {
       return result.records;
     });
-  let itemsIds = [];
+  const itemsIds = [];
   for (let i in itemsIdsResults) {
     let record = itemsIdsResults[i];
     helpers.prepareOutput(record);
@@ -519,6 +564,7 @@ const getClasspiecesPrepareQueryParams = async (req) => {
     }
     let temporals = parameters.temporals;
     if (typeof temporals === 'string') {
+      console.log(temporals);
       temporals = JSON.parse(temporals);
     }
     if (

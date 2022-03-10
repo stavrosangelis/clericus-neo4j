@@ -18,6 +18,10 @@
 # uploads
 /uploads
 
+# Tests
+src/__mocks__
+src/__tests__
+
 # passwords and sensitive data
 /tools/Clericus-f242153b0bef.json
 /src/config/.private.key
@@ -39,5 +43,8 @@
 
 # local ssl cert
 /src/cert
+
+# local tools
+src/controllers/local-tools
 
 /export-import-plan.txt

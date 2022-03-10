@@ -6,17 +6,21 @@ if (process.env.NODE_ENV === 'production') {
 const Canvas = require('canvas');
 const yargs = require('yargs');
 const axios = require('axios');
-const schedule = require('node-schedule');
+// const schedule = require('node-schedule');
 const fs = require('fs');
 const { promisify } = require('util');
 const readFile = promisify(fs.readFile);
 
+/*
+ *
+ * node cli-ocr.js ocr -i=/Users/stavrosangelis/htdocs/ahi/clericus-neo4j/archive/documents/rj-hunter-2/261-EG.jpg -o=/Users/stavrosangelis/htdocs/ahi/clericus-neo4j/archive/documents/rj-hunter-2/ -l=en -t=read/analyze
+ *
+ */
 const argv = yargs
   .command(
     'ocr',
     'Execute OCR in a document. The document must be an image file'
   )
-  .command('results', 'Async Query OCR results')
   .option('input', {
     alias: 'i',
     description: 'Provide the absolute path to the file',
@@ -34,7 +38,7 @@ const argv = yargs
   })
   .option('type', {
     alias: 't',
-    description: 'One of read/ocr',
+    description: 'One of ocr | analyze',
     type: 'string',
   })
   .help('h')
@@ -42,6 +46,14 @@ const argv = yargs
 
 const visionKey = process.env.CLOUD_VISION_KEY;
 const visionURL = process.env.CLOUD_VISION_ENDPOINT;
+
+const delay = (t, val) => {
+  return new Promise(function (resolve) {
+    setTimeout(function () {
+      resolve(val);
+    }, t);
+  });
+};
 
 const highlightText = async (inputFile, text, outputFile) => {
   const lines = text.readResults[0].lines;
@@ -102,7 +114,6 @@ const exportText = async (inputFile, text, outputFile) => {
     if (typeof words !== 'undefined') {
       for (let wordKey in words) {
         const word = words[wordKey];
-        console.log(typeof wordKey);
         newText += word.text;
         if (typeof words[Number(wordKey) + 1] !== 'undefined') {
           newText += ' ';
@@ -128,8 +139,7 @@ const exportText = async (inputFile, text, outputFile) => {
   });
 };
 
-const queryResults = async () => {
-  const { input, output } = argv;
+const resultToCsv = async (input = '', output = '', fileName = '') => {
   if (input === '') {
     console.log('Please provide a valid input path to continue.');
     process.exit();
@@ -138,9 +148,84 @@ const queryResults = async () => {
     console.log('Please provide a valid output path to continue.');
     process.exit();
   }
-  const inputPathParts = input.split('/');
-  let fileName = inputPathParts[inputPathParts.length - 1];
-  fileName = fileName.replace('.jpg', '');
+  const readFile = promisify(fs.readFile);
+  const src = `${output}/${fileName}-text.json`;
+
+  const json = await readFile(src);
+  const jsonData = JSON.parse(json);
+  const results = jsonData.readResults[0];
+  const { lines } = results;
+  const words = [];
+  const { length: linesLength } = lines;
+  const rows = [];
+  for (let i = 0; i < linesLength; i += 1) {
+    const line = lines[i];
+    const { boundingBox } = line;
+    const y = boundingBox[1];
+    const height = boundingBox[5] - boundingBox[1];
+    line.y = y;
+    line.height = height;
+    words.push(line);
+    rows.push({ y, height });
+  }
+  // identify unique rows
+  const newRows = [];
+  const rowsLength = rows.length;
+  for (let i = 0; i < rowsLength; i += 1) {
+    const r = rows[i];
+    const { y, height } = r;
+    const halfHeight = height / 2;
+    const topBoundary = y - halfHeight;
+    const bottomBoundary = y + halfHeight;
+    const findRow =
+      newRows.find((r) => r.y > topBoundary && r.y < bottomBoundary) || null;
+    if (findRow === null) {
+      newRows.push(r);
+    }
+  }
+
+  // fetch row text
+  const resultRows = [];
+  const newRowsLength = newRows.length;
+  for (let i = 0; i < newRowsLength; i += 1) {
+    const nr = newRows[i];
+    const { y, height } = nr;
+    const halfHeight = height / 2;
+    const topBoundary = y - halfHeight;
+    const bottomBoundary = y + halfHeight;
+    const filterLines =
+      lines.filter(
+        (l) =>
+          l.boundingBox[1] > topBoundary && l.boundingBox[1] < bottomBoundary
+      ) || [];
+    const rowText = filterLines.map((t) => `"${t.text}"`).join(',');
+    resultRows.push(rowText);
+  }
+
+  const csvPath = `${output}/${fileName}-data.csv`;
+  const csvText = resultRows.join('\n');
+  await new Promise((resolve, reject) => {
+    fs.writeFile(csvPath, `\ufeff${csvText}`, 'utf8', function (err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+  console.log(`${fileName}-data.csv written successfully`);
+  return true;
+};
+
+const queryResults = async (input = '', output = '', fileName = '') => {
+  if (input === '') {
+    console.log('Please provide a valid input path to continue.');
+    process.exit();
+  }
+  if (output === '') {
+    console.log('Please provide a valid output path to continue.');
+    process.exit();
+  }
   const statusPath = `${output}/${fileName}-text-status.json`;
   // 1. check if text analysis is complete
   const readFile = promisify(fs.readFile);
@@ -161,12 +246,9 @@ const queryResults = async () => {
       console.log('error');
       console.log(error.response.data);
     });
-  if (
-    typeof textData.data.status !== 'undefined' &&
-    textData.data.status === 'succeeded'
-  ) {
+  if (textData?.data?.status === 'succeeded') {
     // fetch data and write them to a file
-    const outputTextFile = `${output}${fileName}-text.json`;
+    const outputTextFile = `${output}/${fileName}-text.json`;
 
     await new Promise((resolve, reject) => {
       fs.writeFile(
@@ -209,33 +291,43 @@ const queryResults = async () => {
     });
 
     // create image with highlights
-    const imgOutput = `${output}${fileName}-text.jpg`;
+    const imgOutput = `${output}/${fileName}-text.jpg`;
     await highlightText(input, textData.data.analyzeResult, imgOutput);
 
     // create simple text file
-    const textOutput = `${output}${fileName}-text.txt`;
+    const textOutput = `${output}/${fileName}-text.txt`;
     await exportText(input, textData.data.analyzeResult, textOutput);
-
-    console.log('Completed successfully');
-    process.exit();
   } else {
-    console.log('Completed with error');
+    await delay(5000);
+    await queryResults(input, output, fileName);
   }
-  process.exit();
+  await resultToCsv(input, output, fileName);
+  return 'Completed successfully';
 };
 
 const ocr = async () => {
-  const { input, output } = argv;
-  const { language } = argv || 'unk';
-  const { type } = argv || 'ocr';
-  if (input === '') {
+  const {
+    input: inputParam = '',
+    output: outputParam = '',
+    language = 'en',
+    type = 'read/analyze',
+  } = argv;
+  if (inputParam === '') {
     console.log('Please provide a valid input path to continue.');
     process.exit();
   }
-  if (output === '') {
+  if (outputParam === '') {
     console.log('Please provide a valid output path to continue.');
     process.exit();
   }
+  const input =
+    inputParam.charAt(inputParam.length - 1) === '/'
+      ? inputParam.slice(0, -1)
+      : inputParam;
+  const output =
+    outputParam.charAt(outputParam.length - 1) === '/'
+      ? outputParam.slice(0, -1)
+      : outputParam;
   if (!input.includes('.jpg')) {
     console.log(`The input file must have a '.jpg' extension`);
     process.exit();
@@ -244,11 +336,18 @@ const ocr = async () => {
   const inputPathParts = input.split('/');
   let fileName = inputPathParts[inputPathParts.length - 1];
   fileName = fileName.replace('.jpg', '');
-  let results = {};
+
+  // make an output dir specific for the fileName
+  const outputDir = `${output}/${fileName}`;
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir);
+  }
+
   const params = {
     mode: 'Printed',
     language,
     detectOrientation: false,
+    readingOrder: 'natural',
   };
   const ocrText = await axios({
     method: 'post',
@@ -279,7 +378,7 @@ const ocr = async () => {
         url: ocrText,
         completed: false,
       };
-      const statusPath = `${output}/${fileName}-text-status.json`;
+      const statusPath = `${outputDir}/${fileName}-text-status.json`;
       await new Promise((resolve, reject) => {
         fs.writeFile(
           statusPath,
@@ -297,15 +396,12 @@ const ocr = async () => {
       });
     }
   } else {
-    results = { status: false, error: 'error' };
+    console.log({ status: false, error: 'error' });
   }
-  console.log(results);
+  await queryResults(input, outputDir, fileName);
   process.exit();
 };
 
 if (argv._.includes('ocr')) {
   ocr();
-}
-if (argv._.includes('results')) {
-  queryResults();
 }

@@ -48,7 +48,7 @@ const cellOutput = (valueParam = '') => {
 const getAdminId = async () => {
   const session = driver.session();
   const userQuery = "MATCH (n:User {email:'admin@test.com'}) return n";
-  let userNode = await session
+  const userNode = await session
     .writeTransaction((tx) => tx.run(userQuery, {}))
     .then((result) => {
       let records = result.records;

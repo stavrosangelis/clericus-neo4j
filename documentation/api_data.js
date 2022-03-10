@@ -761,6 +761,99 @@ define({ "api": [
   },
   {
     "type": "get",
+    "url": "/classpieces-active-filters",
+    "title": "Classpieces active filters",
+    "name": "classpieces_active_filters",
+    "group": "Classpieces",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "50",
+            "description": "<p>The number of results per page</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "object",
+            "optional": true,
+            "field": "temporals",
+            "description": "<p>An object to filter by date</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "temporals[startDate]",
+            "description": "<p>A string containing a start date</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "temporals[endDate]",
+            "description": "<p>An string containing an end date</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "temporals[dateType]",
+            "description": "<p>An object to filter by date</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "[temporals[startDate]]",
+          "content": "dd/mm/yyyy",
+          "type": "json"
+        },
+        {
+          "title": "[temporals[endDate]]",
+          "content": "dd/mm/yyyy",
+          "type": "json"
+        },
+        {
+          "title": "Request-Example:",
+          "content": "{\n  page: 1,\n  limit: 50,\n  temporals: {\n    startDate:\"28/2/2022\",\n    endDate:\"7/3/2022\",\n    dateType:\"range\"\n  }\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "https://clericus.ie/api/classpieces-active-filters?page=1&limit=50&temporals=%7B%22startDate%22:%22%22,%22endDate%22:%22%22,%22dateType%22:%22exact%22%7D",
+        "type": "request"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n    \"status\": true,\n    \"data\": {\n        \"events\": [\n            \"35050\",\n            \"529\"\n        ],\n        \"organisations\": [\n            \"22795\",\n            \"71977\"\n        ]\n    },\n    \"error\": [],\n    \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/ui/classpieces.ctrl.js",
+    "groupTitle": "Classpieces"
+  },
+  {
+    "type": "get",
     "url": "/content-article",
     "title": "Get article",
     "name": "get_content_article",
@@ -953,7 +1046,7 @@ define({ "api": [
             "group": "Parameter",
             "type": "string",
             "optional": true,
-            "field": "importId",
+            "field": "importPlanId",
             "description": "<p>A string to match against the data cleaning / disambiguation related _id.</p>"
           },
           {
@@ -1057,7 +1150,7 @@ define({ "api": [
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "{\"error\":[],\"status\":true,\"data\":{\"createdAt\":\"2021-11-09T12:13:46.110Z\",\"updatedBy\":\"53930\",\"importId\":\"93912\",\"createdBy\":\"53930\",\"rule\":\"{\\\"type\\\":\\\"unique\\\",\\\"columns\\\":[{\\\"value\\\":8,\\\"label\\\":\\\"[I] Diocese\\\"}],\\\"entityType\\\":\\\"\\\"}\",\"_id\":\"93958\",\"label\":\"date unique\",\"completed\":false,\"type\":\"unique\",\"updatedAt\":\"2021-11-09T12:14:03.991Z\"}}",
+          "content": "{\"error\":[],\"status\":true,\"data\":{\"createdAt\":\"2021-11-09T12:13:46.110Z\",\"updatedBy\":\"53930\",\"importPlanId\":\"93912\",\"createdBy\":\"53930\",\"rule\":\"{\\\"type\\\":\\\"unique\\\",\\\"columns\\\":[{\\\"value\\\":8,\\\"label\\\":\\\"[I] Diocese\\\"}],\\\"entityType\\\":\\\"\\\"}\",\"_id\":\"93958\",\"label\":\"date unique\",\"completed\":false,\"type\":\"unique\",\"updatedAt\":\"2021-11-09T12:14:03.991Z\"}}",
           "type": "json"
         }
       ]
@@ -1090,6 +1183,38 @@ define({ "api": [
         {
           "title": "Success-Response:",
           "content": "{\n  \"status\": true,\n  \"data\": [\n    [null, \"O'Byrne\", \"O'Beirne\", \"Denis\", \"Dionysius\", \"Latin\", null, null,  null, null, null, null, null, null, \"L. W. B. Brockliss and Patrick Ferté (eds), 'Prosopography of Irish Clerics in the Universities of Paris and Toulouse, 1573-1792'\"],\n    [null, \"Brady\", null, \"Philip\", \"Philippus\", \"Latin\", null, null, \"Kilmore\", 737, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, \"University of Paris\", \"Paris\", null, null, null, null, null, null, null, \"Faculty of Law\", \"1703-10-??\", null, \"Bachelors in Canon Law\", \"1704-12-12\", \"Licentiate in Canon Law\", \"1705-08-29\", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, \"L. W. B. Brockliss and Patrick Ferté (eds), 'Prosopography of Irish Clerics in the Universities of Paris and Toulouse, 1573-1792'\"],\n  ],\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/dataCleaning.ctrl.js",
+    "groupTitle": "DataCleanings"
+  },
+  {
+    "type": "get",
+    "url": "/data-cleaning-wf-dates",
+    "title": "Get Data cleaning / disambiguation compare dates against expected format and return if dates are well formatted",
+    "name": "get_data-cleaning_well_formatted_dates",
+    "group": "DataCleanings",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The _id of the requested import.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "{\n  \"status\": true,\n  \"data\": [],\n  \"error\": [],\n  \"msg\": \"Query results\"\n}",
           "type": "json"
         }
       ]
@@ -1787,6 +1912,370 @@ define({ "api": [
   },
   {
     "type": "delete",
+    "url": "/import-plan",
+    "title": "Delete import",
+    "name": "delete_import",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "delete",
+    "url": "/import-file-delete",
+    "title": "Delete import file",
+    "name": "delete_import_file",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import file for deletion.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "delete",
+    "url": "/import-plan-relation",
+    "title": "Delete import plan relation",
+    "name": "delete_import_plan_relation",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "importId",
+            "description": "<p>The _id of the import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "Number",
+            "optional": false,
+            "field": "index",
+            "description": "<p>The index of the relation in the relations list.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Request-Example:",
+          "content": "{\n  importId: \"96991\",\n  index: 0,\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "get",
+    "url": "/import-plan-status",
+    "title": "Get import plan ingestion status",
+    "name": "get_import_plan_ingestion_status",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import plan.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "get",
+    "url": "/import-plan-preview-results",
+    "title": "Get import plan results preview",
+    "name": "get_import_plan_preview_results",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import plan.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "rows",
+            "description": "<p>A list of rows from the data file to match against. If left blank it defaults to rows 1-10.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "get",
+    "url": "/import-plans",
+    "title": "Get imports",
+    "name": "get_imports",
+    "group": "ImportPlans",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "_id",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>A unique _id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against the peoples' labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "label",
+            "description": "<p>The field to order the results by.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "put",
+    "url": "/import-plan",
+    "title": "Put import",
+    "name": "put_import",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The _id of the import. This should be undefined|null|blank in the creation of a new import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "array",
+            "optional": true,
+            "field": "label",
+            "description": "<p>The label of the new import.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "put",
+    "url": "/import-plan-ingest",
+    "title": "Start ingestion according to import plan",
+    "name": "put_import_plan_ingest",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>The id of the import plan.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "put",
+    "url": "/import-plan-relation",
+    "title": "Put import plan relation",
+    "name": "put_import_plan_relation",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "importId",
+            "description": "<p>The _id of the import.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "Number",
+            "optional": false,
+            "field": "index",
+            "description": "<p>The index of the relation in the relations list. -1 for new relations.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "Object",
+            "optional": false,
+            "field": "relation",
+            "description": "<p>An object that contains the relation data.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Request-Example:",
+          "content": "{\n  importId: \"96991\",\n  index: -1,\n  relation: {\n    relationLabel: \"hasAffiliation\",\n    srcId: \"96995\",\n    srcType: \"Person\",\n    targetId: \"96994\",\n    targetType: \"Organisation\"\n  }\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "post",
+    "url": "/import-file-upload",
+    "title": "Upload file to an import",
+    "name": "upload_file_to_an_import",
+    "group": "ImportPlans",
+    "permission": [
+      {
+        "name": "admin",
+        "title": "This endpoint is only available to users with administrator priviledges",
+        "description": ""
+      }
+    ],
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "formData",
+            "optional": true,
+            "field": "file",
+            "description": "<p>A form data object with the name &quot;file&quot; containing the filename and the file blob.</p>"
+          }
+        ]
+      }
+    },
+    "examples": [
+      {
+        "title": "Example:",
+        "content": "Content-Disposition: form-data; name=\"file\"; filename=\"some-file.csv\"\nContent-Type: image/jpeg",
+        "type": "formData"
+      }
+    ],
+    "version": "0.0.0",
+    "filename": "src/controllers/importPlan.ctrl.js",
+    "groupTitle": "ImportPlans"
+  },
+  {
+    "type": "delete",
     "url": "/import-rule",
     "title": "Delete import rule",
     "name": "delete_import_rule",
@@ -1849,9 +2338,9 @@ define({ "api": [
         "Parameter": [
           {
             "group": "Parameter",
-            "type": "_id",
+            "type": "importPlanId",
             "optional": true,
-            "field": "importId",
+            "field": "_id",
             "description": "<p>An import unique _id.</p>"
           }
         ]
@@ -1902,7 +2391,7 @@ define({ "api": [
             "group": "Parameter",
             "type": "string",
             "optional": true,
-            "field": "importId",
+            "field": "importPlanId",
             "description": "<p>The _id of the an associated import.</p>"
           },
           {
@@ -1918,229 +2407,6 @@ define({ "api": [
     "version": "0.0.0",
     "filename": "src/controllers/importRules.ctrl.js",
     "groupTitle": "Import_rules"
-  },
-  {
-    "type": "delete",
-    "url": "/import",
-    "title": "Delete import",
-    "name": "delete_import",
-    "group": "Imports",
-    "permission": [
-      {
-        "name": "admin",
-        "title": "This endpoint is only available to users with administrator priviledges",
-        "description": ""
-      }
-    ],
-    "parameter": {
-      "fields": {
-        "Parameter": [
-          {
-            "group": "Parameter",
-            "type": "string",
-            "optional": false,
-            "field": "_id",
-            "description": "<p>The id of the import for deletion.</p>"
-          }
-        ]
-      }
-    },
-    "version": "0.0.0",
-    "filename": "src/controllers/import.ctrl.js",
-    "groupTitle": "Imports"
-  },
-  {
-    "type": "delete",
-    "url": "/import-file-delete",
-    "title": "Delete import file",
-    "name": "delete_import_file",
-    "group": "Imports",
-    "permission": [
-      {
-        "name": "admin",
-        "title": "This endpoint is only available to users with administrator priviledges",
-        "description": ""
-      }
-    ],
-    "parameter": {
-      "fields": {
-        "Parameter": [
-          {
-            "group": "Parameter",
-            "type": "string",
-            "optional": false,
-            "field": "_id",
-            "description": "<p>The id of the import file for deletion.</p>"
-          }
-        ]
-      }
-    },
-    "version": "0.0.0",
-    "filename": "src/controllers/import.ctrl.js",
-    "groupTitle": "Imports"
-  },
-  {
-    "type": "get",
-    "url": "/imports",
-    "title": "Get imports",
-    "name": "get_imports",
-    "group": "Imports",
-    "parameter": {
-      "fields": {
-        "Parameter": [
-          {
-            "group": "Parameter",
-            "type": "_id",
-            "optional": true,
-            "field": "_id",
-            "description": "<p>A unique _id.</p>"
-          },
-          {
-            "group": "Parameter",
-            "type": "string",
-            "optional": true,
-            "field": "label",
-            "description": "<p>A string to match against the peoples' labels.</p>"
-          },
-          {
-            "group": "Parameter",
-            "type": "string",
-            "optional": true,
-            "field": "orderField",
-            "defaultValue": "label",
-            "description": "<p>The field to order the results by.</p>"
-          }
-        ]
-      }
-    },
-    "version": "0.0.0",
-    "filename": "src/controllers/import.ctrl.js",
-    "groupTitle": "Imports"
-  },
-  {
-    "type": "put",
-    "url": "/import",
-    "title": "Put import",
-    "name": "put_import",
-    "group": "Imports",
-    "permission": [
-      {
-        "name": "admin",
-        "title": "This endpoint is only available to users with administrator priviledges",
-        "description": ""
-      }
-    ],
-    "parameter": {
-      "fields": {
-        "Parameter": [
-          {
-            "group": "Parameter",
-            "type": "string",
-            "optional": true,
-            "field": "_id",
-            "description": "<p>The _id of the import. This should be undefined|null|blank in the creation of a new import.</p>"
-          },
-          {
-            "group": "Parameter",
-            "type": "array",
-            "optional": true,
-            "field": "label",
-            "description": "<p>The label of the new import.</p>"
-          }
-        ]
-      }
-    },
-    "version": "0.0.0",
-    "filename": "src/controllers/import.ctrl.js",
-    "groupTitle": "Imports"
-  },
-  {
-    "type": "put",
-    "url": "/import-plan-relation",
-    "title": "Put import plan relation",
-    "name": "put_import_plan_relation",
-    "group": "Imports",
-    "permission": [
-      {
-        "name": "admin",
-        "title": "This endpoint is only available to users with administrator priviledges",
-        "description": ""
-      }
-    ],
-    "parameter": {
-      "fields": {
-        "Parameter": [
-          {
-            "group": "Parameter",
-            "type": "String",
-            "optional": false,
-            "field": "importId",
-            "description": "<p>The _id of the import.</p>"
-          },
-          {
-            "group": "Parameter",
-            "type": "Number",
-            "optional": false,
-            "field": "index",
-            "description": "<p>The index of the relation in the relations list. -1 for new relations.</p>"
-          },
-          {
-            "group": "Parameter",
-            "type": "Object",
-            "optional": false,
-            "field": "relation",
-            "description": "<p>An object that contains the relation data.</p>"
-          }
-        ]
-      },
-      "examples": [
-        {
-          "title": "Request-Example:",
-          "content": "{\n  importId: \"96991\",\n  index: -1,\n  relation: {\n    relationLabel: \"hasAffiliation\",\n    srcId: \"96995\",\n    srcType: \"Person\",\n    targetId: \"96994\",\n    targetType: \"Organisation\"\n  }\n}",
-          "type": "json"
-        }
-      ]
-    },
-    "version": "0.0.0",
-    "filename": "src/controllers/import.ctrl.js",
-    "groupTitle": "Imports"
-  },
-  {
-    "type": "post",
-    "url": "/import-file-upload",
-    "title": "Upload file to an import",
-    "name": "upload_file_to_an_import",
-    "group": "Imports",
-    "permission": [
-      {
-        "name": "admin",
-        "title": "This endpoint is only available to users with administrator priviledges",
-        "description": ""
-      }
-    ],
-    "parameter": {
-      "fields": {
-        "Parameter": [
-          {
-            "group": "Parameter",
-            "type": "formData",
-            "optional": true,
-            "field": "file",
-            "description": "<p>A form data object with the name &quot;file&quot; containing the filename and the file blob.</p>"
-          }
-        ]
-      }
-    },
-    "examples": [
-      {
-        "title": "Example:",
-        "content": "Content-Disposition: form-data; name=\"file\"; filename=\"some-file.csv\"\nContent-Type: image/jpeg",
-        "type": "formData"
-      }
-    ],
-    "version": "0.0.0",
-    "filename": "src/controllers/import.ctrl.js",
-    "groupTitle": "Imports"
   },
   {
     "type": "get",
@@ -5566,6 +5832,13 @@ define({ "api": [
             "optional": false,
             "field": "inverseLabelId",
             "description": "<p>The inverseLabelId of the requested taxonomy term. Either the _id or the labelId or the inverseLabelId should be provided.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "entityType",
+            "description": "<p>If entityType is provided an entityCount will be returned with a count of all entities associated with the term. One of Event | Organisation | Person | Resource</p>"
           }
         ]
       }
@@ -7054,7 +7327,7 @@ define({ "api": [
   },
   {
     "type": "get",
-    "url": "/import",
+    "url": "/import-plan",
     "title": "Get import",
     "name": "get_import",
     "group": "imports",
@@ -7072,7 +7345,7 @@ define({ "api": [
       }
     },
     "version": "0.0.0",
-    "filename": "src/controllers/import.ctrl.js",
+    "filename": "src/controllers/importPlan.ctrl.js",
     "groupTitle": "imports"
   }
 ] });

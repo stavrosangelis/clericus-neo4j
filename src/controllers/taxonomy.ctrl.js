@@ -154,17 +154,18 @@ class Taxonomy {
           nodeProperties +
           ' RETURN n';
       }
-      let resultPromise = await session.run(query, params).then((result) => {
+      const resultPromise = await session.run(query, params).then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
+        const { length } = records;
         let output = {
-          error: ['The record cannot be updated'],
+          error: [`The record "${this.label}" cannot be updated`],
           status: false,
           data: [],
         };
-        if (records.length > 0) {
-          let record = records[0];
-          let key = record.keys[0];
+        if (length > 0) {
+          const record = records[0];
+          const key = record.keys[0];
           let resultRecord = record.toObject()[key];
           resultRecord = helpers.outputRecord(resultRecord);
           output = { error: [], status: true, data: resultRecord };

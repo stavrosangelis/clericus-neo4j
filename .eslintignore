@@ -13,6 +13,10 @@ lib-cov
 # Coverage directory used by tools like istanbul
 coverage
 
+# Tests
+src/__mocks__
+src/__tests__
+
 # Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
