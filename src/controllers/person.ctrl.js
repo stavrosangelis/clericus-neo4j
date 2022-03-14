@@ -22,16 +22,16 @@ class Person {
     if (typeof _id !== 'undefined' && _id !== null) {
       this._id = _id;
     }
-    if (firstName !== null) {
+    if (firstName !== null && firstName !== '') {
       firstName = firstName.trim();
     }
-    if (middleName !== null) {
+    if (middleName !== null && middleName !== '') {
       middleName = middleName.trim();
     }
-    if (lastName !== null) {
+    if (lastName !== null && lastName !== '') {
       lastName = lastName.trim();
     }
-    if (description !== null) {
+    if (description !== null && description !== '') {
       description = description.trim();
     }
     this.honorificPrefix = honorificPrefix;
