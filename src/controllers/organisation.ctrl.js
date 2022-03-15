@@ -175,7 +175,7 @@ class Organisation {
         }
       }
       this.alternateAppelations = newAppelations;
-      if (this.labelSoundex === null) {
+      if (this.labelSoundex === null && isNaN(this.label)) {
         this.labelSoundex = helpers.soundex(this.label.trim());
       }
 

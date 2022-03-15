@@ -22,17 +22,17 @@ class Person {
     if (typeof _id !== 'undefined' && _id !== null) {
       this._id = _id;
     }
-    if (firstName !== null && firstName !== '') {
-      firstName = firstName.toString().trim();
+    if (firstName !== null && isNaN(firstName)) {
+      firstName = firstName.trim();
     }
-    if (middleName !== null && middleName !== '') {
-      middleName = middleName.toString().trim();
+    if (middleName !== null && isNaN(middleName)) {
+      middleName = middleName.trim();
     }
-    if (lastName !== null && lastName !== '') {
-      lastName = lastName.toString().trim();
+    if (lastName !== null && isNaN(lastName)) {
+      lastName = lastName.trim();
     }
-    if (description !== null && description !== '') {
-      description = description.toString().trim();
+    if (description !== null && isNaN(description)) {
+      description = description.trim();
     }
     this.honorificPrefix = honorificPrefix;
     this.firstName = firstName;
@@ -313,12 +313,12 @@ class Person {
   }
 
   async save(userId) {
-    let validatePerson = this.validate();
+    const validatePerson = this.validate();
     if (!validatePerson.status) {
       return validatePerson;
     } else {
-      let session = driver.session();
-      let newAppelations = [];
+      const session = driver.session();
+      const newAppelations = [];
       if (this.alternateAppelations.length > 0) {
         for (let key in this.alternateAppelations) {
           let alternateAppelation = this.alternateAppelations[key];

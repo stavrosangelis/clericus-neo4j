@@ -54,9 +54,9 @@ const dashboardStats = async (req, resp) => {
 };
 
 const countNodes = async (type) => {
-  let session = driver.session();
-  let query = 'MATCH (n:' + type + ') RETURN count(*)';
-  let count = await session
+  const session = driver.session();
+  const query = 'MATCH (n:' + type + ') RETURN count(*)';
+  const count = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();
