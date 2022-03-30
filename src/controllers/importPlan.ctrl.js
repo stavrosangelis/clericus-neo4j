@@ -2684,6 +2684,33 @@ const getImportPlanStatus = async (req, resp) => {
   });
 };
 
+const importPlanFileDownload = async (req, resp) => {
+  const { params } = req;
+  console.log(params);
+  const { _id = null } = params;
+  if (_id === null) {
+    return resp.status(500).json({
+      data: [],
+      errors: [],
+      msg: 'Please provide a valid import plan id to continue',
+    });
+  }
+  const plan = new ImportPlan({ _id });
+  await plan.load();
+  const file = new UploadedFile({ _id: plan.uploadedFile });
+  await file.load();
+  const { filename } = file;
+  const mtype = mimeType.lookup(filename);
+  const { paths } = file;
+  const { path } = JSON.parse(paths[0]) || '';
+  if (path !== '') {
+    const data = fs.readFileSync(path);
+    resp.setHeader('Content-disposition', `attachment; filename=${filename}`);
+    resp.setHeader('Content-type', mtype);
+    resp.send(Buffer.from(data));
+  }
+};
+
 module.exports = {
   ImportPlan: ImportPlan,
   getImportPlans,
@@ -2697,4 +2724,5 @@ module.exports = {
   deleteImportPlanRelation,
   putImportPlanIngest,
   getImportPlanStatus,
+  importPlanFileDownload,
 };

@@ -559,6 +559,10 @@ server.get(
   auth.checkAdminToken,
   importPlanController.getImportPlanStatus
 );
+server.get(
+  '/import-plan-file-download/:_id',
+  importPlanController.importPlanFileDownload
+);
 
 // import rules
 server.get(
