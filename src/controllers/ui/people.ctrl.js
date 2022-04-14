@@ -322,75 +322,75 @@ const getPerson = async (req, resp) => {
 };
 
 const getPersonActiveFilters = async (req, resp) => {
-  let params = await getPeoplePrepareQueryParams(req);
-  let session = driver.session();
-  let peopleIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
-  let peopleIdsResults = await session
+  const params = await getPeoplePrepareQueryParams(req);
+  const session = driver.session();
+  const peopleIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
+  const peopleIdsResults = await session
     .writeTransaction((tx) => tx.run(peopleIdsQuery, {}))
     .then((result) => {
       return result.records;
     });
-  let peopleIds = [];
+  const peopleIds = [];
   for (let i in peopleIdsResults) {
-    let record = peopleIdsResults[i];
+    const record = peopleIdsResults[i];
     prepareOutput(record);
     peopleIds.push(record.toObject()['_id']);
   }
-  let query = `MATCH (p:Person {status:'public'})-->(n {status:'public'}) WHERE id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, labels(n) as labels, n.eventType as eventType, n.systemType as systemType`;
-  let nodesPromise = await session
+  const query = `MATCH (p:Person {status:'public'})-->(n {status:'public'}) WHERE id(p) IN [${peopleIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, labels(n) as labels, n.eventType as eventType, n.systemType as systemType`;
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
     });
   session.close();
 
-  let nodes = nodesPromise.map((record) => {
+  const nodes = nodesPromise.map((record) => {
     prepareOutput(record);
     let outputItem = record.toObject();
     outputItem.type = outputItem.labels[0];
     delete outputItem.labels;
     return outputItem;
   });
-  let events = [];
-  let organisations = [];
-  let sources = [];
-  let eventsFind = nodes.filter((n) => n.type === 'Event');
-  if (eventsFind !== 'undefined') {
-    events = [];
-    for (let i = 0; i < eventsFind.length; i++) {
-      let e = eventsFind[i];
+  const events = [];
+  const organisations = [];
+  const sources = [];
+  const eventsFind = nodes.filter((n) => n.type === 'Event') || [];
+  const { length: eventsFindLength } = eventsFind;
+  if (eventsFindLength > 0) {
+    for (let i = 0; i < eventsFindLength; i += 1) {
+      const e = eventsFind[i];
       if (events.indexOf(e.eventType) === -1) {
         events.push(e.eventType);
       }
     }
   }
-  let organisationsFind = nodes.filter((n) => n.type === 'Organisation');
-  if (organisationsFind !== 'undefined') {
-    let organisationsResult = [];
-    for (let i = 0; i < organisationsFind.length; i++) {
-      let org = organisationsFind[i];
-      organisationsResult.push(org._id);
+  const organisationsFind =
+    nodes.filter((n) => n.type === 'Organisation') || [];
+  const { length: organisationsFindLength } = organisationsFind;
+  if (organisationsFindLength > 0) {
+    for (let i = 0; i < organisationsFindLength; i += 1) {
+      const org = organisationsFind[i];
+      organisations.push(org._id);
     }
-    organisations = organisationsResult;
   }
-  let resourcesFind = nodes.filter((n) => n.type === 'Resource');
+  const resourcesFind = nodes.filter((n) => n.type === 'Resource') || [];
+  const { length: resourcesFindLength } = resourcesFind;
   let documentSystemType = new TaxonomyTerm({ labelId: 'Document' });
   await documentSystemType.load();
-  if (resourcesFind !== 'undefined') {
-    sources = [];
-    for (let i = 0; i < resourcesFind.length; i++) {
+  if (resourcesFindLength > 0) {
+    for (let i = 0; i < resourcesFindLength; i += 1) {
       let r = resourcesFind[i];
       if (r.systemType === documentSystemType._id) {
         sources.push(r._id);
       }
     }
   }
-  let output = {
-    events: events,
-    organisations: organisations,
-    sources: sources,
+  const output = {
+    events,
+    organisations,
+    sources,
   };
-  resp.json({
+  return resp.json({
     status: true,
     data: output,
     error: [],

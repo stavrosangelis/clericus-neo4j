@@ -43,22 +43,22 @@ app.use(express.static(process.env.UPLOADSPATH));
 // add https support
 if (process.env.NODE_ENV === 'development.ssl') {
   const key = fs.readFileSync(
-    path.resolve(__dirname, './cert/client-key.pem'),
+    path.resolve(__dirname, './cert/localhost-key.pem'),
     'utf8'
   );
   const cert = fs.readFileSync(
-    path.resolve(__dirname, './cert/client-cert.pem'),
+    path.resolve(__dirname, './cert/localhost.pem'),
     'utf8'
   );
 
   const options = {
     key: key,
     cert: cert,
-    passphrase: 'localhost',
+    // passphrase: 'localhost',
   };
   /** start express server */
   https.createServer(options, app).listen(port, () => {
-    console.log(`Server started at port: ${port}`);
+    console.log(`HTTPS-enabled server started at port: ${port}`);
   });
 } else {
   http.createServer(app).listen(port, () => {

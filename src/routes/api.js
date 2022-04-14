@@ -143,6 +143,7 @@ server.post(
   '/item-network-simulation',
   visualisationsController.itemGraphSimulation
 );
+server.get('/sample-map-data', visualisationsController.getMapSampleData);
 
 /**
  * @apiDefine admin This endpoint is only available to users with administrator priviledges

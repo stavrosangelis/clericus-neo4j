@@ -965,14 +965,45 @@ const getItemTimeline = async (req, resp) => {
   });
 };
 
+const getMapSampleData = async (req, resp) => {
+  const fPath = `${archivePath}data.example.json`;
+  const file = await helpers.readJSONFile(fPath);
+  if (file.data !== null) {
+    const { data = [] } = file;
+    const { length } = data;
+    if (length > 0) {
+      return resp.status(200).json({
+        status: true,
+        data: JSON.stringify(data),
+        error: [],
+        msg: 'Sample map data',
+      });
+    } else {
+      return resp.status(404).json({
+        status: false,
+        data: [],
+        error: ['File does not contain data'],
+        msg: 'Sample map data',
+      });
+    }
+  }
+  return resp.status(404).json({
+    status: false,
+    data: [],
+    error: ['File not found'],
+    msg: 'Sample map data',
+  });
+};
+
 module.exports = {
-  getItemNetwork: getItemNetwork,
-  getRelatedNodes: getRelatedNodes,
-  getRelatedPaths: getRelatedPaths,
-  getHeatmap: getHeatmap,
-  getGraphNetwork: getGraphNetwork,
-  getTimeline: getTimeline,
-  getItemTimeline: getItemTimeline,
-  produceGraphNetwork: produceGraphNetwork,
-  itemGraphSimulation: itemGraphSimulation,
+  getItemNetwork,
+  getRelatedNodes,
+  getRelatedPaths,
+  getHeatmap,
+  getGraphNetwork,
+  getTimeline,
+  getItemTimeline,
+  produceGraphNetwork,
+  itemGraphSimulation,
+  getMapSampleData,
 };
