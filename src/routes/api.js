@@ -1,5 +1,4 @@
 const express = require('express');
-const passport = require('passport');
 const auth = require('./auth');
 const server = express.Router();
 
@@ -149,8 +148,6 @@ server.get('/sample-map-data', visualisationsController.getMapSampleData);
  * @apiDefine admin This endpoint is only available to users with administrator priviledges
  */
 // ******* admin endpoints ******** //
-// authentication
-passport.use('local', authController.passportLocal);
 // server.post('/login', authController.loginUser);
 server.post('/admin-login', authController.loginAdmin);
 server.post(

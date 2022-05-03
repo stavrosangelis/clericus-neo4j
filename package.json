@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.65.34",
+  "version": "0.65.4",
   "author": "Stavros Angelis",
   "license": "ISC",
   "description": "This is the Clericus API using neo4j as a database",
@@ -45,7 +45,6 @@
     "nodemon": "^2.0.12",
     "passport": "^0.4.1",
     "passport-local": "^1.0.0",
-    "pm2": "^5.1.0",
     "read-excel-file": "^5.2.9",
     "sanitize-html": "^2.4.0",
     "sendmail": "^1.6.1",

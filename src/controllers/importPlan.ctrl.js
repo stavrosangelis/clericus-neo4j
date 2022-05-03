@@ -989,21 +989,23 @@ const parseColumn = (col, row, temporal = false) => {
 
 const parseEvents = async (value, rows = []) => {
   const events = [];
-  const length = rows.length;
+  const { length } = rows;
   for (let i = 0; i < length; i += 1) {
     const data = [];
     const row = rows[i];
-    const length = value.columns.length;
-    for (let v = 0; v < length; v += 1) {
-      const newValue = parseColumn(value.columns[v], row);
+    const { columns } = value;
+    const { length: cLength } = columns;
+    for (let v = 0; v < cLength; v += 1) {
+      const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (value.columns[v].type === 'condition') {
+      } else if (columns[v].type === 'condition') {
         data.push({ condition: false });
       }
     }
+
     const eventData = {};
-    const dataLength = data.length;
+    const { length: dataLength = 0 } = data;
     let hasConditions = false;
     let conditionsFullfilled = false;
     for (let j = 0; j < dataLength; j += 1) {
@@ -1019,9 +1021,12 @@ const parseEvents = async (value, rows = []) => {
     }
     if (
       (!hasConditions || (hasConditions && conditionsFullfilled)) &&
-      typeof eventData.label !== 'undefined' &&
-      eventData.label !== null &&
-      eventData.label !== ''
+      ((typeof eventData._id !== 'undefined' &&
+        eventData._id !== null &&
+        eventData._id !== '') ||
+        (typeof eventData.label !== 'undefined' &&
+          eventData.label !== null &&
+          eventData.label !== ''))
     ) {
       const event = new Event(eventData);
       if (typeof event._id !== 'undefined' && event._id !== null) {
@@ -1037,16 +1042,17 @@ const parseEvents = async (value, rows = []) => {
 
 const parseOrganisations = async (value, rows = []) => {
   const organisations = [];
-  const length = rows.length;
+  const { length } = rows;
   for (let i = 0; i < length; i += 1) {
     const data = [];
     const row = rows[i];
-    const length = value.columns.length;
-    for (let v = 0; v < length; v += 1) {
-      const newValue = parseColumn(value.columns[v], row);
+    const { columns } = value;
+    const { length: cLength } = columns;
+    for (let v = 0; v < cLength; v += 1) {
+      const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (value.columns[v].type === 'condition') {
+      } else if (columns[v].type === 'condition') {
         data.push({ condition: false });
       }
     }
@@ -1067,9 +1073,12 @@ const parseOrganisations = async (value, rows = []) => {
     }
     if (
       (!hasConditions || (hasConditions && conditionsFullfilled)) &&
-      typeof organisationsData.label !== 'undefined' &&
-      organisationsData.label !== null &&
-      organisationsData.label !== ''
+      ((typeof organisationsData._id !== 'undefined' &&
+        organisationsData._id !== null &&
+        organisationsData._id !== '') ||
+        (typeof organisationsData.label !== 'undefined' &&
+          organisationsData.label !== null &&
+          organisationsData.label !== ''))
     ) {
       const organisation = new Organisation(organisationsData);
       if (
@@ -1088,21 +1097,22 @@ const parseOrganisations = async (value, rows = []) => {
 
 const parsePersons = async (value, rows = []) => {
   const persons = [];
-  const length = rows.length;
+  const { length } = rows;
   for (let i = 0; i < length; i += 1) {
     const data = [];
     const row = rows[i];
-    const length = value.columns.length;
-    for (let v = 0; v < length; v += 1) {
-      const newValue = parseColumn(value.columns[v], row);
+    const { columns } = value;
+    const { length: cLength } = columns;
+    for (let v = 0; v < cLength; v += 1) {
+      const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (value.columns[v].type === 'condition') {
+      } else if (columns[v].type === 'condition') {
         data.push({ condition: false });
       }
     }
     const personData = {};
-    const dataLength = data.length;
+    const { length: dataLength = 0 } = data;
     let hasConditions = false;
     let conditionsFullfilled = false;
     for (let j = 0; j < dataLength; j += 1) {
@@ -1118,9 +1128,12 @@ const parsePersons = async (value, rows = []) => {
     }
     if (
       (!hasConditions || (hasConditions && conditionsFullfilled)) &&
-      ((typeof personData.firstName !== 'undefined' &&
-        personData.firstName !== null &&
-        personData.firstName !== '') ||
+      ((typeof personData._id !== 'undefined' &&
+        personData._id !== null &&
+        personData._id !== '') ||
+        (typeof personData.firstName !== 'undefined' &&
+          personData.firstName !== null &&
+          personData.firstName !== '') ||
         (typeof personData.lastName !== 'undefined' &&
           personData.lastName !== null &&
           personData.lastName !== '') ||
@@ -1142,21 +1155,22 @@ const parsePersons = async (value, rows = []) => {
 
 const parseResources = async (value, rows = []) => {
   const resources = [];
-  const length = rows.length;
+  const { length } = rows;
   for (let i = 0; i < length; i += 1) {
     const data = [];
     const row = rows[i];
-    const length = value.columns.length;
-    for (let v = 0; v < length; v += 1) {
-      const newValue = parseColumn(value.columns[v], row);
+    const { columns } = value;
+    const { length: cLength } = columns;
+    for (let v = 0; v < cLength; v += 1) {
+      const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (value.columns[v].type === 'condition') {
+      } else if (columns[v].type === 'condition') {
         data.push({ condition: false });
       }
     }
     const resourcesData = {};
-    const dataLength = data.length;
+    const { length: dataLength = 0 } = data;
     let hasConditions = false;
     let conditionsFullfilled = false;
     for (let j = 0; j < dataLength; j += 1) {
@@ -1172,9 +1186,12 @@ const parseResources = async (value, rows = []) => {
     }
     if (
       (!hasConditions || (hasConditions && conditionsFullfilled)) &&
-      typeof resourcesData.label !== 'undefined' &&
-      resourcesData.label !== null &&
-      resourcesData.label !== ''
+      ((typeof resourcesData._id !== 'undefined' &&
+        resourcesData._id !== null &&
+        resourcesData._id !== '') ||
+        (typeof resourcesData.label !== 'undefined' &&
+          resourcesData.label !== null &&
+          resourcesData.label !== ''))
     ) {
       const resource = new Resource(resourcesData);
       if (typeof resource._id !== 'undefined' && resource._id !== null) {
@@ -1194,17 +1211,18 @@ const parseSpatials = async (value, rows = []) => {
   for (let i = 0; i < length; i += 1) {
     const data = [];
     const row = rows[i];
-    const length = value.columns.length;
-    for (let v = 0; v < length; v += 1) {
-      const newValue = parseColumn(value.columns[v], row);
+    const { columns } = value;
+    const { length: cLength } = columns;
+    for (let v = 0; v < cLength; v += 1) {
+      const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (value.columns[v].type === 'condition') {
+      } else if (columns[v].type === 'condition') {
         data.push({ condition: false });
       }
     }
     const spatialsData = {};
-    const dataLength = data.length;
+    const { length: dataLength = 0 } = data;
     let hasConditions = false;
     let conditionsFullfilled = false;
     for (let j = 0; j < dataLength; j += 1) {
@@ -1220,9 +1238,12 @@ const parseSpatials = async (value, rows = []) => {
     }
     if (
       (!hasConditions || (hasConditions && conditionsFullfilled)) &&
-      typeof spatialsData.label !== 'undefined' &&
-      spatialsData.label !== null &&
-      spatialsData.label !== ''
+      ((typeof spatialsData._id !== 'undefined' &&
+        spatialsData._id !== null &&
+        spatialsData._id !== '') ||
+        (typeof spatialsData.label !== 'undefined' &&
+          spatialsData.label !== null &&
+          spatialsData.label !== ''))
     ) {
       const spatial = new Spatial(spatialsData);
       if (typeof spatial._id !== 'undefined' && spatial._id !== null) {
@@ -1242,17 +1263,18 @@ const parseTemporals = async (value, rows = []) => {
   for (let i = 0; i < length; i += 1) {
     const data = [];
     const row = rows[i];
-    const length = value.columns.length;
-    for (let v = 0; v < length; v += 1) {
-      const newValue = parseColumn(value.columns[v], row, true);
+    const { columns } = value;
+    const { length: cLength } = columns;
+    for (let v = 0; v < cLength; v += 1) {
+      const newValue = parseColumn(columns[v], row, true);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (value.columns[v].type === 'condition') {
+      } else if (columns[v].type === 'condition') {
         data.push({ condition: false });
       }
     }
     const temporalsData = {};
-    const dataLength = data.length;
+    const { length: dataLength = 0 } = data;
     let hasConditions = false;
     let conditionsFullfilled = false;
     for (let j = 0; j < dataLength; j += 1) {
@@ -1274,9 +1296,12 @@ const parseTemporals = async (value, rows = []) => {
     }
     if (
       (!hasConditions || (hasConditions && conditionsFullfilled)) &&
-      typeof temporalsData.label !== 'undefined' &&
-      temporalsData.label !== null &&
-      temporalsData.label !== ''
+      ((typeof temporalsData._id !== 'undefined' &&
+        temporalsData._id !== null &&
+        temporalsData._id !== '') ||
+        (typeof temporalsData.label !== 'undefined' &&
+          temporalsData.label !== null &&
+          temporalsData.label !== ''))
     ) {
       const temporal = new Temporal(temporalsData);
       if (typeof temporal._id !== 'undefined' && temporal._id !== null) {
@@ -1489,17 +1514,16 @@ const loadImportPlanRules = async (_id) => {
  * @apiParam {array} [rows] A list of rows from the data file to match against. If left blank it defaults to rows 1-10.
  **/
 const getImportPreviewResults = async (req, resp) => {
-  const parameters = req.query;
+  const { query: parameters } = req;
   const { _id = null } = parameters;
   let { rows = [] } = parameters;
   if (_id === null || _id === '') {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please provide a valid id to continue.',
     });
-    return false;
   }
   if (rows.length === 0) {
     rows = [2];
@@ -1512,7 +1536,8 @@ const getImportPreviewResults = async (req, resp) => {
 
   // load import rules
   importPlanData.rules = await loadImportPlanRules(_id);
-  const filepath = JSON.parse(importPlanData?.uploadedFileDetails?.paths[0]);
+  const filepath =
+    JSON.parse(importPlanData?.uploadedFileDetails?.paths[0]) || null;
   const { path = null } = filepath;
   const outputRows = [];
   if (path !== null) {

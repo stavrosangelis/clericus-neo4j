@@ -1,17 +1,17 @@
-const User = require('../controllers/user.ctrl').User;
-const TaxonomyTerm = require('../controllers/taxonomyTerm.ctrl').TaxonomyTerm;
-const Usergroup = require('../controllers/usergroup.ctrl').Usergroup;
-const updateReference = require('../controllers/references.ctrl')
-  .updateReference;
-const readJSONFile = require('../helpers').readJSONFile;
 const crypto = require('crypto-js');
 
-const seedUser = async (email, password) => {
+const { User } = require('../controllers/user.ctrl');
+const { TaxonomyTerm } = require('../controllers/taxonomyTerm.ctrl');
+const { Usergroup } = require('../controllers/usergroup.ctrl');
+const { updateReference } = require('../controllers/references.ctrl');
+const { readJSONFile } = require('../helpers');
+
+// create new default admin account
+const seedUser = async (email = null, password = null) => {
   // 1. load default user data
-  const entries = await readJSONFile(
-    process.env.ABSPATH + 'src/seed/data/user.json'
-  );
-  let defaultUser = entries.data;
+  const userDataPath = `${process.env.ABSPATH}src/seed/data/user.json`;
+  const entries = await readJSONFile(userDataPath);
+  const { data: defaultUser } = entries;
 
   // 2. hash user password
   if (email !== null) {
@@ -24,10 +24,10 @@ const seedUser = async (email, password) => {
   }
 
   // 3. initiate a user from the user model
-  let newUser = new User(defaultUser);
+  const newUser = new User(defaultUser);
 
   // 4. save new User
-  let saveUser = await newUser.save();
+  const saveUser = await newUser.save();
 
   // 5. save user password
   newUser._id = saveUser.data._id;
@@ -35,38 +35,39 @@ const seedUser = async (email, password) => {
 
   await newUser.updatePassword();
 
-  let output = {
+  const output = {
     user: newUser,
   };
   return output;
 };
 
+// add new admin account to admin user group
 const addUserToGroup = async (userId) => {
   // 6. link user to admin userGroup
   // 6.1. load taxonomy term
-  let taxTerm = new TaxonomyTerm({ labelId: 'belongsToUserGroup' });
+  const taxTerm = new TaxonomyTerm({ labelId: 'belongsToUserGroup' });
   await taxTerm.load();
 
   // 6.2. load admin usergroup
-  let adminUsergroup = new Usergroup({ label: 'Administrator' });
+  const adminUsergroup = new Usergroup({ label: 'Administrator' });
   await adminUsergroup.load();
 
   // 6.3. add relation
-  let ref = {
+  const ref = {
     items: [
       { _id: userId, type: 'User', role: '' },
       { _id: adminUsergroup._id, type: 'Usergroup', role: '' },
     ],
     taxonomyTermId: taxTerm._id,
   };
-  let addReference = await updateReference(ref);
-  let output = {
+  const addReference = await updateReference(ref);
+  const output = {
     ref: addReference,
   };
   return output;
 };
 
 module.exports = {
-  seedUser: seedUser,
-  addUserToGroup: addUserToGroup,
+  seedUser,
+  addUserToGroup,
 };

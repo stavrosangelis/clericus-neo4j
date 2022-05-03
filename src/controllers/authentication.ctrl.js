@@ -1,58 +1,11 @@
 const passport = require('passport');
-const LocalStrategy = require('passport-local').Strategy;
+const { Strategy: LocalStrategy } = require('passport-local');
 const driver = require('../config/db-driver');
-const helpers = require('../helpers');
-const User = require('./user.ctrl').User;
-const adminActiveToken = require('../routes/auth').adminActiveToken;
+const { outputRecord } = require('../helpers');
+const { User } = require('./user.ctrl');
+const { adminActiveToken } = require('../routes/auth');
 
-// set passport strategy
-const passportLocal = new LocalStrategy(
-  {
-    usernameField: 'email',
-    passwordField: 'password',
-  },
-  async function (username, password, done) {
-    let session = driver.session();
-    let query =
-      'MATCH (u:User {email: $email})-[:belongsToUserGroup]->(ug) RETURN u,ug';
-    let params = {
-      email: username,
-    };
-    let user = await session
-      .writeTransaction((tx) => tx.run(query, params))
-      .then((result) => {
-        session.close();
-        let outputRecord = null;
-        if (result.records.length > 0) {
-          let resultData = result.records[0].toObject();
-          let userData = resultData.u;
-          let userGroupData = resultData.ug;
-          outputRecord = helpers.outputRecord(userData);
-          outputRecord.usergroup = helpers.outputRecord(userGroupData);
-        }
-        return outputRecord;
-      });
-    if (user === null) {
-      return done('Please provide a valid email address', false, {
-        message: 'Please provide a valid email address',
-      });
-    }
-    if (Object.entries(user.usergroup).length === 0) {
-      return done('The user is not assigned to a usergroup', false, {
-        message: 'The user is not assigned to a usergroup',
-      });
-    }
-    let newUser = new User(user);
-    let validatePassword = await newUser.validatePassword(password);
-    if (!validatePassword) {
-      return done('Incorrect password.', false, {
-        message: 'Incorrect password.',
-      });
-    }
-    return done(null, newUser, {});
-  }
-);
-
+// set passport strategy for login in administrators
 const passportAdmin = new LocalStrategy(
   {
     usernameField: 'email',
@@ -60,20 +13,23 @@ const passportAdmin = new LocalStrategy(
   },
   async function (username, password, done) {
     const session = driver.session();
-    const query = `MATCH (u:User)-[:belongsToUserGroup]->(ug) WHERE u.email="${username}" RETURN u,ug`;
+    const query = `MATCH (u:User {email: $email})-[:belongsToUserGroup]->(ug) RETURN u,ug`;
+    const params = {
+      email: username,
+    };
     const user = await session
-      .writeTransaction((tx) => tx.run(query, {}))
+      .writeTransaction((tx) => tx.run(query, params))
       .then((result) => {
         session.close();
-        let outputRecord = null;
-        if (result.records.length > 0) {
-          let resultData = result.records[0].toObject();
-          let userData = resultData.u;
-          let userGroupData = resultData.ug;
-          outputRecord = helpers.outputRecord(userData);
-          outputRecord.usergroup = helpers.outputRecord(userGroupData);
+        const { records } = result;
+        if (records.length > 0) {
+          const record = records[0].toObject();
+          const { u: userData = null, ug: usergroupData = null } = record;
+          const output = outputRecord(userData);
+          output.usergroup = outputRecord(usergroupData);
+          return output;
         }
-        return outputRecord;
+        return null;
       })
       .catch((error) => {
         console.log(error);
@@ -83,7 +39,7 @@ const passportAdmin = new LocalStrategy(
         message: 'Please provide a valid email address',
       });
     }
-    if (Object.entries(user.usergroup).length === 0) {
+    if (user.usergroup === null) {
       return done('The user is not assigned to a usergroup', false, {
         message: 'The user is not assigned to a usergroup',
       });
@@ -93,8 +49,9 @@ const passportAdmin = new LocalStrategy(
         message: 'You are not authorised to access this page',
       });
     }
-    let newUser = new User(user);
-    let validatePassword = await newUser.validatePassword(password);
+    user.isAdmin = user.usergroup.isAdmin;
+    const newUser = new User(user);
+    const validatePassword = await newUser.validatePassword(password);
     if (!validatePassword) {
       return done('Incorrect password.', false, {
         message: 'Incorrect password.',
@@ -103,72 +60,7 @@ const passportAdmin = new LocalStrategy(
     return done(null, newUser, {});
   }
 );
-
-passport.use('local', passportLocal);
 passport.use('admin', passportAdmin);
-
-const loginUser = async (req, resp) => {
-  let postData = req.body;
-  if (!postData.email) {
-    return resp.json({
-      status: false,
-      data: [],
-      error: 'Please enter a valid email address to continue',
-      msg: '',
-    });
-  }
-
-  if (!postData.password) {
-    return resp.json({
-      status: false,
-      data: [],
-      error: 'Please enter your password to continue',
-      msg: '',
-    });
-  }
-  return passport.authenticate(
-    'local',
-    { session: false },
-    (error, passportUser) => {
-      if (error) {
-        return resp.json({
-          status: false,
-          data: [],
-          error: error,
-          msg: '',
-        });
-      }
-
-      if (passportUser) {
-        const user = passportUser;
-        user.token = passportUser.generateJWT();
-
-        let returnUser = new User(
-          user._id,
-          user.firstName,
-          user.lastName,
-          user.email,
-          null,
-          user.token
-        );
-        resp.json({
-          status: true,
-          data: returnUser,
-          error: [],
-          msg: '',
-        });
-      }
-      if (!passportUser) {
-        return resp.json({
-          status: false,
-          data: [],
-          error: "The email/password you provided don't match with a user",
-          msg: '',
-        });
-      }
-    }
-  )(req, resp);
-};
 
 /**
 * @api {post} /admin-login Admin login
@@ -200,27 +92,25 @@ const loginUser = async (req, resp) => {
         "updatedBy": null,
         "updatedAt": null
     },
-    "error": [],
-    "msg": ""
+    "errors": [],
 }
 */
 const loginAdmin = async (req, resp) => {
-  let postData = req.body;
-  if (!postData.email) {
-    return resp.json({
+  const { body: postData } = req;
+  const { email = '', password = '' } = postData;
+  if (email === '') {
+    return resp.status(403).json({
       status: false,
       data: [],
-      error: 'Please enter a valid email address to continue',
-      msg: '',
+      errors: ['Please enter a valid email address to continue'],
     });
   }
 
-  if (!postData.password) {
-    return resp.json({
+  if (password === '') {
+    return resp.status(403).json({
       status: false,
       data: [],
-      error: 'Please enter your password to continue',
-      msg: '',
+      errors: ['Please enter your password to continue'],
     });
   }
 
@@ -229,11 +119,10 @@ const loginAdmin = async (req, resp) => {
     { session: false },
     (error, passportUser) => {
       if (error) {
-        return resp.json({
+        return resp.status(403).json({
           status: false,
           data: [],
-          error: error,
-          msg: '',
+          errors: [error],
         });
       }
 
@@ -241,53 +130,46 @@ const loginAdmin = async (req, resp) => {
         const user = passportUser;
         user.token = passportUser.generateJWT();
         delete user.password;
-        resp.json({
+        return resp.status(200).json({
           status: true,
           data: user,
-          error: [],
-          msg: '',
+          errors: [],
         });
       }
       if (!passportUser) {
-        return resp.json({
+        return resp.status(403).json({
           status: false,
           data: [],
-          error: "The email/password you provided don't match with a user",
-          msg: '',
+          errors: [`The provided email/password does not match with a user`],
         });
       }
     }
   )(req, resp);
 };
 
+// registration endpoint is not activated
 const registerUser = async (req, resp) => {
-  let postData = req.body;
-  let emailRegEx = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
-  if (
-    typeof postData.email === 'undefined' ||
-    postData.email === '' ||
-    postData.email.search(emailRegEx) === -1
-  ) {
-    resp.json({
+  const { body: postData } = req;
+  const emailRegEx = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
+  const { email = '' } = postData;
+  if (email === '' || email.search(emailRegEx) === -1) {
+    return resp.status(200).json({
       status: false,
       data: [],
-      error: true,
-      msg: 'Please enter a valid email address to continue',
+      errors: ['Please enter a valid email address to continue'],
     });
-    return false;
   }
-  let user = new User();
+  const user = new User();
   for (let key in postData) {
     if (postData[key] !== null) {
       user[key] = postData[key];
     }
   }
-  let insertUserPromise = await user.insert();
-  resp.json({
+  const insertUserPromise = await user.insert();
+  return resp.status(201).json({
     status: true,
     data: insertUserPromise,
-    error: [],
-    msg: '',
+    errors: [],
   });
 };
 
@@ -308,30 +190,26 @@ const registerUser = async (req, resp) => {
 }
 */
 const activeSession = async (req, resp) => {
-  const parameters = req.body;
-  const token = parameters.token || null;
+  const { body: postData } = req;
+  const { token = null } = postData;
   const active = adminActiveToken(token);
   if (!active) {
-    resp.json({
+    return resp.status(403).json({
       status: false,
       data: [],
-      error: true,
-      msg: 'Please provide a valid token to continue',
+      errors: ['Unauthorised access'],
     });
   } else {
-    resp.json({
+    return resp.status(200).json({
       status: true,
-      data: token,
-      error: false,
-      msg: 'Token successfully verified',
+      data: 'Session active',
+      errors: [],
     });
   }
 };
 
 module.exports = {
-  loginUser: loginUser,
-  loginAdmin: loginAdmin,
-  activeSession: activeSession,
-  registerUser: registerUser,
-  passportLocal: passportLocal,
+  loginAdmin,
+  activeSession,
+  registerUser,
 };

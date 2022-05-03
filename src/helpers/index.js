@@ -3,8 +3,9 @@ const Soundex = require('soundex');
 const fs = require('fs');
 const crypto = require('crypto');
 const sizeOfImage = require('image-size');
-const ExifImage = require('exif').ExifImage;
+const { ExifImage } = require('exif');
 const IptcImage = require('node-iptc');
+
 const driver = require('../config/db-driver');
 
 const soundex = (data = null) => {
@@ -14,31 +15,34 @@ const soundex = (data = null) => {
   return Soundex(data);
 };
 
-const hashFileName = (data) => {
+const hashFileName = (data = null) => {
   if (data === null || data === '') {
     return false;
   }
-  let newData = data + randomChars();
+  const newData = data + randomChars();
   return crypto.createHash('md5').update(newData).digest('hex');
 };
 
 const randomChars = (length = 10) => {
-  var text = '';
-  var possible =
+  let text = '';
+  const possible =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (var i = 0; i < length; i++) {
+  for (var i = 0; i < length; i += 1) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
   return text;
 };
 
-const imageIptc = (imgPath) => {
+const imageIptc = (imgPath = null) => {
+  if (imgPath === null) {
+    return false;
+  }
   return new Promise((resolve) => {
     fs.readFile(imgPath, function (error, data) {
       if (error) {
         console.log(error);
       }
-      var iptcData = IptcImage(data);
+      const iptcData = IptcImage(data);
       resolve(iptcData);
     });
   }).catch((error) => {
@@ -46,11 +50,14 @@ const imageIptc = (imgPath) => {
   });
 };
 
-const imageExif = (imgPath) => {
+const imageExif = (imgPath = null) => {
+  if (imgPath === null) {
+    return false;
+  }
   return new Promise((resolve) => {
     ExifImage({ image: imgPath }, function (error, exifData) {
       if (error) {
-        // console.log(error.message);
+        console.log(error);
       }
       resolve(exifData);
     });
@@ -59,8 +66,11 @@ const imageExif = (imgPath) => {
   });
 };
 
-const imgDimensions = async (imgPath) => {
-  let dimensions = await sizeOfImage(imgPath);
+const imgDimensions = async (imgPath = null) => {
+  if (imgPath === null) {
+    return false;
+  }
+  const dimensions = await sizeOfImage(imgPath);
   dimensions.extension = dimensions.type;
   delete dimensions.type;
   return dimensions;
@@ -84,10 +94,9 @@ const prepareNodeProperties = (item) => {
       value = '[]';
     }
     nodeProperties += key + ': $' + key;
-    i++;
+    i += 1;
   }
-  nodeProperties = '{' + nodeProperties + '}';
-  return nodeProperties;
+  return `{${nodeProperties}}`;
 };
 
 const prepareOutput = (object) => {
@@ -104,7 +113,7 @@ const prepareOutput = (object) => {
 };
 
 const prepareParams = (item) => {
-  let params = {};
+  const params = {};
   for (let key in item) {
     params[key] = item[key];
   }
@@ -112,16 +121,17 @@ const prepareParams = (item) => {
 };
 
 const normalizeRecordsOutput = (records) => {
-  let output = [];
-  for (let i = 0; i < records.length; i++) {
-    let record = records[i];
+  const output = [];
+  const { length } = records;
+  for (let i = 0; i < length; i += 1) {
+    const record = records[i];
     let labels = null;
     if (typeof record._fields[0].labels !== 'undefined') {
       labels = record._fields[0].labels;
     }
-    let key = record.keys[0];
+    const key = record.keys[0];
     prepareOutput(record);
-    let outputItem = outputRecord(record.toObject()[key]);
+    const outputItem = outputRecord(record.toObject()[key]);
     if (labels !== null) {
       outputItem.systemLabels = labels;
     }
@@ -131,12 +141,13 @@ const normalizeRecordsOutput = (records) => {
 };
 
 const normalizeGraphRecordsOutput = (records) => {
-  let output = [];
-  for (let i = 0; i < records.length; i++) {
-    let record = records[i];
-    let key = record.keys[0];
+  const output = [];
+  const { length } = records;
+  for (let i = 0; i < length; i += 1) {
+    const record = records[i];
+    const key = record.keys[0];
     prepareOutput(record);
-    let outputItem = outputRecord(record.toObject()[key]);
+    const outputItem = outputRecord(record.toObject()[key]);
     if (record.keys.indexOf('count') > -1) {
       outputItem.count = record.toObject()['count'];
     }
@@ -146,24 +157,28 @@ const normalizeGraphRecordsOutput = (records) => {
 };
 
 const normalizeRelationsOutput = (records) => {
-  let output = [];
-  for (let i = 0; i < records.length; i++) {
-    let record = records[i];
-    let relation = record._fields[0];
+  const output = [];
+  const { length } = records;
+  for (let i = 0; i < length; i += 1) {
+    const record = records[i];
+    const relation = record._fields[0];
     prepareOutput(relation);
     output.push(relation);
   }
   return output;
 };
 
-const readJSONFile = (path) => {
+const readJSONFile = (path = '') => {
+  if (path === '') {
+    return { data: null, error: 'The file path cannot be empty' };
+  }
   return new Promise((resolve) => {
     fs.readFile(path, 'utf-8', (error, data) => {
       let dataJson = null;
       if (error === null) {
         dataJson = JSON.parse(data);
       }
-      let output = { data: dataJson, error: error };
+      const output = { data: dataJson, error: error };
       resolve(output);
     });
   }).catch((error) => {
@@ -185,36 +200,37 @@ const outputRecord = (record) => {
 
 const outputRelation = (relation) => {
   prepareOutput(relation);
-  let output = Object.assign({}, relation);
+  const output = Object.assign({}, relation);
   output._id = relation.identity;
   delete output.identity;
   return output;
 };
 
 const outputPaths = (paths, _id = null) => {
-  let output = paths.map((path) => {
-    let segments = path.segments
+  const output = paths.map((path) => {
+    const segments = path.segments
       .filter((segment) => {
-        let end = outputRecord(segment.end);
+        const end = outputRecord(segment.end);
         if (end._id === _id) {
           return false;
         }
         return true;
       })
       .map((segment) => {
-        let start = outputRecord(segment.start);
+        const start = outputRecord(segment.start);
         start.entityType = segment.start.labels;
-        let rel = outputRelation(segment.relationship);
-        let end = outputRecord(segment.end);
+        const rel = outputRelation(segment.relationship);
+        const end = outputRecord(segment.end);
         end.entityType = segment.end.labels;
-        return { start: start, rel: rel, end: end };
+        return { start, rel, end };
       });
     return segments;
   });
   return output;
 };
 
-const normalizeLabelId = (label) => {
+const normalizeLabelId = (labelParam = '') => {
+  let label = labelParam;
   if (typeof label !== 'string') {
     return '';
   }
@@ -224,7 +240,8 @@ const normalizeLabelId = (label) => {
   let output = '';
   let labelArr = label.split(' ');
   // for each space in string split the string parts and normalize them
-  for (let i = 0; i < labelArr.length; i++) {
+  const { length } = labelArr;
+  for (let i = 0; i < length; i += 1) {
     let chunk = labelArr[i];
     chunk = chunk.trim();
     if (i === 0) {
@@ -432,7 +449,7 @@ const temporalEvents = async (props, eventTypes) => {
   ) {
     return [];
   }
-  let eventTypesIds = eventTypes.map((_id) => `"${_id}"`);
+  const eventTypesIds = eventTypes.map((_id) => `"${_id}"`);
   let query = `MATCH (n:Temporal)
     WHERE NOT n.startDate="" AND date(datetime({epochmillis: apoc.date.parse(n.startDate,"ms","dd-MM-yyyy")}))${operator}date(datetime({epochmillis: apoc.date.parse('${startDate}',"ms","dd/MM/yyyy")}))
     OPTIONAL MATCH (n)-->(e:Event) WHERE e.status='public'
@@ -466,7 +483,8 @@ const temporalEvents = async (props, eventTypes) => {
       console.log(error);
     });
   const output = [];
-  for (let i = 0; i < eventIds.length; i++) {
+  const { length } = eventIds;
+  for (let i = 0; i < length; i += 1) {
     const eventId = eventIds[i];
     prepareOutput(eventId);
     const _id = eventId.toObject()['id'] || null;
@@ -478,10 +496,10 @@ const temporalEvents = async (props, eventTypes) => {
 };
 
 const eventsFromTypes = async (props) => {
-  let ids = props.map((_id) => `"${_id}"`);
-  let query = `MATCH (n:Event) WHERE n.eventType IN [${ids}] AND n.status='public' RETURN distinct id(n) as _id;`;
-  let session = driver.session();
-  let eventIds = await session
+  const ids = props.map((_id) => `"${_id}"`);
+  const query = `MATCH (n:Event) WHERE n.eventType IN [${ids}] AND n.status='public' RETURN distinct id(n) as _id;`;
+  const session = driver.session();
+  const eventIds = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();
@@ -490,9 +508,10 @@ const eventsFromTypes = async (props) => {
     .catch((error) => {
       console.log(error);
     });
-  let output = [];
-  for (let i = 0; i < eventIds.length; i++) {
-    let eventId = eventIds[i];
+  const output = [];
+  const { length } = eventIds;
+  for (let i = 0; i < length; i += 1) {
+    const eventId = eventIds[i];
     prepareOutput(eventId);
     let _id = eventId.toObject()['_id'];
     if (_id !== null) {
@@ -503,12 +522,12 @@ const eventsFromTypes = async (props) => {
 };
 
 const msToTime = (s) => {
-  var ms = s % 1000;
+  const ms = s % 1000;
   s = (s - ms) / 1000;
-  var secs = s % 60;
+  const secs = s % 60;
   s = (s - secs) / 60;
-  var mins = s % 60;
-  var hrs = (s - mins) / 60;
+  const mins = s % 60;
+  const hrs = (s - mins) / 60;
   return `${hrs}:${mins}:${secs}.${ms}`;
 };
 

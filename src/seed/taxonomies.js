@@ -1,19 +1,19 @@
-const Taxonomy = require('../controllers/taxonomy.ctrl').Taxonomy;
-const readJSONFile = require('../helpers').readJSONFile;
+const { Taxonomy } = require('../controllers/taxonomy.ctrl');
+const { readJSONFile } = require('../helpers');
 
 const seedTaxonomies = async (userId) => {
-  const entries = await readJSONFile(
-    process.env.ABSPATH + 'src/seed/data/taxonomies.json'
-  );
+  const path = `${process.env.ABSPATH}src/seed/data/taxonomies.json`;
+  const entries = await readJSONFile(path);
   const promises = [];
-  for (let key in entries.data) {
-    let entry = entries.data[key];
-    let taxonomy = new Taxonomy(entry);
+  const { data } = entries;
+  for (let key in data) {
+    const entry = data[key];
+    const taxonomy = new Taxonomy(entry);
     promises.push(await taxonomy.save(userId));
   }
   return promises;
 };
 
 module.exports = {
-  seedTaxonomies: seedTaxonomies,
+  seedTaxonomies,
 };

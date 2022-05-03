@@ -1,13 +1,18 @@
-const settings = require('./settings.js');
-const initDB = require('./init-db.js').initDB;
-const seedTaxonomies = require('./taxonomies.js').seedTaxonomies;
-const seedTaxonomyTerms = require('./taxonomy-terms.js').seedTaxonomyTerms;
-const seedUsergroups = require('./user-groups.js').seedUsergroups;
-const seedUser = require('./user.js').seedUser;
-const addUserToGroup = require('./user.js').addUserToGroup;
-const seedEntities = require('./entities.js').seedEntities;
-const seedEntitiesProperties = require('./entities-properties.js')
-  .seedEntitiesProperties;
+const { loadSettings, disallowSeeding } = require('./settings.js');
+const { initDB } = require('./init-db.js');
+
+// seeds
+const { seedTaxonomies } = require('./taxonomies.js');
+const { seedTaxonomyTerms } = require('./taxonomy-terms.js');
+const {
+  seedUsergroups,
+  usergroupUpdateCreatedBy,
+} = require('./user-groups.js');
+const { seedUser } = require('./user.js');
+const { addUserToGroup } = require('./user.js');
+const { seedEntities } = require('./entities.js');
+const { seedEntitiesProperties } = require('./entities-properties.js');
+
 /**
  * @api {post} /seed-db Post seed db
  * @apiName post seed db
@@ -17,86 +22,86 @@ const seedEntitiesProperties = require('./entities-properties.js')
  * @apiParam {string} password The admin user password.
  */
 const seedData = async (req, resp) => {
-  let postData = req.body;
-  let email = null;
-  let password = null;
-  if (typeof postData.email !== 'undefined' && postData.email !== '') {
-    email = postData.email;
-  }
-  if (typeof postData.password !== 'undefined' && postData.password !== '') {
-    password = postData.password;
-  }
+  const postData = req.body;
+  const { email = null, password = null } = postData;
   let status = true;
-  let errors = [];
-  let data = {};
+  const errors = [];
+  const data = {};
 
-  // 1. check settings
-  // 1.1. check if seeding is allowed
-  let settingsData = await settings.loadSettings();
-  // 1.2. if seeding is not allowed output error and stop executing
+  // 0. check settings
+  // 0.1. check if seeding is allowed
+  const settingsData = await loadSettings();
+
+  // 0.2. if seeding is not allowed output error and stop executing
   if (!settingsData.seedingAllowed) {
     status = false;
-    let error = 'The database has already been seeded.';
-    errors.push(error);
-    resp.json({
+    errors.push('The database has already been seeded.');
+    return resp.json({
       status: status,
       data: [],
       error: errors,
       msg: [],
     });
-    return false;
   }
-  console.log('step 1 complete');
   // else proceed to seed the db
 
-  // 2. set db indexes and constraints
-  let initDBPromise = await initDB();
-  data.initdb = initDBPromise;
+  // 1. set db indexes and constraints
+  data.initdb = await initDB();
+  console.log('step 1 complete');
+
+  // 2. insert usergroups
+  data.usergroups = await seedUsergroups();
   console.log('step 2 complete');
 
   // 3. insert default admin account
-  let seedUserPromise = await seedUser(email, password);
-  data.user = seedUserPromise;
-  let userId = data.user.user._id;
+  data.user = await seedUser(email, password);
+  const { _id: userId = null } = data.user.user;
+
+  // if new user hasn't been created successfully stop here
+  if (userId === null) {
+    status = false;
+    errors.push(
+      'There was an error while creating the default admin user account'
+    );
+    return resp.json({
+      status: status,
+      data: [],
+      error: errors,
+      msg: [],
+    });
+  }
+
+  // 3.2. add default user account _id as creator to all user groups
+  await usergroupUpdateCreatedBy(userId);
   console.log('step 3 complete');
 
-  // 4. insert usergroups
-  let seedUsergroupsPromise = await seedUsergroups(userId);
-  data.usergroups = seedUsergroupsPromise;
+  // 4. insert taxonomies
+  data.taxonomies = await seedTaxonomies(userId);
   console.log('step 4 complete');
 
-  // 5. insert taxonomies
-  let seedTaxonomiesPromise = await seedTaxonomies(userId);
-  data.taxonomies = seedTaxonomiesPromise;
+  // 5. insert taxonomy terms
+  data.taxonomyTerms = await seedTaxonomyTerms(userId);
   console.log('step 5 complete');
 
-  // 6. insert taxonomy terms
-  let seedTaxonomyTermsPromise = await seedTaxonomyTerms(userId);
-  data.taxonomyTerms = seedTaxonomyTermsPromise;
+  // 6. add user to usergroup
+  data.userUsergroup = await addUserToGroup(userId);
   console.log('step 6 complete');
 
-  // 7. add user to usergroup
-  let addUserToGroupPromise = await addUserToGroup(userId);
-  data.userUsergroup = addUserToGroupPromise;
-  console.log('step 7 complete');
-
-  // 8. insert entities
+  // 7. insert entities
   let seedEntitiesPromise = await seedEntities(userId);
   data.entities = seedEntitiesPromise;
+  console.log('step 7 complete');
+
+  // 8. insert entity properties
+  data.entitiesProperties = await seedEntitiesProperties(userId);
   console.log('step 8 complete');
 
-  // 9. insert entity properties
-  let seedEntitiesPropertiesPromise = await seedEntitiesProperties(userId);
-  data.entitiesProperties = seedEntitiesPropertiesPromise;
+  // 9. dissalow any further seeding in the database
+  data.seeding = await disallowSeeding();
   console.log('step 9 complete');
-
-  // 10. dissalow any further seeding in the database
-  let disallowSeeding = await settings.disallowSeeding();
-  data.seeding = disallowSeeding;
-  console.log('step 10 complete');
   console.log('seeding complete');
 
-  resp.json({
+  return resp.json({
     status: status,
     data: data,
     error: errors,
@@ -105,5 +110,5 @@ const seedData = async (req, resp) => {
 };
 
 module.exports = {
-  seedData: seedData,
+  seedData,
 };

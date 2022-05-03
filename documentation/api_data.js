@@ -196,10 +196,33 @@ define({ "api": [
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Article) WHERE id(n)=2880 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":3,\"high\":0}}},\"error\":[],\"msg\":\"Query results\"}",
+          "content": "{\"status\":true,\"data\":{\"records\":[],\"summary\":{\"statement\":{\"text\":\"MATCH (n:Article) WHERE id(n)=2880 DELETE n\",\"parameters\":{}},\"statementType\":\"w\",\"counters\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"updateStatistics\":{\"_stats\":{\"nodesCreated\":0,\"nodesDeleted\":1,\"relationshipsCreated\":0,\"relationshipsDeleted\":0,\"propertiesSet\":0,\"labelsAdded\":0,\"labelsRemoved\":0,\"indexesAdded\":0,\"indexesRemoved\":0,\"constraintsAdded\":0,\"constraintsRemoved\":0}},\"plan\":false,\"profile\":false,\"notifications\":[],\"server\":{\"address\":\"localhost:7687\",\"version\":\"Neo4j/3.5.12\"},\"resultConsumedAfter\":{\"low\":0,\"high\":0},\"resultAvailableAfter\":{\"low\":3,\"high\":0}}},\"errors\":[]}",
           "type": "json"
         }
       ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "delete",
+    "url": "/highlight",
+    "title": "Delete article highlight",
+    "name": "delete_article_highlight",
+    "group": "Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The article id.</p>"
+          }
+        ]
+      }
     },
     "version": "0.0.0",
     "filename": "src/controllers/article.ctrl.js",
@@ -241,11 +264,77 @@ define({ "api": [
     "title": "Get articles",
     "name": "get_articles",
     "group": "Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against articles' labels.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "categoryId",
+            "description": "<p>A category id to match against articles' categories.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "categoryName",
+            "description": "<p>A string to match against articles' categories.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "defaultValue": "25",
+            "description": "<p>The number of results per page</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "orderField",
+            "defaultValue": "label",
+            "description": "<p>The field to order the results by.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "boolean",
+            "optional": true,
+            "field": "orderDesc",
+            "defaultValue": "false",
+            "description": "<p>If the results should be ordered in a descending order.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "defaultValue": "1",
+            "description": "<p>The current page of results</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "status",
+            "description": "<p>The status of the articles</p>"
+          }
+        ]
+      }
+    },
     "success": {
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Article\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\",\"systemLabels\":[\"Article\"]},{\"createdAt\":\"2020-01-27T17:43:44.578Z\",\"label\":\"Bottom Article\",\"templatePosition\":\"bottom\",\"updatedAt\":\"2020-01-27T17:43:44.578Z\",\"_id\":\"2683\",\"systemLabels\":[\"Article\"]}]},\"error\":[],\"msg\":\"Query results\"}",
+          "content": "{\"status\":true,\"data\":{\"data\":[{\"createdAt\":\"2020-01-27T15:55:23.499Z\",\"templatePosition\":\"\",\"label\":\"Top Article\",\"_id\":\"2822\",\"updatedAt\":\"2020-01-27T17:55:15.742Z\",\"systemLabels\":[\"Article\"]},{\"createdAt\":\"2020-01-27T17:43:44.578Z\",\"label\":\"Bottom Article\",\"templatePosition\":\"bottom\",\"updatedAt\":\"2020-01-27T17:43:44.578Z\",\"_id\":\"2683\",\"systemLabels\":[\"Article\"]}]},\"errors\":[]}",
           "type": "json"
         }
       ]
@@ -257,8 +346,8 @@ define({ "api": [
   {
     "type": "get",
     "url": "/highlights",
-    "title": "Get highlights",
-    "name": "get_highlights",
+    "title": "Get articles highlights",
+    "name": "get_articles_highlights",
     "group": "Articles",
     "parameter": {
       "fields": {
@@ -276,6 +365,29 @@ define({ "api": [
             "optional": true,
             "field": "limit",
             "description": "<p>The number of the requested highlights.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "get",
+    "url": "/articles-list",
+    "title": "Get articles list",
+    "name": "get_articles_list",
+    "group": "Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "label",
+            "description": "<p>A string to match against articles' labels.</p>"
           }
         ]
       }
@@ -396,10 +508,70 @@ define({ "api": [
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "{\"status\":true,\"data\":{\"createdAt\":\"2020-01-30T14:56:30.780Z\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"label\":\"test\",\"_id\":\"2880\",\"category\":0,\"content\":\"<p>test content</p>\",\"status\":\"private\",\"teaser\":\"<p>test teaser</p>\",\"updatedAt\":\"2020-01-30T15:00:44.721Z\"},\"error\":[],\"msg\":\"Query results\"}",
+          "content": "{\"status\":true,\"data\":{\"createdAt\":\"2020-01-30T14:56:30.780Z\",\"updatedBy\":\"437\",\"createdBy\":\"437\",\"label\":\"test\",\"_id\":\"2880\",\"category\":0,\"content\":\"<p>test content</p>\",\"status\":\"private\",\"teaser\":\"<p>test teaser</p>\",\"updatedAt\":\"2020-01-30T15:00:44.721Z\"},\"errors\":[]}",
           "type": "json"
         }
       ]
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "put",
+    "url": "/highlight",
+    "title": "Put article highlight",
+    "name": "put_article_highlight",
+    "group": "Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": true,
+            "field": "_id",
+            "description": "<p>The article id.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "order",
+            "description": "<p>The article highlight order.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "src/controllers/article.ctrl.js",
+    "groupTitle": "Articles"
+  },
+  {
+    "type": "put",
+    "url": "/highlights",
+    "title": "Put articles highlights",
+    "name": "put_articles_highlights",
+    "group": "Articles",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "page",
+            "description": "<p>The page of the requested highlights.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "number",
+            "optional": true,
+            "field": "limit",
+            "description": "<p>The number of the requested highlights.</p>"
+          }
+        ]
+      }
     },
     "version": "0.0.0",
     "filename": "src/controllers/article.ctrl.js",
@@ -5024,7 +5196,7 @@ define({ "api": [
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "{\n    \"status\": true,\n    \"data\": {\n        \"_id\": \"260\",\n        \"firstName\": \"Admin\",\n        \"lastName\": \"\",\n        \"email\": \"admin@test.com\",\n        \"usergroup\": {\n            \"description\": \"This group has access to the back-end\",\n            \"isDefault\": false,\n            \"isAdmin\": true,\n            \"label\": \"Administrator\",\n            \"_id\": \"401\"\n        },\n        \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3N1ZXIiOiJDbGVyaWN1cyBhcHAiLCJlbWFpbCI6ImFkbWluQHRlc3QuY29tIiwiaWQiOiIyNjAiLCJleHBpcmVzSW4iOiIyMDIwLTAxLTE1VDExOjQ1OjM5LjYwOVoiLCJhbGdvcml0aG0iOiJSUzI1NiIsImlzQWRtaW4iOnRydWUsImlhdCI6MTU3OTAwMjMzOX0.LJsBRcM3J5d_wvm4wneQCRDeN3mBRArmCgaosMQzl-0\",\n        \"createdBy\": null,\n        \"createdAt\": null,\n        \"updatedBy\": null,\n        \"updatedAt\": null\n    },\n    \"error\": [],\n    \"msg\": \"\"\n}",
+          "content": "{\n    \"status\": true,\n    \"data\": {\n        \"_id\": \"260\",\n        \"firstName\": \"Admin\",\n        \"lastName\": \"\",\n        \"email\": \"admin@test.com\",\n        \"usergroup\": {\n            \"description\": \"This group has access to the back-end\",\n            \"isDefault\": false,\n            \"isAdmin\": true,\n            \"label\": \"Administrator\",\n            \"_id\": \"401\"\n        },\n        \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3N1ZXIiOiJDbGVyaWN1cyBhcHAiLCJlbWFpbCI6ImFkbWluQHRlc3QuY29tIiwiaWQiOiIyNjAiLCJleHBpcmVzSW4iOiIyMDIwLTAxLTE1VDExOjQ1OjM5LjYwOVoiLCJhbGdvcml0aG0iOiJSUzI1NiIsImlzQWRtaW4iOnRydWUsImlhdCI6MTU3OTAwMjMzOX0.LJsBRcM3J5d_wvm4wneQCRDeN3mBRArmCgaosMQzl-0\",\n        \"createdBy\": null,\n        \"createdAt\": null,\n        \"updatedBy\": null,\n        \"updatedAt\": null\n    },\n    \"errors\": [],\n}",
           "type": "json"
         }
       ]

@@ -1,31 +1,23 @@
-const readJSONFile = require('../helpers').readJSONFile;
-const updateReference = require('../controllers/references.ctrl')
-  .updateReference;
+const { normalizeRecordsOutput, readJSONFile } = require('../helpers');
+const { updateReference } = require('../controllers/references.ctrl');
 const driver = require('../config/db-driver');
-const helpers = require('../helpers');
+
+const { ABSPATH } = process.env;
 
 const seedEntitiesProperties = async () => {
-  const entries = await readJSONFile(
-    process.env.ABSPATH + 'src/seed/data/entities-properties.json'
-  );
-  let session = driver.session();
+  const session = driver.session();
 
   // 1. load entities
   const entitiesQuery = 'MATCH (n:Entity) RETURN n';
   const entities = await session
     .writeTransaction((tx) => tx.run(entitiesQuery, {}))
     .then((result) => {
-      let outputRecords = [];
-      if (result.records.length > 0) {
-        outputRecords = result.records.map((record) => {
-          let outputRecord = record.toObject();
-          helpers.prepareOutput(outputRecord);
-          outputRecord.n._id = outputRecord.n.identity;
-          delete outputRecord.n.identity;
-          return outputRecord;
-        });
+      const { records = [] } = result;
+      const { length } = records;
+      if (length > 0) {
+        return normalizeRecordsOutput(records);
       }
-      return outputRecords;
+      return [];
     });
 
   // 2. loadTerms
@@ -33,41 +25,43 @@ const seedEntitiesProperties = async () => {
   const taxonomyTerms = await session
     .writeTransaction((tx) => tx.run(taxonomyTermsQuery, {}))
     .then((result) => {
-      let outputRecords = [];
-      if (result.records.length > 0) {
-        outputRecords = result.records.map((record) => {
-          let outputRecord = record.toObject();
-          helpers.prepareOutput(outputRecord);
-          outputRecord.n._id = outputRecord.n.identity;
-          delete outputRecord.n.identity;
-          return outputRecord;
-        });
+      const { records = [] } = result;
+      const { length } = records;
+      if (length > 0) {
+        return normalizeRecordsOutput(records);
       }
-      return outputRecords;
+      return [];
     });
 
   session.close();
   // 3. prepare properties for update
-  let addReferences = [];
-  for (let key in entries.data) {
-    let entry = entries.data[key];
-    let source = entities.find(
-      (item) => item.n.properties.labelId === entry.sourceEntityLabelId
-    );
-    let target = entities.find(
-      (item) => item.n.properties.labelId === entry.targetEntityLabelId
-    );
-    let term = taxonomyTerms.find(
-      (item) => item.n.properties.labelId === entry.termLabelId
-    );
-    let ref = {
-      items: [
-        { _id: source.n._id, type: 'Entity', role: '' },
-        { _id: target.n._id, type: 'Entity', role: '' },
-      ],
-      taxonomyTermId: term.n._id,
-    };
-    addReferences.push(updateReference(ref));
+  // load the entries data from file
+  const entries = await readJSONFile(
+    `${ABSPATH}src/seed/data/entities-properties.json`
+  );
+  const addReferences = [];
+  const { data } = entries;
+  for (const key in data) {
+    const entry = data[key];
+    // find source value
+    const source =
+      entities.find((item) => item.labelId === entry.sourceEntityLabelId) ||
+      null;
+    const target =
+      entities.find((item) => item.labelId === entry.targetEntityLabelId) ||
+      null;
+    const term =
+      taxonomyTerms.find((item) => item.labelId === entry.termLabelId) || null;
+    if (source !== null && target !== null && term !== null) {
+      const ref = {
+        items: [
+          { _id: source._id, type: 'Entity', role: '' },
+          { _id: target._id, type: 'Entity', role: '' },
+        ],
+        taxonomyTermId: term._id,
+      };
+      addReferences.push(updateReference(ref));
+    }
   }
 
   // 4. add properties to their respective entities
@@ -77,5 +71,5 @@ const seedEntitiesProperties = async () => {
 };
 
 module.exports = {
-  seedEntitiesProperties: seedEntitiesProperties,
+  seedEntitiesProperties,
 };

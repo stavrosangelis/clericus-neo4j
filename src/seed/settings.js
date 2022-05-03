@@ -1,7 +1,8 @@
-const readJSONFile = require('../helpers').readJSONFile;
 const fs = require('fs');
 
-const settingsPath = process.env.ABSPATH + 'src/seed/data/settings.json';
+const { readJSONFile } = require('../helpers');
+
+const settingsPath = `${process.env.ABSPATH}src/seed/data/settings.json`;
 
 const loadSettings = async () => {
   const settings = await readJSONFile(settingsPath);
@@ -19,6 +20,6 @@ const disallowSeeding = async () => {
 };
 
 module.exports = {
-  loadSettings: loadSettings,
-  disallowSeeding: disallowSeeding,
+  loadSettings,
+  disallowSeeding,
 };
