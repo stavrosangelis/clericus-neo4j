@@ -485,6 +485,7 @@ const getResources = async (req, resp) => {
     skip +
     ' LIMIT ' +
     limit;
+
   let data = await getResourcesQuery(query, queryParams, limit);
   if (data.error) {
     resp.json({

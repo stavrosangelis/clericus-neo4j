@@ -69,31 +69,35 @@ const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 }
 */
 const getClasspieces = async (req, resp) => {
-  let params = await getClasspiecesPrepareQueryParams(req);
+  const params = await getClasspiecesPrepareQueryParams(req);
+  const {
+    currentPage = 1,
+    limit = 25,
+    match = '',
+    queryParams = '',
+    queryOrder = '',
+    returnResults = false,
+    skip = 0,
+  } = params;
   let responseData = {};
-  if (!params.returnResults) {
+  if (!returnResults) {
     responseData = {
       currentPage: 1,
       data: [],
       totalItems: 0,
       totalPages: 1,
     };
-    return resp.json({
+    return resp.status(200).json({
       status: true,
       data: responseData,
       error: [],
       msg: 'Query results',
     });
   } else {
-    let query = `MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    let data = await getResourcesQuery(
-      query,
-      params.match,
-      params.queryParams,
-      params.limit
-    );
+    const query = `MATCH ${match} ${queryParams} RETURN distinct n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+    const data = await getResourcesQuery(query, match, queryParams, limit);
     if (data.error) {
-      return resp.json({
+      return resp.status(400).json({
         status: false,
         data: [],
         error: data.error,
@@ -101,12 +105,12 @@ const getClasspieces = async (req, resp) => {
       });
     } else {
       responseData = {
-        currentPage: params.currentPage,
+        currentPage: currentPage,
         data: data.nodes,
         totalItems: data.count,
         totalPages: data.totalPages,
       };
-      return resp.json({
+      return resp.status(200).json({
         status: true,
         data: responseData,
         error: [],
@@ -117,22 +121,22 @@ const getClasspieces = async (req, resp) => {
 };
 
 const getResourcesQuery = async (query, match, queryParams, limit) => {
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
     });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise, 'n');
-  let nodesOutput = nodes.map((node) => {
-    let nodeOutput = {};
+  const nodes = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  const nodesOutput = nodes.map((node) => {
+    const nodeOutput = {};
     for (let key in node) {
       nodeOutput[key] = node[key];
-      let paths = [];
+      const paths = [];
       if (key === 'paths' && node[key].length > 0) {
         for (let akey in node[key]) {
-          let path = JSON.parse(node[key][akey]);
+          const path = JSON.parse(node[key][akey]);
           paths.push(path);
         }
         nodeOutput[key] = paths;
@@ -140,24 +144,24 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
     }
     return nodeOutput;
   });
-  let count = await session
+  const count = await session
     .writeTransaction((tx) =>
       tx.run(`MATCH ${match} ${queryParams} RETURN count(distinct n) as c`)
     )
     .then((result) => {
       session.close();
-      let resultRecord = result.records[0];
-      let countObj = resultRecord.toObject();
+      const resultRecord = result.records[0];
+      const countObj = resultRecord.toObject();
       helpers.prepareOutput(countObj);
       let output = countObj['c'];
       output = parseInt(output, 10);
       return output;
     });
-  let totalPages = Math.ceil(count / limit);
-  let result = {
+  const totalPages = Math.ceil(count / limit);
+  const result = {
     nodes: nodesOutput,
-    count: count,
-    totalPages: totalPages,
+    count,
+    totalPages,
   };
   return result;
 };
@@ -216,36 +220,33 @@ const getResourcesQuery = async (query, match, queryParams, limit) => {
 }
 */
 const getClasspiece = async (req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+  const { query: parameters } = req;
+  const { _id = '' } = parameters;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-
-  let _id = parameters._id;
-  let session = driver.session();
-  let query =
-    'MATCH (n:Resource) WHERE id(n)=' + _id + " AND n.status='public' return n";
-  let classpiece = await session
+  const session = driver.session();
+  const query = `MATCH (n:Resource) WHERE id(n)=${_id} AND n.status='public' return n`;
+  const classpiece = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();
-      let records = result.records;
+      const { records } = result;
       if (records.length > 0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.n);
-        return outputRecord;
+        const record = records[0].toObject();
+        return helpers.outputRecord(record.n);
       }
+      return null;
     })
     .catch((error) => {
       console.log(error);
     });
-  if (typeof classpiece !== 'undefined') {
+  if (classpiece !== null) {
     if (typeof classpiece.metadata === 'string') {
       classpiece.metadata = JSON.parse(classpiece.metadata);
     }
@@ -262,14 +263,14 @@ const getClasspiece = async (req, resp) => {
       });
     }
 
-    let events = await helpers.loadRelations(_id, 'Resource', 'Event', true);
-    let organisations = await helpers.loadRelations(
+    const events = await helpers.loadRelations(_id, 'Resource', 'Event', true);
+    const organisations = await helpers.loadRelations(
       _id,
       'Resource',
       'Organisation',
       true
     );
-    let people = await helpers.loadRelations(
+    const people = await helpers.loadRelations(
       _id,
       'Resource',
       'Person',
@@ -277,14 +278,15 @@ const getClasspiece = async (req, resp) => {
       null,
       'rn.lastName'
     );
-    let resources = await classpieceResources(
+    const resources = await classpieceResources(
       _id,
       'Resource',
       'Resource',
       true
     );
-    for (let i = 0; i < events.length; i++) {
-      let eventItem = events[i];
+    const { length: eLength = 0 } = events;
+    for (let i = 0; i < eLength; i += 1) {
+      const eventItem = events[i];
       eventItem.temporal = await helpers.loadRelations(
         eventItem.ref._id,
         'Event',
@@ -293,12 +295,13 @@ const getClasspiece = async (req, resp) => {
       );
     }
 
-    let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
+    const classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
     await classpieceSystemType.load();
-    let classpieces = [];
-    let systemType = classpieceSystemType._id;
-    for (let i = 0; i < resources.length; i++) {
-      let resource = resources[i];
+    const classpieces = [];
+    const { _id: systemType } = classpieceSystemType;
+    const { length: rLength = 0 } = resources;
+    for (let i = 0; i < rLength; i += 1) {
+      const resource = resources[i];
       if (typeof resource.ref.person !== 'undefined') {
         resource.ref.person.affiliations = await helpers.loadRelations(
           resource.ref.person._id,
@@ -318,14 +321,14 @@ const getClasspiece = async (req, resp) => {
     classpiece.people = people;
     classpiece.resources = resources;
     classpiece.classpieces = classpieces;
-    resp.json({
+    return resp.status(200).json({
       status: true,
       data: classpiece,
       error: [],
       msg: 'Query results',
     });
   } else {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
@@ -343,41 +346,29 @@ const classpieceResources = async (
   if (srcId === null || srcType === null) {
     return false;
   }
-  let session = driver.session();
-  let query =
-    'MATCH (n:' +
-    srcType +
-    ')-[r]->(rn) WHERE id(n)=' +
-    srcId +
-    ' return n, r, rn';
+  const session = driver.session();
+  let query = `MATCH (n:${srcType})-[r]->(rn) WHERE id(n)=${srcId} return n, r, rn`;
   if (status) {
     query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
     OPTIONAL MATCH (n)-[r]->(rn) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
   }
   if (targetType !== null) {
-    query =
-      'MATCH (n:' +
-      srcType +
-      ')-[r]->(rn:' +
-      targetType +
-      ') WHERE id(n)=' +
-      srcId +
-      ' return n, r, rn';
+    query = `MATCH (n:${srcType})-[r]->(rn:${targetType}) WHERE id(n)=${srcId} return n, r, rn`;
     if (status) {
       query = `MATCH (n:${srcType}) WHERE id(n)=${srcId} AND n.status='public'
       OPTIONAL MATCH (n)-[r]->(rn:${targetType}) WHERE rn.status='public' return n, r, rn ORDER BY id(r)`;
     }
   }
-  let relations = await session
+  const relations = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then(async (result) => {
       session.close();
-      let records = result.records;
-      let relations = [];
+      const { records } = result;
+      const relations = [];
       for (let key in records) {
-        let record = records[key].toObject();
-        let sourceItem = helpers.outputRecord(record.n);
-        let relation = record.r;
+        const record = records[key].toObject();
+        const sourceItem = helpers.outputRecord(record.n);
+        const relation = record.r;
         helpers.prepareOutput(relation);
         let targetItem = null;
         if (record.rn !== null) {
@@ -391,7 +382,7 @@ const classpieceResources = async (
             }
             targetItem.person = await relatedPerson(targetItem._id);
           }
-          let newRelation = await helpers.prepareRelation(
+          const newRelation = await helpers.prepareRelation(
             sourceItem,
             relation,
             targetItem
@@ -461,18 +452,18 @@ const getClasspiecesActiveFilters = async (req, resp) => {
     });
   const itemsIds = [];
   for (let i in itemsIdsResults) {
-    let record = itemsIdsResults[i];
+    const record = itemsIdsResults[i];
     helpers.prepareOutput(record);
     itemsIds.push(record.toObject()['_id']);
   }
-  let query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND n.status='public' AND id(c) IN [${itemsIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.systemType as systemType, n.eventType as eventType`;
-  let nodesPromise = await session
+  const query = `MATCH (c:Resource)-->(n) WHERE c.status='public' AND n.status='public' AND id(c) IN [${itemsIds}] AND (n:Event OR n:Organisation OR n:Person OR n:Resource) RETURN DISTINCT id(n) AS _id, n.label AS label, labels(n) as labels, n.systemType as systemType, n.eventType as eventType`;
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
     });
   session.close();
-  let nodes = nodesPromise.map((record) => {
+  const nodes = nodesPromise.map((record) => {
     helpers.prepareOutput(record);
     let outputItem = record.toObject();
     outputItem.type = outputItem.labels[0];
@@ -501,11 +492,11 @@ const getClasspiecesActiveFilters = async (req, resp) => {
     organisations = organisationsResult;
   }
 
-  let output = {
-    events: events,
-    organisations: organisations,
+  const output = {
+    events,
+    organisations,
   };
-  resp.json({
+  return resp.status(200).json({
     status: true,
     data: output,
     error: [],
@@ -517,38 +508,40 @@ const relatedPerson = async (resourceId = null) => {
   if (resourceId === null) {
     return false;
   }
-  let session = driver.session();
-  let query =
-    'MATCH (n:Resource)-[r:isRepresentationOf]->(rn) WHERE id(n)=' +
-    resourceId +
-    ' return rn';
-  let person = await session
+  const session = driver.session();
+  const query = `MATCH (n:Resource)-[r:isRepresentationOf]->(rn) WHERE id(n)=${resourceId} return rn`;
+  const person = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then(async (result) => {
       session.close();
-      let records = result.records;
+      const { records } = result;
       if (records.length > 0) {
-        let record = records[0].toObject();
-        let outputRecord = helpers.outputRecord(record.rn);
-        return outputRecord;
+        const record = records[0].toObject();
+        return helpers.outputRecord(record.rn);
       }
+      return null;
     });
   return person;
 };
 
 const getClasspiecesPrepareQueryParams = async (req) => {
-  let parameters = req.query;
-  let label = '';
-  let description = '';
+  const { query: parameters } = req;
+  const {
+    label = '',
+    description = '',
+    orderField = 'label',
+    orderDesc = '',
+    limit: limitParam = 25,
+    page: pageParam = 0,
+  } = parameters;
   let events = [];
   let organisations = [];
   let people = [];
   let resources = [];
-  let page = 0;
-  let orderField = 'label';
+  let page = Number(pageParam);
+  const limit = Number(limitParam);
   let queryPage = 0;
   let queryOrder = '';
-  let limit = 25;
   let returnResults = true;
 
   let match = '(n:Resource)';
@@ -564,7 +557,6 @@ const getClasspiecesPrepareQueryParams = async (req) => {
     }
     let temporals = parameters.temporals;
     if (typeof temporals === 'string') {
-      console.log(temporals);
       temporals = JSON.parse(temporals);
     }
     if (
@@ -598,15 +590,15 @@ const getClasspiecesPrepareQueryParams = async (req) => {
   }
 
   // get classpiece resource type id
-  let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
+  const classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
   await classpieceSystemType.load();
 
-  let systemType = classpieceSystemType._id;
-  if (typeof parameters.label !== 'undefined') {
-    label = parameters.label;
-    if (label !== '') {
-      queryParams = "toLower(n.label) =~ toLower('.*" + label + ".*') ";
+  const { _id: systemType } = classpieceSystemType;
+  if (label !== '') {
+    if (queryParams !== '') {
+      queryParams += ' AND ';
     }
+    queryParams += `toLower(n.label) =~ toLower('.*${label}.*') `;
   }
   if (systemType !== '') {
     if (queryParams !== '') {
@@ -614,36 +606,21 @@ const getClasspiecesPrepareQueryParams = async (req) => {
     }
     queryParams += `n.systemType = '${systemType}' `;
   }
-  if (typeof parameters.description !== 'undefined') {
-    description = parameters.description;
-    if (description !== '') {
-      if (queryParams !== '') {
-        queryParams += ' AND ';
-      }
-      queryParams +=
-        "toLower(n.description) =~ toLower('.*" + description + ".*') ";
+  if (description !== '') {
+    if (queryParams !== '') {
+      queryParams += ' AND ';
     }
-  }
-
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
+    queryParams += `toLower(n.description) =~ toLower('.*${description}.*') `;
   }
   if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === 'true'
-    ) {
+    queryOrder = `ORDER BY n.${orderField}`;
+    if (orderDesc === 'true') {
       queryOrder += ' DESC';
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
+  if (page > 0) {
+    queryPage = page - 1;
   }
 
   if (typeof parameters.events !== 'undefined') {
@@ -735,36 +712,26 @@ const getClasspiecesPrepareQueryParams = async (req) => {
       queryParams += `AND id(re) IN [${resources}] `;
     }
   }
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
-  let currentPage = page;
-  if (page === 0) {
-    currentPage = 1;
-  }
 
-  let skip = limit * queryPage;
+  const currentPage = page === 0 ? 1 : page;
+  const skip = limit * queryPage;
   if (queryParams !== '') {
-    queryParams = 'WHERE ' + queryParams;
+    queryParams = `WHERE ${queryParams}`;
   }
 
   return {
-    match: match,
-    queryParams: queryParams,
-    skip: skip,
-    limit: limit,
-    currentPage: currentPage,
-    queryOrder: queryOrder,
-    returnResults: returnResults,
+    match,
+    queryParams,
+    skip,
+    limit,
+    currentPage,
+    queryOrder,
+    returnResults,
   };
 };
 
 module.exports = {
-  getClasspieces: getClasspieces,
-  getClasspiece: getClasspiece,
-  getClasspiecesActiveFilters: getClasspiecesActiveFilters,
+  getClasspieces,
+  getClasspiece,
+  getClasspiecesActiveFilters,
 };
