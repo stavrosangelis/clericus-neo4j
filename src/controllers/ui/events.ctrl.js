@@ -10,7 +10,7 @@ const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 * @apiParam {string} [label] A string to match against the events labels.
 * @apiParam {string} [temporal] A temporal value.
 * @apiParam {string} [spatial] A spatial label.
-* @apiParam {string} [orderField=firstName] The field to order the results by.
+* @apiParam {string} [orderField=label] The field to order the results by.
 * @apiParam {boolean} [orderDesc=false] If the results should be ordered in a descending order.
 * @apiParam {number} [page=1] The current page of results
 * @apiParam {number} [limit=25] The number of results per page

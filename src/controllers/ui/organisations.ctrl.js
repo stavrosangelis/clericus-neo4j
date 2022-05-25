@@ -8,6 +8,19 @@ const {
 } = require('../../helpers');
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 
+const dateToIsoFormat = (str) => {
+  const parts = str.split('-');
+  const year = parts[2];
+  const month =
+    !parts[1].includes('0') && Number(parts[1]) < 10
+      ? `0${parts[1]}`
+      : parts[1];
+  const day =
+    !parts[0].includes('0') && Number(parts[0]) < 10
+      ? `0${parts[0]}`
+      : parts[0];
+  return `${year}-${month}-${day}`;
+};
 /**
 * @api {get} /organisations Get organisations
 * @apiName get organisations
@@ -249,13 +262,11 @@ const getOrganisation = async (req, resp) => {
       );
       if (eventItem.temporal.length > 0) {
         eventItem.temporal.sort((a, b) => {
-          const akey = a.ref.startDate || null;
-          const bkey = b.ref.startDate || null;
+          const { startDate: akey = null } = a.ref;
+          const { startDate: bkey = null } = b.ref;
           if (akey !== null && bkey !== null) {
-            const aParts = akey.split('-');
-            const aDate = moment(`${aParts[2]}-${aParts[1]}-${aParts[0]}`);
-            const bParts = bkey.split('-');
-            const bDate = moment(`${bParts[2]}-${bParts[1]}-${bParts[0]}`);
+            const aDate = moment(dateToIsoFormat(akey));
+            const bDate = moment(dateToIsoFormat(bkey));
             if (aDate.diff(bDate) > 0) {
               return 1;
             } else {
@@ -299,10 +310,8 @@ const getOrganisation = async (req, resp) => {
       const akey = a.temporal[0]?.ref?.startDate || null;
       const bkey = b.temporal[0]?.ref?.startDate || null;
       if (akey !== null && bkey !== null) {
-        const aParts = akey.split('-');
-        const aDate = moment(`${aParts[2]}-${aParts[1]}-${aParts[0]}`);
-        const bParts = bkey.split('-');
-        const bDate = moment(`${bParts[2]}-${bParts[1]}-${bParts[0]}`);
+        const aDate = moment(dateToIsoFormat(akey));
+        const bDate = moment(dateToIsoFormat(bkey));
         if (aDate.diff(bDate) > 0) {
           return 1;
         } else {

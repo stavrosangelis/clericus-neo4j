@@ -44,7 +44,7 @@ const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 }
 */
 const getPeople = async (req, resp) => {
-  let params = await getPeoplePrepareQueryParams(req);
+  const params = await getPeoplePrepareQueryParams(req);
   let responseData = {};
   if (!params.returnResults) {
     responseData = {
@@ -53,30 +53,35 @@ const getPeople = async (req, resp) => {
       totalItems: 0,
       totalPages: 1,
     };
-    return resp.json({
+    return resp.status(200).json({
       status: true,
       data: responseData,
       error: [],
       msg: 'Query results',
     });
   } else {
-    let optionalMatchQuery = '';
-    if (params.optionalMatch !== '') {
-      optionalMatchQuery = params.optionalMatch;
-    }
-    const query = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN distinct n ${params.queryOrder} SKIP ${params.skip} LIMIT ${params.limit}`;
-    const queryCount = `${optionalMatchQuery} MATCH ${params.match} ${params.queryParams} RETURN count(distinct n) as c`;
-    let data = await getPeopleQuery(query, queryCount, params.limit);
+    const {
+      match,
+      optionalMatch,
+      queryParams,
+      skip,
+      limit,
+      currentPage,
+      queryOrder,
+    } = params;
+    const query = `${optionalMatch} MATCH ${match} ${queryParams} RETURN distinct n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
+    const queryCount = `${optionalMatch} MATCH ${match} ${queryParams} RETURN count(distinct n) as c`;
+    const data = await getPeopleQuery(query, queryCount, limit);
     if (data.error) {
-      resp.json({
+      resp.status(400).json({
         status: false,
         data: [],
         error: data.error,
         msg: data.error.message,
       });
     } else {
-      let responseData = {
-        currentPage: params.currentPage,
+      const responseData = {
+        currentPage: currentPage,
         data: data.nodes,
         totalItems: data.count,
         totalPages: data.totalPages,
@@ -324,7 +329,8 @@ const getPerson = async (req, resp) => {
 const getPersonActiveFilters = async (req, resp) => {
   const params = await getPeoplePrepareQueryParams(req);
   const session = driver.session();
-  const peopleIdsQuery = `MATCH ${params.match} ${params.queryParams} RETURN distinct id(n) as _id`;
+  const { match, optionalMatch, queryParams } = params;
+  const peopleIdsQuery = `${optionalMatch} MATCH ${match} ${queryParams} RETURN distinct id(n) as _id`;
   const peopleIdsResults = await session
     .writeTransaction((tx) => tx.run(peopleIdsQuery, {}))
     .then((result) => {
@@ -399,141 +405,128 @@ const getPersonActiveFilters = async (req, resp) => {
 };
 
 const getPeoplePrepareQueryParams = async (req) => {
-  let parameters = req.body;
-  let label = '';
-  let firstName = '';
-  let lastName = '';
-  let fnameSoundex = '';
-  let lnameSoundex = '';
-  let description = '';
-  let personType = '';
-  let page = 0;
-  let orderField = 'lastName';
+  const { body: params } = req;
+  const {
+    label: labelParam = '',
+    firstName: firstNameParam = '',
+    lastName: lastNameParam = '',
+    fnameSoundex: fnameSoundexParam = '',
+    lnameSoundex: lnameSoundexParam = '',
+    description: descriptionParam = '',
+    personType: personTypeParam = '',
+    orderField = 'lastName',
+    orderDesc = '',
+    page: pageParam = 1,
+    limit: limitParam = 25,
+    advancedSearch = null,
+    sources = [],
+    temporals: temporalsParams = null,
+    events: eventsParams = [],
+    spatial = [],
+    organisations = [],
+    people = [],
+    resources = [],
+  } = params;
+  let page = Number(pageParam);
   let queryPage = 0;
-  let queryOrder = '';
-  let limit = 25;
+  const limit = Number(limitParam);
   let returnResults = true;
+  const label = labelParam !== '' ? addslashes(labelParam).trim() : '';
+  const firstName =
+    firstNameParam !== '' ? addslashes(firstNameParam).trim() : '';
+  const lastName = lastNameParam !== '' ? addslashes(lastNameParam).trim() : '';
+  const fnameSoundex =
+    fnameSoundexParam !== '' ? addslashes(fnameSoundexParam).trim() : '';
+  const lnameSoundex =
+    lnameSoundexParam !== '' ? addslashes(lnameSoundexParam).trim() : '';
+  const description =
+    descriptionParam !== '' ? addslashes(descriptionParam).trim() : '';
+  const personType =
+    personTypeParam !== '' ? addslashes(personTypeParam).trim() : '';
 
   let match = '(n:Person)';
   let optionalMatch = '';
+  let queryOrder = '';
 
   let queryParams = " n.status='public' ";
 
-  if (typeof parameters.advancedSearch !== 'undefined') {
-    queryParams += advancedQueryBuilder(parameters.advancedSearch);
-  }
-
-  if (
-    typeof parameters.label !== 'undefined' &&
-    typeof parameters.advancedSearch === 'undefined'
-  ) {
-    label = addslashes(parameters.label).trim();
+  if (advancedSearch !== null) {
+    queryParams += advancedQueryBuilder(advancedSearch);
+  } else {
     if (label !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
       queryParams += ` (toLower(n.label) =~ toLower(".*${label}.*") OR single(x IN n.alternateAppelations WHERE toLower(x) =~ toLower(".*${label}.*"))) `;
     }
-  }
-  if (
-    typeof parameters.firstName !== 'undefined' &&
-    typeof parameters.advancedSearch === 'undefined'
-  ) {
-    firstName = addslashes(parameters.firstName).trim();
+
     if (firstName !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams +=
-        "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
+      queryParams += `toLower(n.firstName) =~ toLower('.*${firstName}.*') `;
     }
-  }
-  if (
-    typeof parameters.lastName !== 'undefined' &&
-    typeof parameters.advancedSearch === 'undefined'
-  ) {
-    lastName = addslashes(parameters.lastName).trim();
+
     if (lastName !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams += "toLower(n.lastName) =~ toLower('.*" + lastName + ".*') ";
+      queryParams += `toLower(n.lastName) =~ toLower('.*${lastName}.*') `;
+    }
+
+    if (fnameSoundex !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      queryParams += `toLower(n.fnameSoundex) =~ toLower('.*${fnameSoundex}.*') `;
+    }
+
+    if (lnameSoundex !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      queryParams += `toLower(n.lnameSoundex) =~ toLower('.*${lnameSoundex}.*') `;
+    }
+
+    if (description !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      queryParams += `toLower(n.description) =~ toLower('.*${description}.*') `;
     }
   }
-  if (
-    typeof parameters.fnameSoundex !== 'undefined' &&
-    typeof parameters.advancedSearch === 'undefined'
-  ) {
-    fnameSoundex = soundex(parameters.fnameSoundex).trim();
-    if (queryParams !== '') {
-      queryParams += ' AND ';
-    }
-    queryParams +=
-      "toLower(n.fnameSoundex) =~ toLower('.*" + fnameSoundex + ".*') ";
-  }
-  if (
-    typeof parameters.lnameSoundex !== 'undefined' &&
-    typeof parameters.advancedSearch === 'undefined'
-  ) {
-    lnameSoundex = soundex(parameters.lnameSoundex).trim();
-    if (queryParams !== '') {
-      queryParams += ' AND ';
-    }
-    queryParams +=
-      "toLower(n.lnameSoundex) =~ toLower('.*" + lnameSoundex + ".*') ";
-  }
-  if (
-    typeof parameters.description !== 'undefined' &&
-    typeof parameters.advancedSearch === 'undefined'
-  ) {
-    description = addslashes(parameters.description).trim();
-    if (queryParams !== '') {
-      queryParams += ' AND ';
-    }
-    queryParams +=
-      "toLower(n.description) =~ toLower('.*" + description + ".*') ";
-  }
-  if (typeof parameters.personType !== 'undefined') {
-    personType = addslashes(parameters.personType).trim();
+
+  if (personType !== '') {
     if (queryParams !== '') {
       queryParams += ' AND ';
     }
     queryParams += ` toLower(n.personType)= toLower("${personType}") `;
   }
-  if (parameters.sources?.length > 0) {
-    optionalMatch = `OPTIONAL MATCH (s:Resource) WHERE id(s) IN [${parameters.sources}]`;
+
+  if (sources.length > 0) {
+    optionalMatch = `OPTIONAL MATCH (s:Resource) WHERE id(s) IN [${sources}]`;
     queryParams += ' AND exists((n)-[:isReferencedIn]->(s))';
   }
 
-  if (typeof parameters.orderField !== 'undefined') {
-    orderField = parameters.orderField;
-  }
   if (orderField !== '') {
-    queryOrder = 'ORDER BY n.' + orderField;
-    if (
-      typeof parameters.orderDesc !== 'undefined' &&
-      parameters.orderDesc === true
-    ) {
+    queryOrder = `ORDER BY n.${orderField}`;
+    if (orderDesc) {
       queryOrder += ' DESC';
     }
   }
 
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
+  if (page > 0) {
+    queryPage = page - 1;
   }
 
   // temporal
   let temporalEventIds = [];
-  if (typeof parameters.temporals !== 'undefined') {
+  if (temporalsParams !== null) {
     let eventTypes = [];
-    if (typeof parameters.events !== 'undefined') {
-      eventTypes = parameters.events;
+    if (eventsParams.length > 0) {
+      eventTypes = eventsParams;
     }
-    let temporals = parameters.temporals;
+    let temporals = temporalsParams;
     if (typeof temporals === 'string') {
       temporals = JSON.parse(temporals);
     }
@@ -551,41 +544,38 @@ const getPeoplePrepareQueryParams = async (req) => {
   }
   // spatial
   let spatialEventIds = [];
-  if (typeof parameters.spatial !== 'undefined') {
-    let session = driver.session();
-    let querySpatial = `MATCH (n:Spatial)-[r]-(e:Event) WHERE id(n) IN [${parameters.spatial}] RETURN DISTINCT id(e)`;
-    let spatialResults = await session
+  if (spatial.length > 0) {
+    const session = driver.session();
+    const querySpatial = `MATCH (n:Spatial)-[r]-(e:Event) WHERE id(n) IN [${spatial}] RETURN DISTINCT id(e)`;
+    const spatialResults = await session
       .writeTransaction((tx) => tx.run(querySpatial, {}))
       .then((result) => {
         session.close();
         return result.records;
       });
-    for (let s = 0; s < spatialResults.length; s++) {
-      let sr = spatialResults[s];
+    const { length: sLength } = spatialResults;
+    for (let s = 0; s < sLength; s += 1) {
+      const sr = spatialResults[s];
       prepareOutput(sr);
       spatialEventIds.push(sr._fields[0]);
     }
   }
 
   let events = [];
-  let organisations = [];
-  let people = [];
-  let resources = [];
-  if (
-    typeof parameters.events !== 'undefined' &&
-    parameters.events.length > 0
-  ) {
-    if (temporalEventIds.length > 0) {
-      for (let i = 0; i < temporalEventIds.length; i++) {
-        let tei = temporalEventIds[i];
+  if (eventsParams.length > 0) {
+    const { length: tLength = 0 } = temporalEventIds;
+    const { length: sLength = 0 } = spatialEventIds;
+    if (tLength > 0) {
+      for (let i = 0; i < tLength; i += 1) {
+        const tei = temporalEventIds[i];
         if (events.indexOf(tei) === -1) {
           events.push(tei);
         }
       }
     }
-    if (spatialEventIds.length > 0) {
-      for (let i = 0; i < spatialEventIds.length; i++) {
-        let sei = spatialEventIds[i];
+    if (sLength > 0) {
+      for (let i = 0; i < sLength; i += 1) {
+        const sei = spatialEventIds[i];
         if (events.indexOf(sei) === -1) {
           events.push(sei);
         }
@@ -599,17 +589,19 @@ const getPeoplePrepareQueryParams = async (req) => {
     }
   } else {
     events = [];
-    if (temporalEventIds.length > 0) {
-      for (let i = 0; i < temporalEventIds.length; i++) {
-        let tei = temporalEventIds[i];
+    const { length: tLength = 0 } = temporalEventIds;
+    const { length: sLength = 0 } = spatialEventIds;
+    if (tLength > 0) {
+      for (let i = 0; i < tLength; i += 1) {
+        const tei = temporalEventIds[i];
         if (events.indexOf(tei) === -1) {
           events.push(tei);
         }
       }
     }
-    if (spatialEventIds.length > 0) {
-      for (let i = 0; i < spatialEventIds.length; i++) {
-        let sei = spatialEventIds[i];
+    if (sLength > 0) {
+      for (let i = 0; i < sLength; i += 1) {
+        const sei = spatialEventIds[i];
         if (events.indexOf(sei) === -1) {
           events.push(sei);
         }
@@ -624,11 +616,7 @@ const getPeoplePrepareQueryParams = async (req) => {
       queryParams += ` AND id(e) IN [${events}] `;
     }
   }
-  if (
-    typeof parameters.organisations !== 'undefined' &&
-    parameters.organisations.length > 0
-  ) {
-    organisations = parameters.organisations;
+  if (organisations.length > 0) {
     if (events.length > 0) {
       match += ', (n:Person)-[rorganisation]->(o:Organisation)';
     } else {
@@ -640,11 +628,7 @@ const getPeoplePrepareQueryParams = async (req) => {
       queryParams += ` AND id(o) IN [${organisations}] `;
     }
   }
-  if (
-    typeof parameters.people !== 'undefined' &&
-    parameters.people.length > 0
-  ) {
-    people = parameters.people;
+  if (people.length > 0) {
     if (events.length > 0 || organisations.length > 0) {
       match += ', (n:Person)-[rperson]->(p:Person)';
     } else {
@@ -656,11 +640,7 @@ const getPeoplePrepareQueryParams = async (req) => {
       queryParams += ` AND id(p) IN [${people}] `;
     }
   }
-  if (
-    typeof parameters.resources !== 'undefined' &&
-    parameters.resources.length > 0
-  ) {
-    resources = parameters.resources;
+  if (resources.length > 0) {
     if (events.length > 0 || organisations.length > 0 || people.length > 0) {
       match += ', (n:Person)-[rresource]->(re:Resource)';
     } else {
@@ -672,80 +652,70 @@ const getPeoplePrepareQueryParams = async (req) => {
       queryParams += ` AND id(re) IN [${resources}] `;
     }
   }
-  if (typeof parameters.page !== 'undefined') {
-    page = parseInt(parameters.page, 10);
-    queryPage = parseInt(parameters.page, 10) - 1;
-  }
-  if (typeof parameters.limit !== 'undefined') {
-    limit = parseInt(parameters.limit, 10);
-  }
-  let currentPage = page;
-  if (page === 0) {
-    currentPage = 1;
-  }
-  let skip = limit * queryPage;
+
+  const currentPage = page === 0 ? 1 : page;
+  const skip = limit * queryPage;
   if (queryParams !== '') {
-    queryParams = 'WHERE ' + queryParams;
+    queryParams = `WHERE ${queryParams}`;
   }
   return {
-    match: match,
-    optionalMatch: optionalMatch,
-    queryParams: queryParams,
-    skip: skip,
-    limit: limit,
-    currentPage: currentPage,
-    queryOrder: queryOrder,
-    returnResults: returnResults,
+    match,
+    optionalMatch,
+    queryParams,
+    skip,
+    limit,
+    currentPage,
+    queryOrder,
+    returnResults,
   };
 };
 
-const advancedQueryBuilder = (advancedSearch) => {
+const advancedQueryBuilder = (advancedSearch = []) => {
   let query = '';
-  for (let i = 0; i < advancedSearch.length; i++) {
-    let item = advancedSearch[i];
-    query += ` ${item.boolean.toUpperCase()}`;
-    if (item.select === 'honorificPrefix') {
-      if (item.qualifier === 'not_equals') {
-        query += ` NOT single(x IN n.${item.select} WHERE x="${item.input}")`;
+  const { length } = advancedSearch;
+  for (let i = 0; i < length; i += 1) {
+    const item = advancedSearch[i];
+    const { boolean, input = '', qualifier = '', select = '' } = item;
+    query += ` ${boolean.toUpperCase()}`;
+    if (select === 'honorificPrefix') {
+      if (qualifier === 'not_equals') {
+        query += ` NOT single(x IN n.${select} WHERE x="${input}")`;
       }
-      if (item.qualifier === 'not_contains') {
-        query += ` NOT single(x IN n.${item.select} WHERE toLower(x) =~ toLower(".*${item.input}.*"))`;
+      if (qualifier === 'not_contains') {
+        query += ` NOT single(x IN n.${select} WHERE toLower(x) =~ toLower(".*${input}.*"))`;
       }
-      if (item.qualifier === 'contains') {
-        query += ` single(x IN n.${item.select} WHERE toLower(x) =~ toLower(".*${item.input}.*")) `;
-      }
-      if (item.qualifier === 'equals') {
-        query += ` single(x IN n.${item.select} WHERE x="${item.input}") `;
-      }
-    } else if (
-      item.select === 'fnameSoundex' ||
-      item.select === 'lnameSoundex'
-    ) {
-      let inputVal = soundex(item.input).trim();
-      if (item.qualifier === 'not_equals') {
-        query += ` NOT n.${item.select} = "${inputVal}" `;
-      }
-      if (item.qualifier === 'not_contains') {
-        query += ` NOT toLower(n.${item.select}) =~ toLower(".*${inputVal}.*") `;
-      }
-      if (item.qualifier === 'contains') {
-        query += ` toLower(n.${item.select}) =~ toLower(".*${inputVal}.*") `;
+      if (qualifier === 'contains') {
+        query += ` single(x IN n.${select} WHERE toLower(x) =~ toLower(".*${input}.*")) `;
       }
       if (item.qualifier === 'equals') {
-        query += ` n.${item.select} = "${inputVal}" `;
+        query += ` single(x IN n.${select} WHERE x="${input}") `;
+      }
+    } else if (select === 'fnameSoundex' || select === 'lnameSoundex') {
+      const inputVal = soundex(input).trim();
+      if (qualifier === 'not_equals') {
+        query += ` NOT n.${select} = "${inputVal}" `;
+      }
+      if (qualifier === 'not_contains') {
+        query += ` NOT toLower(n.${select}) =~ toLower(".*${inputVal}.*") `;
+      }
+      if (qualifier === 'contains') {
+        query += ` toLower(n.${select}) =~ toLower(".*${inputVal}.*") `;
+      }
+      if (qualifier === 'equals') {
+        query += ` n.${select} = "${inputVal}" `;
       }
     } else {
-      if (item.qualifier === 'not_equals') {
-        query += ` NOT n.${item.select} = "${item.input}" `;
+      if (qualifier === 'not_equals') {
+        query += ` NOT n.${select} = "${input}" `;
       }
-      if (item.qualifier === 'not_contains') {
-        query += ` NOT toLower(n.${item.select}) =~ toLower(".*${item.input}.*") `;
+      if (qualifier === 'not_contains') {
+        query += ` NOT toLower(n.${select}) =~ toLower(".*${input}.*") `;
       }
-      if (item.qualifier === 'contains') {
-        query += ` toLower(n.${item.select}) =~ toLower(".*${item.input}.*") `;
+      if (qualifier === 'contains') {
+        query += ` toLower(n.${select}) =~ toLower(".*${input}.*") `;
       }
-      if (item.qualifier === 'equals') {
-        query += ` n.${item.select} = "${item.input}" `;
+      if (qualifier === 'equals') {
+        query += ` n.${select} = "${input}" `;
       }
     }
   }
@@ -753,11 +723,11 @@ const advancedQueryBuilder = (advancedSearch) => {
 };
 
 const getPeopleSources = async (req, resp) => {
-  let documentSystemType = new TaxonomyTerm({ labelId: 'Document' });
+  const documentSystemType = new TaxonomyTerm({ labelId: 'Document' });
   await documentSystemType.load();
-  let query = `MATCH (r:Resource {systemType:"${documentSystemType._id}",status:"public"}) RETURN r`;
-  let session = driver.session();
-  let nodesPromise = await session
+  const query = `MATCH (r:Resource {systemType:"${documentSystemType._id}",status:"public"}) RETURN r`;
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
@@ -765,7 +735,7 @@ const getPeopleSources = async (req, resp) => {
     .catch((error) => {
       console.log(error);
     });
-  let sources = normalizeRecordsOutput(nodesPromise, 'n');
+  const sources = normalizeRecordsOutput(nodesPromise, 'n');
   session.close();
   return resp.json({
     status: true,
@@ -776,8 +746,8 @@ const getPeopleSources = async (req, resp) => {
 };
 
 module.exports = {
-  getPeople: getPeople,
-  getPerson: getPerson,
-  getPersonActiveFilters: getPersonActiveFilters,
-  getPeopleSources: getPeopleSources,
+  getPeople,
+  getPerson,
+  getPersonActiveFilters,
+  getPeopleSources,
 };

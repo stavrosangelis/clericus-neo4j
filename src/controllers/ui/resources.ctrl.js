@@ -427,7 +427,7 @@ const getResourcesPrepareQueryParams = async (req) => {
   let organisations = [];
   let people = [];
   let resources = [];
-  let resourcesTypes = [];
+  let resourcesType = '';
   let page = 0;
   let orderField = 'label';
   let queryPage = 0;
@@ -502,22 +502,14 @@ const getResourcesPrepareQueryParams = async (req) => {
   }
 
   if (
-    typeof parameters.resourcesTypes !== 'undefined' &&
-    parameters.resourcesTypes.length > 0
+    typeof parameters.resourcesType !== 'undefined' &&
+    parameters.resourcesType !== ''
   ) {
-    resourcesTypes = parameters.resourcesTypes;
+    resourcesType = parameters.resourcesType;
     if (queryParams !== '') {
       queryParams += ' AND ';
     }
-    let resourcesTypesQuery = '';
-    for (let key in resourcesTypes) {
-      let rType = resourcesTypes[key];
-      if (resourcesTypesQuery !== '') {
-        resourcesTypesQuery += ' OR ';
-      }
-      resourcesTypesQuery += ` n.systemType="${rType}"`;
-    }
-    queryParams += `(${resourcesTypesQuery})`;
+    queryParams += ` n.systemType="${resourcesType}"`;
   }
 
   if (typeof parameters.orderField !== 'undefined') {

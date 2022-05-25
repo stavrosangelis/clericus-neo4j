@@ -350,56 +350,61 @@ const prepareOrganisations = async (records) => {
 };
 
 const getItemNetwork = async (req, resp) => {
-  let params = req.query;
-  let _id = 0;
-  if (typeof params._id === 'undefined' || params._id === '') {
-    resp.json({
+  const { query: params } = req;
+  const { _id = '' } = params;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
-  } else {
-    _id = params._id;
   }
-  let path = `${archivePath}network-graph.json`;
-  let networkGraph = await helpers.readJSONFile(path);
+  const path = `${archivePath}network-graph.json`;
+  const networkGraph = await helpers.readJSONFile(path);
 
-  let node = networkGraph.data.nodes.find((n) => n.id === _id);
-  node.size = 50;
-  let relatedNodesIds = [];
-  let links = networkGraph.data.links.filter((l) => {
-    if (l.source.itemId === _id || l.target.itemId === _id) {
-      if (
-        l.source.itemId !== _id &&
-        relatedNodesIds.indexOf(l.source.itemId) === -1
-      ) {
-        relatedNodesIds.push(l.source.itemId);
-      }
-      if (
-        l.target.itemId !== _id &&
-        relatedNodesIds.indexOf(l.target.itemId) === -1
-      ) {
-        relatedNodesIds.push(l.target.itemId);
-      }
-      return true;
-    }
-    return false;
-  });
+  const { nodes: dNodes = [], links: dLinks = [] } = networkGraph.data;
+  const node = dNodes.find((n) => n.id === _id) || null;
+  if (node !== null) {
+    node.size = 50;
+    const relatedNodesIds = [];
 
-  let nodes = networkGraph.data.nodes.filter(
-    (n) => relatedNodesIds.indexOf(n.id) > -1
-  );
-  nodes = [node, ...nodes];
-  let data = JSON.stringify({ nodes: nodes, links: links });
-  return resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: 'Query results',
-  });
+    const links = dLinks.filter((l) => {
+      const { source, target } = l;
+      const { id: sItemId } = source;
+      const { id: tItemId } = target;
+      if (sItemId === _id || tItemId === _id) {
+        if (sItemId !== _id && relatedNodesIds.indexOf(sItemId) === -1) {
+          relatedNodesIds.push(sItemId);
+        }
+        if (tItemId !== _id && relatedNodesIds.indexOf(tItemId) === -1) {
+          relatedNodesIds.push(tItemId);
+        }
+        return true;
+      }
+      return false;
+    });
+
+    const nodes =
+      dNodes.filter((n) => relatedNodesIds.indexOf(n.id) > -1) || [];
+    const allNodes = [node, ...nodes];
+    const data = JSON.stringify({ nodes: allNodes, links });
+    return resp.status(200).json({
+      status: true,
+      data,
+      error: [],
+      msg: 'Query results',
+    });
+  } else {
+    return resp.status(400).json({
+      status: false,
+      data: [],
+      error: true,
+      msg: 'Undefined node',
+    });
+  }
 };
+
 /* const getItemNetwork_old = async (req, resp) => {
   let t0 = performance.now();
   let params = req.query;

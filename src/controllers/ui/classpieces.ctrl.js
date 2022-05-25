@@ -302,18 +302,22 @@ const getClasspiece = async (req, resp) => {
     const { length: rLength = 0 } = resources;
     for (let i = 0; i < rLength; i += 1) {
       const resource = resources[i];
-      if (typeof resource.ref.person !== 'undefined') {
-        resource.ref.person.affiliations = await helpers.loadRelations(
-          resource.ref.person._id,
-          'Person',
-          'Organisation',
-          true,
-          'hasAffiliation'
-        );
-      }
-      if (resource.ref.systemType === systemType) {
-        classpieces.push(resource);
-        resources.splice(i, 1);
+      const { ref = null } = resource;
+      if (ref !== null) {
+        const { person = null, systemType: rSystemType = null } = ref;
+        if (person !== null) {
+          resource.ref.person.affiliations = await helpers.loadRelations(
+            resource.ref.person._id,
+            'Person',
+            'Organisation',
+            true,
+            'hasAffiliation'
+          );
+        }
+        if (rSystemType !== null && rSystemType === systemType) {
+          classpieces.push(resource);
+          resources.splice(i, 1);
+        }
       }
     }
     classpiece.events = events;

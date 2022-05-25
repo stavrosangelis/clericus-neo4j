@@ -266,9 +266,9 @@ const getArticle = async (req, resp) => {
     (typeof parameters._id === 'undefined' || parameters._id === '') &&
     (typeof parameters.permalink === 'undefined' || parameters.permalink === '')
   ) {
-    resp.json({
+    resp.status(400).json({
       status: false,
-      data: [],
+      data: null,
       error: true,
       msg: 'Please select a valid id to continue.',
     });
@@ -303,7 +303,7 @@ const getArticle = async (req, resp) => {
   } else {
     resp.json({
       status: false,
-      data: [],
+      data: null,
       error: true,
       msg: 'This article is not available',
     });
