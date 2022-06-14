@@ -120,9 +120,9 @@ const prepareParams = (item) => {
   return params;
 };
 
-const normalizeRecordsOutput = (records) => {
+const normalizeRecordsOutput = (records = []) => {
   const output = [];
-  const { length } = records;
+  const { length = 0 } = records;
   for (let i = 0; i < length; i += 1) {
     const record = records[i];
     let labels = null;

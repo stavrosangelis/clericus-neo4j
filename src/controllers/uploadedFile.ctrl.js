@@ -266,7 +266,7 @@ const getUploadedFiles = async (req, resp) => {
   }
 
   if (type !== '') {
-    queryParams += `toLower(n.type) =~ toLower('${type}') `;
+    queryParams += `exists(n.type) AND toLower(n.type) =~ toLower('${type}') `;
   }
 
   if (orderField !== '') {
@@ -308,8 +308,8 @@ const getUploadedFiles = async (req, resp) => {
 };
 
 const getUploadedFilesQuery = async (query, queryParams, limit) => {
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
@@ -318,9 +318,9 @@ const getUploadedFilesQuery = async (query, queryParams, limit) => {
       console.log(error);
     });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  const nodes = helpers.normalizeRecordsOutput(nodesPromise);
 
-  let count = await session
+  const count = await session
     .writeTransaction((tx) =>
       tx.run('MATCH (n:UploadedFile) ' + queryParams + ' RETURN count(*)')
     )

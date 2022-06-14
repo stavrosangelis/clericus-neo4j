@@ -1,6 +1,5 @@
 const sanitizeHtml = require('sanitize-html');
 const fs = require('fs');
-
 const driver = require('../config/db-driver');
 const {
   normalizeRecordsOutput,

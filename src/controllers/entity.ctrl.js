@@ -53,34 +53,30 @@ class Entity {
       });
     }
 
-    let msg = 'The record is valid';
-    if (!status) {
-      msg = 'The record is not valid';
-    }
-    let output = {
+    const msg = !status ? 'The record is not valid' : 'The record is valid';
+    return {
       status: status,
       msg: msg,
       errors: errors,
     };
-    return output;
   }
 
   async load() {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Entity) WHERE id(n)=' + this._id + ' RETURN n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Entity) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
-          return outputRecord;
+          const record = records[0].toObject();
+          return helpers.outputRecord(record.n);
         }
+        return null;
       });
     // assign results to class values
     for (let key in node) {
@@ -94,18 +90,18 @@ class Entity {
     if (this.labelId === null) {
       return false;
     }
-    let session = driver.session();
-    let query = "MATCH (n:Entity {labelId: '" + this.labelId + "'}) return n";
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Entity {labelId: '${this.labelId}'}) return n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
-          return outputRecord;
+          const record = records[0].toObject();
+          return helpers.outputRecord(record.n);
         }
+        return null;
       });
     // assign results to class values
     for (let key in node) {
@@ -119,27 +115,27 @@ class Entity {
     if (typeof this._id === 'undefined' || this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = `MATCH (n:Entity)-[r]->(re:Entity) WHERE id(n)=${this._id} RETURN n,r,re`;
-    let relations = await session
+    const session = driver.session();
+    const query = `MATCH (n:Entity)-[r]->(re:Entity) WHERE id(n)=${this._id} RETURN n,r,re`;
+    const relations = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let properties = prepareRelations(records);
-          return properties;
-        } else return [];
+          return prepareRelations(records);
+        }
+        return [];
       });
     return relations;
   }
 
   async save(userId) {
-    let validateEntity = this.validate();
+    const validateEntity = this.validate();
     if (!validateEntity.status) {
       return validateEntity;
     } else {
-      let session = driver.session();
+      const session = driver.session();
       // normalize label id
       if (
         typeof this._id === 'undefined' ||
@@ -148,53 +144,50 @@ class Entity {
         this.labelId = helpers.normalizeLabelId(this.label);
       }
       // timestamps
-      let now = new Date().toISOString();
+      const now = new Date().toISOString();
       if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
       } else {
-        let original = new Entity({ _id: this._id });
+        const original = new Entity({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
       }
       this.updatedBy = userId;
       this.updatedAt = now;
-      let nodeProperties = helpers.prepareNodeProperties(this);
-      let params = helpers.prepareParams(this);
+      const nodeProperties = helpers.prepareNodeProperties(this);
+      const params = helpers.prepareParams(this);
 
       let query = '';
       if (typeof this._id === 'undefined' || this._id === null) {
-        query = 'CREATE (n:Entity ' + nodeProperties + ') RETURN n';
+        query = `CREATE (n:Entity ${nodeProperties}) RETURN n`;
       } else {
-        query =
-          'MATCH (n:Entity) WHERE id(n)=' +
-          this._id +
-          ' AND n.locked=false SET n=' +
-          nodeProperties +
-          ' RETURN n';
+        query = `MATCH (n:Entity) WHERE id(n)=${this._id} AND n.locked=false SET n=${nodeProperties} RETURN n`;
       }
-      let resultPromise = await session
+      const resultPromise = await session
         .run(query, params)
         .then((result) => {
           session.close();
-          let records = result.records;
+          const { records } = result;
           let output = {
             error: ['The record cannot be updated'],
             status: false,
             data: [],
           };
           if (records.length > 0) {
-            let record = records[0];
-            let key = record.keys[0];
-            let resultRecord = record.toObject()[key];
-            resultRecord = helpers.outputRecord(resultRecord);
-            output = { error: [], status: true, data: resultRecord };
+            const [record] = records;
+            const { keys } = record;
+            const [key] = keys;
+            const resultRecord = record.toObject()[key];
+            const data = helpers.outputRecord(resultRecord);
+            output = { error: [], status: true, data };
           }
           return output;
         })
         .catch((error) => {
           console.log(error);
+          return { error, status: false, data: [] };
         });
       return resultPromise;
     }

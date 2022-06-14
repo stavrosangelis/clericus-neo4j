@@ -1,17 +1,26 @@
 const driver = require('../config/db-driver');
-const helpers = require('../helpers');
+const {
+  addslashes,
+  loadRelations,
+  normalizeRecordsOutput,
+  outputRecord,
+  prepareNodeProperties,
+  prepareOutput,
+  prepareParams,
+  soundex,
+} = require('../helpers');
 
 class Person {
   constructor({
     _id = null,
     honorificPrefix = [],
-    firstName = null,
-    middleName = null,
-    lastName = null,
+    firstName = '',
+    middleName = '',
+    lastName = '',
     fnameSoundex = null,
     lnameSoundex = null,
     alternateAppelations = [],
-    description = null,
+    description = '',
     personType = 'Clergy',
     status = 'private',
     createdBy = null,
@@ -19,19 +28,20 @@ class Person {
     updatedBy = null,
     updatedAt = null,
   }) {
-    if (typeof _id !== 'undefined' && _id !== null) {
+    this._id = null;
+    if (_id !== null) {
       this._id = _id;
     }
-    if (firstName !== null && isNaN(firstName)) {
+    if (firstName !== '' && isNaN(firstName)) {
       firstName = firstName.trim();
     }
-    if (middleName !== null && isNaN(middleName)) {
+    if (middleName !== '' && isNaN(middleName)) {
       middleName = middleName.trim();
     }
-    if (lastName !== null && isNaN(lastName)) {
+    if (lastName !== '' && isNaN(lastName)) {
       lastName = lastName.trim();
     }
-    if (description !== null && isNaN(description)) {
+    if (description !== '' && isNaN(description)) {
       description = description.trim();
     }
     this.honorificPrefix = honorificPrefix;
@@ -39,10 +49,10 @@ class Person {
     this.middleName = middleName;
     this.lastName = lastName;
     this.label = this.personLabel({
-      honorificPrefix: honorificPrefix,
-      firstName: firstName,
-      middleName: middleName,
-      lastName: lastName,
+      honorificPrefix,
+      firstName,
+      middleName,
+      lastName,
     });
     this.fnameSoundex = fnameSoundex;
     this.lnameSoundex = lnameSoundex;
@@ -241,8 +251,7 @@ class Person {
         const { records } = result;
         if (records.length > 0) {
           const record = records[0].toObject();
-          const outputRecord = helpers.outputRecord(record.n);
-          return outputRecord;
+          return outputRecord(record.n);
         }
         return null;
       })
@@ -261,18 +270,14 @@ class Person {
       }
     }
     // relations
-    const events = await helpers.loadRelations(this._id, 'Person', 'Event');
-    const organisations = await helpers.loadRelations(
+    const events = await loadRelations(this._id, 'Person', 'Event');
+    const organisations = await loadRelations(
       this._id,
       'Person',
       'Organisation'
     );
-    const people = await helpers.loadRelations(this._id, 'Person', 'Person');
-    const resources = await helpers.loadRelations(
-      this._id,
-      'Person',
-      'Resource'
-    );
+    const people = await loadRelations(this._id, 'Person', 'Person');
+    const resources = await loadRelations(this._id, 'Person', 'Resource');
     this.events = events;
     this.organisations = organisations;
     this.people = people;
@@ -292,7 +297,7 @@ class Person {
         let records = result.records;
         if (records.length > 0) {
           let record = records[0].toObject();
-          let outputRecord = helpers.outputRecord(record.n);
+          let outputRecord = outputRecord(record.n);
           return outputRecord;
         }
       })
@@ -381,8 +386,8 @@ class Person {
       this.updatedBy = userId;
       this.updatedAt = now;
 
-      let nodeProperties = helpers.prepareNodeProperties(this);
-      let params = helpers.prepareParams(this);
+      let nodeProperties = prepareNodeProperties(this);
+      let params = prepareParams(this);
 
       let query = '';
       if (typeof this._id === 'undefined' || this._id === null) {
@@ -409,7 +414,7 @@ class Person {
             let record = records[0];
             let key = record.keys[0];
             let resultRecord = record.toObject()[key];
-            resultRecord = helpers.outputRecord(resultRecord);
+            resultRecord = outputRecord(resultRecord);
             output = { error: [], status: true, data: resultRecord };
           }
           return output;
@@ -482,177 +487,131 @@ class Person {
 }
 */
 const getPeople = async (req, resp) => {
-  let parameters = req.query;
-  let label = '';
-  let personType = '';
-  let firstName = '';
-  let lastName = '';
-  let fnameSoundex = '';
-  let lnameSoundex = '';
-  let description = '';
-  let classpieceId = 0;
-  let status = '';
-  let page = 0;
-  let orderField = 'firstName';
+  const { query: params } = req;
+  const {
+    _id = '',
+    label: labelParam = '',
+    firstName: firstNameParam = '',
+    lastName: lastNameParam = '',
+    fnameSoundex: fnameSoundexParam = '',
+    lnameSoundex: lnameSoundexParam = '',
+    description: descriptionParam = '',
+    personType: personTypeParam = '',
+    orderField = 'lastName',
+    orderDesc = '',
+    page: pageParam = 1,
+    limit: limitParam = 25,
+    status = '',
+    classpieceId: classpieceIdParam = '',
+  } = params;
+  let page = Number(pageParam);
   let queryPage = 0;
-  let queryOrder = '';
-  let limit = 25;
+  const limit = Number(limitParam);
+  const label = labelParam !== '' ? addslashes(labelParam).trim() : '';
+  const firstName =
+    firstNameParam !== '' ? addslashes(firstNameParam).trim() : '';
+  const lastName = lastNameParam !== '' ? addslashes(lastNameParam).trim() : '';
+  const fnameSoundex =
+    fnameSoundexParam !== '' ? addslashes(fnameSoundexParam).trim() : '';
+  const lnameSoundex =
+    lnameSoundexParam !== '' ? addslashes(lnameSoundexParam).trim() : '';
+  const description =
+    descriptionParam !== '' ? addslashes(descriptionParam).trim() : '';
+  const personType =
+    personTypeParam !== '' ? addslashes(personTypeParam).trim() : '';
+  const classpieceId = classpieceIdParam !== '' ? Number(classpieceIdParam) : 0;
 
   let query = '';
   let queryParams = '';
+  let queryOrder = '';
 
-  if (
-    typeof parameters._id !== 'undefined' &&
-    parameters._id !== null &&
-    parameters._id !== ''
-  ) {
-    const personId = parameters._id.trim();
+  if (_id !== '') {
+    const personId = _id.trim();
     queryParams = `id(n)=${personId} `;
   } else {
-    if (typeof parameters.label !== 'undefined') {
-      label = helpers.addslashes(parameters.label);
-      if (label !== '') {
-        queryParams += "toLower(n.label) =~ toLower('.*" + label + ".*') ";
-      }
+    if (label !== '') {
+      queryParams += `toLower(n.label) =~ toLower('.*${label}.*') `;
     }
-    if (typeof parameters.firstName !== 'undefined') {
-      firstName = helpers.addslashes(parameters.firstName);
-      if (firstName !== '') {
-        if (queryParams !== '') {
-          queryParams += ' AND ';
-        }
-        queryParams +=
-          "toLower(n.firstName) =~ toLower('.*" + firstName + ".*') ";
-      }
-    }
-    if (typeof parameters.lastName !== 'undefined') {
-      lastName = helpers.addslashes(parameters.lastName);
-      if (lastName !== '') {
-        if (queryParams !== '') {
-          queryParams += ' AND ';
-        }
-        queryParams +=
-          "toLower(n.lastName) =~ toLower('.*" + lastName + ".*') ";
-      }
-    }
-    if (typeof parameters.fnameSoundex !== 'undefined') {
-      fnameSoundex = helpers.soundex(parameters.fnameSoundex);
+    if (firstName !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams +=
-        "toLower(n.fnameSoundex) =~ toLower('.*" + fnameSoundex + ".*') ";
+      queryParams += `exists(n.firstName) AND toLower(n.firstName) =~ toLower('.*${firstName}.*') `;
     }
-    if (typeof parameters.lnameSoundex !== 'undefined') {
-      lnameSoundex = helpers.soundex(parameters.lnameSoundex);
+    if (lastName !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams +=
-        "toLower(n.lnameSoundex) =~ toLower('.*" + lnameSoundex + ".*') ";
+      queryParams += `exists(n.lastName) AND toLower(n.lastName) =~ toLower('.*${lastName}.*') `;
     }
-    if (typeof parameters.description !== 'undefined') {
-      description = helpers.addslashes(parameters.description.toLowerCase());
+    if (fnameSoundex !== '') {
       if (queryParams !== '') {
         queryParams += ' AND ';
       }
-      queryParams +=
-        "toLower(n.description) =~ toLower('.*" + description + ".*') ";
+      queryParams += `exists(n.fnameSoundex) AND toLower(n.fnameSoundex) =~ toLower('.*${fnameSoundex}.*') `;
     }
-    if (typeof parameters.status !== 'undefined') {
-      status = parameters.status;
-      if (status !== '') {
-        if (queryParams !== '') {
-          queryParams += ' AND ';
-        }
-        queryParams += "toLower(n.status) =~ toLower('.*" + status + ".*') ";
+    if (lnameSoundex !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
+      queryParams += `exists(n.lnameSoundex) AND toLower(n.lnameSoundex) =~ toLower('.*${lnameSoundex}.*') `;
     }
-    if (typeof parameters.orderField !== 'undefined') {
-      orderField = parameters.orderField;
-    }
-    if (typeof parameters.personType !== 'undefined') {
-      personType = parameters.personType;
-      if (personType !== '') {
-        if (queryParams !== '') {
-          queryParams += ' AND ';
-        }
-        queryParams +=
-          "exists(n.personType) AND toLower(n.personType) =~ toLower('.*" +
-          personType +
-          ".*') ";
+    if (description !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
       }
+      queryParams += `exists(n.description) AND toLower(n.description) =~ toLower('.*${description}.*') `;
+    }
+    if (status !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      queryParams += `toLower(n.status) =~ toLower('.*${status}.*') `;
+    }
+    if (personType !== '') {
+      if (queryParams !== '') {
+        queryParams += ' AND ';
+      }
+      queryParams += `exists(n.personType) AND toLower(n.personType) =~ toLower('.*${personType}.*') `;
     }
     if (orderField !== '') {
-      queryOrder = 'ORDER BY n.' + orderField;
-      if (
-        typeof parameters.orderDesc !== 'undefined' &&
-        parameters.orderDesc === 'true'
-      ) {
+      queryOrder = `ORDER BY n.${orderField}`;
+      if (orderDesc === 'true') {
         queryOrder += ' DESC';
       }
     }
-    if (typeof parameters.classpieceId !== 'undefined') {
-      classpieceId = parseInt(parameters.classpieceId, 10);
-    }
 
-    if (typeof parameters.page !== 'undefined') {
-      page = parseInt(parameters.page, 10);
-      queryPage = parseInt(parameters.page, 10) - 1;
-      if (queryPage < 0) {
-        queryPage = 0;
-      }
-    }
-    if (typeof parameters.limit !== 'undefined') {
-      limit = parseInt(parameters.limit, 10);
+    if (page > 0) {
+      queryPage = page - 1;
     }
   }
 
-  let currentPage = page;
-  if (page === 0) {
-    currentPage = 1;
-  }
-  let skip = limit * queryPage;
+  const currentPage = page === 0 ? 1 : page;
+  const skip = limit * queryPage;
   if (classpieceId === 0 && queryParams !== '') {
-    queryParams = 'WHERE ' + queryParams;
+    queryParams = `WHERE ${queryParams}`;
   }
   if (classpieceId === 0) {
-    query =
-      'MATCH (n:Person) ' +
-      queryParams +
-      ' RETURN n ' +
-      queryOrder +
-      ' SKIP ' +
-      skip +
-      ' LIMIT ' +
-      limit;
+    query = `MATCH (n:Person) ${queryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
   } else {
     if (queryParams !== '') {
       queryParams = `WHERE id(r)=${classpieceId} AND ${queryParams}`;
     } else {
       queryParams = `WHERE id(r)=${classpieceId}`;
     }
-    query =
-      'MATCH (n:Person)-->(r:Resource) ' +
-      queryParams +
-      ' RETURN n ' +
-      queryOrder +
-      ' SKIP ' +
-      skip +
-      ' LIMIT ' +
-      limit;
+    query = `MATCH (n:Person)-->(r:Resource) ${queryParams} RETURN n ${queryOrder} SKIP ${skip} LIMIT ${limit}`;
   }
-  let data = await getPeopleQuery(query, queryParams, limit, classpieceId);
+  const data = await getPeopleQuery(query, queryParams, limit, classpieceId);
   if (data.error) {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: data.error,
       msg: data.error.message,
     });
   } else {
-    let responseData = {
-      currentPage: currentPage,
+    const responseData = {
+      currentPage,
       data: data.nodes,
       totalItems: data.count,
       totalPages: data.totalPages,
@@ -677,7 +636,7 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
       console.log(error);
     });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  let nodes = normalizeRecordsOutput(nodesPromise);
 
   // get related resources
   for (let i = 0; i < nodes.length; i += 1) {
@@ -685,9 +644,9 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
     let relations = {};
     relations.nodeId = node._id;
     node.resources =
-      (await helpers.loadRelations(node._id, 'Person', 'Resource')) || [];
+      (await loadRelations(node._id, 'Person', 'Resource')) || [];
     node.affiliations =
-      (await helpers.loadRelations(
+      (await loadRelations(
         node._id,
         'Person',
         'Organisation',
@@ -707,7 +666,7 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
       session.close();
       let resultRecord = result.records[0];
       let countObj = resultRecord.toObject();
-      helpers.prepareOutput(countObj);
+      prepareOutput(countObj);
       let output = countObj['count(*)'];
       return output;
     });
@@ -792,10 +751,10 @@ const putPerson = async (req, resp) => {
       personData[key] = postData[key];
       // add the soundex
       if (key === 'firstName') {
-        personData.fnameSoundex = helpers.soundex(postData.firstName.trim());
+        personData.fnameSoundex = soundex(postData.firstName.trim());
       }
       if (key === 'lastName') {
-        personData.lnameSoundex = helpers.soundex(postData.lastName.trim());
+        personData.lnameSoundex = soundex(postData.lastName.trim());
       }
     }
   }
@@ -816,21 +775,21 @@ const putPerson = async (req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Person) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":17,"high":0}}},"error":[],"msg":"Query results"}*/
 const deletePerson = async (req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let person = new Person({ _id: parameters._id });
-  let data = await person.delete();
-  resp.json({
+  const person = new Person({ _id });
+  const data = await person.delete();
+  resp.status(200).json({
     status: true,
-    data: data,
+    data,
     error: [],
     msg: 'Query results',
   });
@@ -909,7 +868,7 @@ const patchUnknown = async (req, resp) => {
     .catch((error) => {
       console.log(error);
     });
-  let nodes = helpers.normalizeRecordsOutput(transactionLabel);
+  let nodes = normalizeRecordsOutput(transactionLabel);
   let normalizedNodes = [];
   let results = [];
   for await (const n of nodes) {
@@ -992,7 +951,7 @@ const fixLabels = async (req, resp) => {
       console.log(error);
     });
 
-  let nodes = helpers.normalizeRecordsOutput(nodesPromise);
+  let nodes = normalizeRecordsOutput(nodesPromise);
   let userId = req.decoded.id;
   for (let i = 0; i < nodes.length; i++) {
     let node = nodes[i];
@@ -1014,7 +973,7 @@ const fixLabels = async (req, resp) => {
           let record = records[0];
           let key = record.keys[0];
           let resultRecord = record.toObject()[key];
-          resultRecord = helpers.outputRecord(resultRecord);
+          resultRecord = outputRecord(resultRecord);
           ret = resultRecord;
         }
         return ret;

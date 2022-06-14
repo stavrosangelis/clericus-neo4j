@@ -40,7 +40,7 @@ class Resource {
     this.metadata = metadata;
     this.originalLocation = originalLocation;
     this.paths = paths;
-    this.resourceType = resourceType;
+    this.resourceType = resourceType || 'image';
     this.systemType = systemType;
     this.uploadedFile = uploadedFile;
     this.status = status;
@@ -643,14 +643,14 @@ const putResource = async (req, resp) => {
     });
     return false;
   }
-  let resourceData = postData.resource;
+  const { resource: resourceData } = postData;
 
-  let userId = req.decoded.id;
-  let resource = new Resource(resourceData);
-  let data = await resource.save(userId);
+  const { id: userId } = req.decoded;
+  const resource = new Resource(resourceData);
+  const data = await resource.save(userId);
   resp.json({
     status: true,
-    data: data,
+    data,
     error: [],
     msg: 'Query results',
   });
@@ -667,21 +667,21 @@ const putResource = async (req, resp) => {
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":11,"high":0}}},"error":[],"msg":"Query results"}*/
 const deleteResource = async (req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let resource = new Resource({ _id: parameters._id });
-  let data = await resource.delete();
-  resp.json({
+  const resource = new Resource({ _id });
+  const data = await resource.delete();
+  resp.status(200).json({
     status: true,
-    data: data,
+    data,
     error: [],
     msg: 'Query results',
   });
@@ -857,7 +857,7 @@ const uploadResource = async (req, resp) => {
     );
   }
   // 3. insert/update resource
-  let parseResourceDetailsPromise = await parseResourceDetails(
+  const parseResourceDetailsPromise = await parseResourceDetails(
     fileType0,
     fileType1,
     uploadedFile,
@@ -1049,15 +1049,15 @@ const parseResourceDetails = async (
 ) => {
   let newResourceData = {};
   if (fileType0 === 'image') {
-    let newFilePath = newUploadFile.path;
-    let imageDefault = await helpers.imgDimensions(newFilePath);
+    const { path: newFilePath } = newUploadFile;
+    const imageDefault = await helpers.imgDimensions(newFilePath);
     imageDefault.x = 0;
     imageDefault.y = 0;
     imageDefault.rotate = 0;
-    let imageExif = await helpers.imageExif(newFilePath);
-    let imageIptc = await helpers.imageIptc(newFilePath);
-    let newLabel = uploadedFile.name.replace(/\.[^/.]+$/, '');
-    let newResourceImageMetadata = {};
+    const imageExif = await helpers.imageExif(newFilePath);
+    const imageIptc = await helpers.imageIptc(newFilePath);
+    const newLabel = uploadedFile.name.replace(/\.[^/.]+$/, '');
+    const newResourceImageMetadata = {};
     if (imageDefault !== null) {
       newResourceImageMetadata.default = imageDefault;
     }
@@ -1081,7 +1081,7 @@ const parseResourceDetails = async (
       resourceType: 'image',
     };
   } else if (fileType1 === 'pdf') {
-    let newLabel = uploadedFile.name.replace(/\.[^/.]+$/, '');
+    const newLabel = uploadedFile.name.replace(/\.[^/.]+$/, '');
     newResourceData = {
       label: newLabel,
       fileName: uploadedFile.name,
@@ -1105,20 +1105,19 @@ const parseResourceDetails = async (
 * @apiSuccessExample {json} Success-Response:
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Resource) WHERE id(n)=2069 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":11,"high":0}}},"error":[],"msg":"Query results"}*/
 const deleteClasspiece = async (req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+  const { query: parameters } = req;
+  const { _id = '' } = parameters;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let _id = parameters._id;
 
   // 1. load classpiece and all related people and thumbnails
-  let resource = new Resource({ _id: _id });
+  const resource = new Resource({ _id });
   await resource.load();
   // 2. delete related people
   let peopleResponse = [];
@@ -1161,9 +1160,9 @@ const deleteClasspiece = async (req, resp) => {
     }
   }
   // 4. delete classpiece
-  let deleteResource = await resource.delete();
+  const deletedResource = await resource.delete();
   let deleteResourceSuccess =
-    deleteResource.summary.counters._stats.nodesDeleted;
+    deletedResource.summary.counters._stats.nodesDeleted;
   let deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" deleted successfully.`;
   if (deleteResourceSuccess !== 1) {
     deleteResourceResponse = `Classpiece with label "${resource.label}" and _id "${resource._id}" failed to delete.`;
@@ -1182,37 +1181,39 @@ const deleteClasspiece = async (req, resp) => {
 };
 
 const updateAnnotationImage = async (req, resp) => {
-  let postData = req.body;
+  const { body: postData } = req;
   if (Object.keys(postData).length === 0) {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: ['Please provide the appropriate post data'],
     });
-    return false;
   }
-  let resourceId = postData.itemId;
-  let sourceId = postData.sourceId;
+  const { itemId: resourceId, sourceId } = postData;
 
   // resource
-  let resource = new Resource({ _id: resourceId });
+  const resource = new Resource({ _id: resourceId });
   await resource.load();
-  let resourceMeta = resource.metadata.image.default;
-  let width = resourceMeta.width;
-  let height = resourceMeta.height;
-  let extension = resourceMeta.extension;
-  let x = resourceMeta.x;
-  let y = resourceMeta.y;
-  let rotate = resourceMeta.rotate;
-  let resourcePaths = resource.paths;
+  const { default: resourceMeta } = resource.metadata.image;
+  const {
+    extension,
+    height: rHeight = 100,
+    rotate = 0,
+    width: rWidth = 100,
+    x = 0,
+    y = 0,
+  } = resourceMeta;
+  let width = rWidth;
+  let height = rHeight;
+  const { paths: resourcePaths = [] } = resource;
   let resourceThumbnailPath = '';
   let resourceImagePath = '';
   let hashedName = '';
 
-  if (typeof resource.paths !== 'undefined' && resource.paths.length > 0) {
+  if (resourcePaths.length > 0) {
     let resourcePath = resourcePaths.find((p) => {
-      let path = p;
+      let path = { ...p };
       if (typeof p === 'string') {
         path = JSON.parse(path);
       }
@@ -1255,7 +1256,7 @@ const updateAnnotationImage = async (req, resp) => {
     resourceImagePath = `images/fullsize/${hashedName}`;
   }
   // source
-  let source = new Resource({ _id: sourceId });
+  const source = new Resource({ _id: sourceId });
   await source.load();
   let sourcePaths = source.paths;
   let sourcePath = sourcePaths.find((p) => {
@@ -1291,14 +1292,14 @@ const updateAnnotationImage = async (req, resp) => {
     if (height < 0) {
       height = Math.abs(height);
     }
-    var canvas = Canvas.createCanvas(width, height);
-    var ctx = canvas.getContext('2d');
+    const canvas = Canvas.createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
     if (rotate !== 0) {
-      let rotateDegrees = rotate;
-      let radians = degreesToRadians(rotateDegrees);
-      let cx = x + width * 0.5;
-      let cy = y + height * 0.5;
-      let newCoordinates = rotateCoordinates(
+      const rotateDegrees = rotate;
+      const radians = degreesToRadians(rotateDegrees);
+      const cx = x + width * 0.5;
+      const cy = y + height * 0.5;
+      const newCoordinates = rotateCoordinates(
         cx,
         cy,
         x,
@@ -1308,11 +1309,12 @@ const updateAnnotationImage = async (req, resp) => {
         height,
         rotateDegrees
       );
-      let newX = newCoordinates.x;
-      let newY = newCoordinates.y;
-
-      let newWidth = newCoordinates.width;
-      let newHeight = newCoordinates.height;
+      const {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      } = newCoordinates;
 
       canvas.width = width;
       canvas.height = height;
@@ -1339,8 +1341,8 @@ const updateAnnotationImage = async (req, resp) => {
     } else {
       ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
     }
-    var out = fs.createWriteStream(outputDir);
-    var stream = canvas.createJPEGStream({
+    const out = fs.createWriteStream(outputDir);
+    const stream = canvas.createJPEGStream({
       bufsize: 2048,
       quality: 90,
     });
@@ -1361,21 +1363,21 @@ const updateAnnotationImage = async (req, resp) => {
     height
   );
   // add paths to resource
-  if (typeof resource.paths === 'undefined' || resource.paths.length === 0) {
+  if (resourcePaths.length === 0) {
     resource.paths = [
       { path: resourceImagePath, pathType: 'source' },
       { path: resourceThumbnailPath, pathType: 'thumbnail' },
     ];
-    let userId = req.decoded.id;
+    const { id: userId } = req.decoded;
     await resource.save(userId);
   }
 
-  let classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({
+  const classpieceThumbnailTaxonomyTerm = new TaxonomyTerm({
     labelId: 'hasPart',
   });
   await classpieceThumbnailTaxonomyTerm.load();
 
-  let classpieceThumbnailReference = {
+  const classpieceThumbnailReference = {
     items: [
       { _id: sourceId, type: 'Resource' },
       { _id: resourceId, type: 'Resource' },
@@ -1385,7 +1387,7 @@ const updateAnnotationImage = async (req, resp) => {
 
   await referencesController.updateReference(classpieceThumbnailReference);
 
-  resp.json({
+  return resp.status(200).json({
     status: true,
     data: resource,
     error: [],
@@ -1627,7 +1629,7 @@ module.exports = {
   getResource: getResource,
   putResource: putResource,
   uploadResource: uploadResource,
-  deleteResource: deleteResource,
+  deleteResource,
   deleteResources: deleteResources,
   deleteClasspiece: deleteClasspiece,
   updateAnnotationImage: updateAnnotationImage,
