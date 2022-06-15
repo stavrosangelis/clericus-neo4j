@@ -43,18 +43,17 @@ references are bi-directional. An example reference object is the following:
 {"status":true,"data":{"nodesCreated":0,"nodesDeleted":0,"relationshipsCreated":2,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0},"error":[],"msg":"Query results"}
 */
 const putReference = async (req, resp) => {
-  let postData = req.body;
+  const { body: postData } = req;
   if (Object.keys(postData).length === 0) {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'The reference must not be empty',
     });
-    return false;
   }
   let newReference = await updateReference(postData);
-  resp.json({
+  return resp.status(200).json({
     status: true,
     data: newReference,
     error: [],
@@ -220,7 +219,7 @@ const updateReference = async (reference) => {
       ']->(n1)' +
       targetRole;
   }
-  let resultExec = await session
+  const resultExec = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       session.close();
@@ -431,10 +430,10 @@ const getReferences = async (req, resp) => {
 };
 
 module.exports = {
-  getReferences: getReferences,
-  putReference: putReference,
-  putReferences: putReferences,
-  updateReference: updateReference,
-  deleteReference: deleteReference,
-  removeReference: removeReference,
+  getReferences,
+  putReference,
+  putReferences,
+  updateReference,
+  deleteReference,
+  removeReference,
 };

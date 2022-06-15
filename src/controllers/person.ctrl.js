@@ -17,10 +17,12 @@ class Person {
     firstName = '',
     middleName = '',
     lastName = '',
+    nameSuffix = [],
     fnameSoundex = null,
     lnameSoundex = null,
     alternateAppelations = [],
     description = '',
+    gender = '',
     personType = 'Clergy',
     status = 'private',
     createdBy = null,
@@ -48,15 +50,18 @@ class Person {
     this.firstName = firstName;
     this.middleName = middleName;
     this.lastName = lastName;
+    this.nameSuffix = nameSuffix;
     this.label = this.personLabel({
       honorificPrefix,
       firstName,
       middleName,
       lastName,
+      nameSuffix,
     });
     this.fnameSoundex = fnameSoundex;
     this.lnameSoundex = lnameSoundex;
     this.description = description;
+    this.gender = gender;
     this.personType = personType;
     this.status = status;
     this.alternateAppelations = this.normalizeAppelations(alternateAppelations);
@@ -67,36 +72,42 @@ class Person {
   }
 
   personLabel(props) {
+    const {
+      honorificPrefix = [],
+      firstName = '',
+      middleName = '',
+      lastName = '',
+      nameSuffix = [],
+    } = props;
     let label = '';
-    if (
-      typeof props.firstName !== 'undefined' &&
-      props.firstName !== null &&
-      props.firstName !== ''
-    ) {
-      if (label !== '') {
-        label += ' ';
-      }
-      label += props.firstName.trim();
+    if (honorificPrefix.length > 0) {
+      const labelHP = honorificPrefix.filter((i) => i !== '').join(', ');
+      label += `(${labelHP})`;
     }
-    if (
-      typeof props.middleName !== 'undefined' &&
-      props.middleName !== null &&
-      props.middleName !== ''
-    ) {
+    if (firstName !== '') {
       if (label !== '') {
         label += ' ';
       }
-      label += props.middleName.trim();
+      label += firstName.trim();
     }
-    if (
-      typeof props.lastName !== 'undefined' &&
-      props.lastName !== null &&
-      props.lastName !== ''
-    ) {
+    if (middleName !== '') {
       if (label !== '') {
         label += ' ';
       }
-      label += props.lastName.trim();
+      label += middleName.trim();
+    }
+    if (lastName !== '') {
+      if (label !== '') {
+        label += ' ';
+      }
+      label += lastName.trim();
+    }
+    if (nameSuffix.length > 0) {
+      const labelNS = nameSuffix.filter((i) => i !== '').join(', ');
+      if (label !== '') {
+        label += ' ';
+      }
+      label += `(${labelNS})`;
     }
     label = label.replace(/ {2}/g, ' ');
     return label;
