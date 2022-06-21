@@ -16,6 +16,8 @@ const readXlsxFile = require('read-excel-file/node');
 const csvParser = require('csv-parser');
 const fs = require('fs');
 
+const { ARCHIVEPATH } = process.env;
+
 const unlinkFile = (path) => {
   return new Promise((resolve) => {
     fs.unlink(path, (err) => {
@@ -470,12 +472,13 @@ const loadDataRows = async (importData = null) => {
   }
   const paths = importData.uploadedFileDetails.paths[0];
   const path = typeof paths === 'string' ? JSON.parse(paths).path : paths.path;
-  const type = mimeType.lookup(path);
+  const absPath = path.replace('/archive/', ARCHIVEPATH);
+  const type = mimeType.lookup(absPath);
   const extension = mimeType.extension(type);
   const excel = ['xls', 'xlsx'];
   let rows = [];
   if (excel.indexOf(extension) > -1) {
-    rows = readXlsxFile(path).then((results, errors) => {
+    rows = readXlsxFile(absPath).then((results, errors) => {
       if (errors) {
         return errors;
       } else {
@@ -485,14 +488,15 @@ const loadDataRows = async (importData = null) => {
   } else if (extension === 'csv') {
     const csvData = await new Promise((resolve) => {
       const results = [];
-      fs.createReadStream(path)
+      fs.createReadStream(absPath)
         .pipe(csvParser())
         .on('data', (data) => results.push(data))
         .on('end', () => {
           resolve(results);
         });
     });
-    for (let i = 0; i < csvData.length; i += 1) {
+    const { length } = csvData;
+    for (let i = 0; i < length; i += 1) {
       const row = csvData[i];
       const rowsKeys = Object.keys(row);
       const newRow = [];
@@ -566,27 +570,24 @@ const mergeArrayValues = (array, key) => {
 {"error":[],"status":true,"data":{"createdAt":"2021-11-09T12:13:46.110Z","updatedBy":"53930","importPlanId":"93912","createdBy":"53930","rule":"{\"type\":\"unique\",\"columns\":[{\"value\":8,\"label\":\"[I] Diocese\"}],\"entityType\":\"\"}","_id":"93958","label":"date unique","completed":false,"type":"unique","updatedAt":"2021-11-09T12:14:03.991Z"}}
 */
 const getUnique = async (req, resp) => {
-  const parameters = req.query;
-  const { columns: columnsParam } = parameters || [];
-  const { _id } = parameters || null;
-  const userId = req.decoded.id;
+  const { query: parameters } = req;
+  const { _id = null, columns: columnsParam = [] } = parameters;
+  const { id: userId } = req.decoded;
   if (_id === null) {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid _id to continue.',
     });
-    return false;
   }
   if (typeof columnsParam === 'undefined' || columnsParam.length === 0) {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select one or more columns to continue.',
     });
-    return false;
   }
   const columns = columnsParam.map((c) => JSON.parse(c));
 
@@ -598,14 +599,16 @@ const getUnique = async (req, resp) => {
 
   const paths = importData.uploadedFileDetails.paths[0];
   const path = typeof paths === 'string' ? JSON.parse(paths).path : paths.path;
-  const type = mimeType.lookup(path);
+  const absPath = path.replace('/archive/', ARCHIVEPATH);
+  const type = mimeType.lookup(absPath);
   const extension = mimeType.extension(type);
-  const dir = extractDirPath(path);
+  const dir = extractDirPath(absPath);
 
   const rows = await loadDataRows(importData);
   const uniqueValues = [];
   const uniqueOut = [];
-  for (let i = 0; i < rows.length; i += 1) {
+  const { length } = rows;
+  for (let i = 0; i < length; i += 1) {
     const row = rows[i];
     const rowsKeys = Object.keys(row);
     let texts = [];
@@ -666,7 +669,7 @@ const getUnique = async (req, resp) => {
   const update = new DataCleaning(instance);
   update.save(userId);
 
-  resp.json({
+  return resp.status(200).json({
     status: true,
     data: extension,
     error: [],

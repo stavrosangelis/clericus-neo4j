@@ -1,6 +1,13 @@
 const driver = require('../config/db-driver');
 const fs = require('fs');
-const helpers = require('../helpers');
+const {
+  addslashes,
+  normalizeRecordsOutput,
+  outputRecord,
+  prepareOutput,
+  prepareNodeProperties,
+  prepareParams,
+} = require('../helpers');
 const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const privateKey = fs.readFileSync('./src/config/.private.key', 'utf8');
@@ -75,7 +82,7 @@ class User {
         if (records.length > 0) {
           let record = records[0];
           let user = record.toObject().n;
-          user = helpers.outputRecord(user);
+          user = outputRecord(user);
           return user;
         }
       });
@@ -88,7 +95,7 @@ class User {
           session.close();
           let record = records[0];
           let usergroup = record.toObject().ug;
-          usergroup = helpers.outputRecord(usergroup);
+          usergroup = outputRecord(usergroup);
           return usergroup;
         }
       });
@@ -103,7 +110,7 @@ class User {
             session.close();
             let record = records[0];
             let usergroup = record.toObject().n;
-            usergroup = helpers.outputRecord(usergroup);
+            usergroup = outputRecord(usergroup);
             return usergroup;
           }
         });
@@ -125,23 +132,22 @@ class User {
   }
 
   async save(userId) {
-    let newData = Object.assign({}, this);
-    let validateUser = this.validate();
+    const newData = Object.assign({}, this);
+    const validateUser = this.validate();
     if (!validateUser.status) {
       return validateUser;
     } else {
       await this.load();
-      let session = driver.session();
-      let params = {};
+      const session = driver.session();
       let query = '';
 
       // timestamps
-      let now = new Date().toISOString();
+      const now = new Date().toISOString();
       if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
       } else {
-        let original = new User({ _id: this._id });
+        const original = new User({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
@@ -149,30 +155,13 @@ class User {
       this.updatedBy = userId;
       this.updatedAt = now;
 
+      const nodeProperties = prepareNodeProperties(newData);
+      const params = prepareParams(newData);
+
       if (typeof this._id === 'undefined' || this._id === null) {
-        let nodeProperties = helpers.prepareNodeProperties(newData);
-        params = helpers.prepareParams(newData);
-        query = 'CREATE (n:User ' + nodeProperties + ') RETURN n';
+        query = `CREATE (n:User ${nodeProperties}) RETURN n`;
       } else {
-        let update = '';
-        let i = 0;
-        for (let key in newData) {
-          if (i > 0) {
-            update += ',';
-          }
-          if (typeof newData[key] === 'string') {
-            update += ' n.' + key + "='" + newData[key] + "'";
-          } else {
-            update += ' n.' + key + '=' + newData[key];
-          }
-          i++;
-        }
-        query =
-          'MATCH (n:User) WHERE id(n)=' +
-          this._id +
-          ' SET ' +
-          update +
-          ' RETURN n';
+        query = `MATCH (n:User) WHERE id(n)=${this._id} SET n=${nodeProperties}  RETURN n`;
       }
       const resultPromise = await session
         .run(query, params)
@@ -188,7 +177,7 @@ class User {
             let record = records[0];
             let key = record.keys[0];
             let resultRecord = record.toObject()[key];
-            resultRecord = helpers.outputRecord(resultRecord);
+            resultRecord = outputRecord(resultRecord);
             output = { error: [], status: true, data: resultRecord };
           }
           return output;
@@ -238,7 +227,7 @@ class User {
           let record = records[0];
           let key = record.keys[0];
           let resultRecord = record.toObject()[key];
-          resultRecord = helpers.outputRecord(resultRecord);
+          resultRecord = outputRecord(resultRecord);
           output = { error: [], status: true, data: resultRecord };
         }
         return output;
@@ -294,6 +283,9 @@ class User {
   }
 
   async validatePassword(password) {
+    if (typeof this.password === 'undefined') {
+      return false;
+    }
     const passwordVerify = await argon2.verify(this.password, password);
     return passwordVerify;
   }
@@ -343,7 +335,7 @@ const getUsers = async (req, resp) => {
   let queryParams = '';
 
   if (typeof parameters.label !== 'undefined') {
-    label = helpers.addslashes(parameters.label);
+    label = addslashes(parameters.label);
     if (label !== '') {
       queryParams += `(toLower(n.firstName) =~ toLower('.*${label}.*') OR toLower(n.lastName) =~ toLower('.*${label}.*'))`;
     }
@@ -419,10 +411,13 @@ const getUsersQuery = async (query, limit) => {
       return result.records;
     });
 
-  const nodesResults = helpers.normalizeRecordsOutput(nodesPromise);
+  const nodesResults = normalizeRecordsOutput(nodesPromise);
   const nodes = nodesResults.map((node) => {
     node.label = node.firstName;
     if (node.lastName !== '') {
+      if (node.label !== '') {
+        node.label += ' ';
+      }
       node.label += node.lastName;
     }
     delete node.password;
@@ -436,7 +431,7 @@ const getUsersQuery = async (query, limit) => {
       session.close();
       let resultRecord = result.records[0];
       let countObj = resultRecord.toObject();
-      helpers.prepareOutput(countObj);
+      prepareOutput(countObj);
       let output = countObj['count(*)'];
       output = parseInt(output, 10);
       return output;
@@ -499,33 +494,25 @@ const getUser = async (req, resp) => {
 {"error":[],"status":true,"data":{"firstName":"","createdAt":"2020-01-15T16:49:21.096Z","lastName":"","updatedBy":"260","createdBy":"260","usergroup":"240","email":"test@test.com","token":false,"updatedAt":"2020-01-15T16:49:21.096Z","_id":"2656"}}
 */
 const putUser = async (req, resp) => {
-  let postData = req.body;
+  const { body: postData } = req;
   if (Object.keys(postData).length === 0) {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
-      error: true,
+      errors: [],
       msg: 'The user must not be empty',
     });
-    return false;
   }
-  let userData = {};
+  const userData = {};
   for (let key in postData) {
     if (postData[key] !== null) {
       userData[key] = postData[key];
-      // add the soundex
-      if (key === 'firstName') {
-        userData.fnameSoundex = helpers.soundex(postData.firstName.trim());
-      }
-      if (key === 'lastName') {
-        userData.lnameSoundex = helpers.soundex(postData.lastName.trim());
-      }
     }
   }
-  let userId = req.decoded.id;
-  let user = new User(userData);
-  let output = await user.save(userId);
-  resp.json(output);
+  const { userId } = req.decoded;
+  const user = new User(userData);
+  const output = await user.save(userId);
+  return resp.json(output);
 };
 
 /**

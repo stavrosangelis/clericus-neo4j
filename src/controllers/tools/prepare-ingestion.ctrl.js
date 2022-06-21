@@ -9,9 +9,11 @@ const IptcImage = require('node-iptc');
 const sizeOfImage = require('image-size');
 const crypto = require('crypto');
 
-const resourcesPath = process.env.RESOURCESPATH;
-const serverURL = process.env.SERVERURL;
-const archivePath = process.env.ARCHIVEPATH;
+const {
+  RESOURCESPATH: resourcesPath,
+  SERVERURL: serverURL,
+  ARCHIVEPATH: archivePath,
+} = process.env;
 
 const referencesController = require('../references.ctrl');
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
@@ -91,8 +93,8 @@ const Organisation = require('../organisation.ctrl').Organisation;
 }, "error": false, "msg": ""
 }*/
 const preIngestionReportClassPiece = async (req, resp) => {
-  let parameters = req.query;
-  let file = parameters.file;
+  const { query: parameters } = req;
+  const { file } = parameters;
   if (typeof file === 'undefined' || file === '') {
     resp.json({
       status: false,
@@ -103,15 +105,15 @@ const preIngestionReportClassPiece = async (req, resp) => {
     return false;
   }
 
-  let fileName = path.parse(file).name;
-  let classPieceSource = resourcesPath + 'images/processed/fullsize/' + file;
-  let outputJsonDir = resourcesPath + 'output/' + fileName + '/json/';
+  const fileName = path.parse(file).name;
+  const classPieceSource = `${resourcesPath}images/processed/fullsize/${file}`;
+  const outputJsonDir = `${resourcesPath}output/${fileName}/json/`;
   // class piece
-  var classPiecePromise = await classPieceImageResource(
+  const classPiecePromise = await classPieceImageResource(
     classPieceSource,
     fileName
   );
-  var classPieceFaces = await facesImageResources(
+  const classPieceFaces = await facesImageResources(
     outputJsonDir + fileName + '-faces.json',
     fileName
   );
@@ -346,7 +348,7 @@ const ingestClasspiece = async (req, resp) => {
   });
 };
 
-var classPieceImageResource = async (imgPath) => {
+const classPieceImageResource = async (imgPath) => {
   var imgDimensionsPromise = imgDimensions(imgPath);
   var exifPromise = imageExif(imgPath);
   var iptcPromise = imageIptc(imgPath);
@@ -420,11 +422,11 @@ var facesEach = async (dataJson, fileName) => {
     }
   }
 
-  let facesdata = await Promise.all(facesDataPromises).then((data) => {
+  const facesdata = await Promise.all(facesDataPromises).then((data) => {
     return data;
   });
   let faces = dataJson.map((item, j) => {
-    let imageData = facesdata[j];
+    const imageData = facesdata[j];
     let newItem = {};
     let faceData = faceImageData(item, imageData.default);
     newItem.fileName = j + '.jpg';
@@ -445,41 +447,48 @@ var facesEach = async (dataJson, fileName) => {
   return faces;
 };
 
-var faceImageResource = async (imgPath) => {
-  var imgDimensionsPromise = await imgDimensions(imgPath);
-  var exifPromise = await imageExif(imgPath);
-  var iptcPromise = await imageIptc(imgPath);
-  let output = await Promise.all([
-    imgDimensionsPromise,
-    exifPromise,
-    iptcPromise,
-  ])
-    .then((data) => {
-      let imageMetadata = {};
-      let exifValues = null;
-      let iptcValues = null;
-      if (typeof data[1] !== 'undefined' && data[1] !== false) {
-        exifValues = data[1];
-      }
-      if (typeof data[2] !== 'undefined' && data[2] !== false) {
-        iptcValues = data[2];
-      }
-      imageMetadata.default = data[0];
-      if (exifValues !== null) {
-        imageMetadata.exif = data[1];
-      }
-      if (iptcValues !== null) {
-        imageMetadata.iptc = data[2];
-      }
-      return imageMetadata;
-    })
-    .catch((error) => {
-      console.log(error);
-    });
-  return output;
+var faceImageResource = async (imgPathParam = '') => {
+  if (imgPathParam !== '') {
+    const imgPath = imgPathParam.replace('/resources/', resourcesPath);
+    const fileExists = fs.existsSync(imgPath);
+    if (fileExists) {
+      const imgDimensionsPromise = await imgDimensions(imgPath);
+      const exifPromise = await imageExif(imgPath);
+      const iptcPromise = await imageIptc(imgPath);
+      const output = await Promise.all([
+        imgDimensionsPromise,
+        exifPromise,
+        iptcPromise,
+      ])
+        .then((data) => {
+          let imageMetadata = {};
+          let exifValues = null;
+          let iptcValues = null;
+          if (typeof data[1] !== 'undefined' && data[1] !== false) {
+            exifValues = data[1];
+          }
+          if (typeof data[2] !== 'undefined' && data[2] !== false) {
+            iptcValues = data[2];
+          }
+          imageMetadata.default = data[0];
+          if (exifValues !== null) {
+            imageMetadata.exif = data[1];
+          }
+          if (iptcValues !== null) {
+            imageMetadata.iptc = data[2];
+          }
+          return imageMetadata;
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+      return output;
+    }
+  }
+  return null;
 };
 
-var faceImageData = (face, imageDefaultData) => {
+const faceImageData = (face, imageDefaultData = null) => {
   let faceObj = {};
   let defaultValues = {};
   if (typeof face.faceRectangle !== 'undefined') {
@@ -531,43 +540,63 @@ var faceImageData = (face, imageDefaultData) => {
   return faceObj;
 };
 
-var imageIptc = (imgPath) => {
-  return new Promise((resolve) => {
-    fs.readFile(imgPath, function (error, data) {
-      if (error) {
+const imageIptc = (imgPath = '') => {
+  if (imgPath !== '') {
+    const fileExists = fs.existsSync(imgPath);
+    if (fileExists) {
+      return new Promise((resolve) => {
+        fs.readFile(imgPath, function (error, data) {
+          if (error) {
+            console.log(error);
+          }
+          var iptcData = IptcImage(data);
+          resolve(iptcData);
+        });
+      }).catch((error) => {
         console.log(error);
-      }
-      var iptcData = IptcImage(data);
-      resolve(iptcData);
-    });
-  }).catch((error) => {
-    console.log(error);
-  });
+      });
+    }
+  }
+  return null;
 };
 
-var imageExif = (imgPath) => {
-  return new Promise((resolve) => {
-    ExifImage({ image: imgPath }, function (error, exifData) {
-      if (error) {
-        // console.log(error.message);
-      }
-      resolve(exifData);
-    });
-  }).catch((error) => {
-    console.log(error);
-  });
+const imageExif = (imgPath = '') => {
+  if (imgPath !== '') {
+    const fileExists = fs.existsSync(imgPath);
+    if (fileExists) {
+      return new Promise((resolve) => {
+        ExifImage({ image: imgPath }, function (error, exifData) {
+          if (error) {
+            // console.log(error.message);
+          }
+          resolve(exifData);
+        });
+      }).catch((error) => {
+        console.log(error);
+      });
+    }
+  }
+  return null;
 };
 
-var imgDimensions = (imgPath) => {
-  return new Promise((resolve) => {
-    sizeOfImage(imgPath, (err, dimensions) => {
-      dimensions.extension = dimensions.type;
-      delete dimensions.type;
-      resolve(dimensions);
-    });
-  }).catch((error) => {
-    console.log(error);
-  });
+const imgDimensions = (imgPath = '') => {
+  if (imgPath !== '') {
+    const fileExists = fs.existsSync(imgPath);
+    if (fileExists) {
+      return new Promise((resolve) => {
+        sizeOfImage(imgPath, (err, dimensions = null) => {
+          if (dimensions !== null) {
+            dimensions.extension = dimensions.type;
+            delete dimensions.type;
+          }
+          resolve(dimensions);
+        });
+      }).catch((error) => {
+        console.log(error);
+      });
+    }
+  }
+  return null;
 };
 
 const ingestClasspieceImage = async (classpiece, userId) => {
@@ -756,15 +785,19 @@ const ingestPersonThumbnail = async (person, classpiece, userId) => {
   if (classpiece === null) {
     return false;
   }
+  const { label = '' } = classpiece;
   let exifData = {};
   let iptcData = {};
-  if (typeof person.thumbnail.path !== 'undefined') {
-    let imgPath = person.thumbnail.path;
-    let exifPromise = imageExif(imgPath);
-    let iptcPromise = imageIptc(imgPath);
+  const { thumbnail = null } = person;
+  if (thumbnail !== null) {
+    const { path = '' } = thumbnail;
+    if (path !== '') {
+      const exifPromise = imageExif(path);
+      const iptcPromise = imageIptc(path);
 
-    exifData = await exifPromise;
-    iptcData = await iptcPromise;
+      exifData = await exifPromise;
+      iptcData = await iptcPromise;
+    }
   }
 
   // get value of thumbnail resource system type
@@ -776,14 +809,9 @@ const ingestPersonThumbnail = async (person, classpiece, userId) => {
     let fileExtension = person.default.extension;
     let hashedName = hashFileName(person.label) + '.' + fileExtension;
 
-    let fullsizeSrc =
-      resourcesPath +
-      'output/' +
-      classpiece.label +
-      '/thumbnails/' +
-      person.fileName;
-    let fullsizeTarget = archivePath + 'images/fullsize/' + hashedName;
-    let fullsizePath = 'images/fullsize/' + hashedName;
+    let fullsizeSrc = `${resourcesPath}output/${label}/thumbnails/${person.fileName}`;
+    let fullsizeTarget = `${archivePath}images/fullsize/${hashedName}`;
+    let fullsizePath = `images/fullsize/${hashedName}`;
     copyFile(fullsizeSrc, fullsizeTarget);
 
     let thumbnailsTarget = archivePath + 'images/thumbnails/' + hashedName;

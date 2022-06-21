@@ -1,5 +1,5 @@
 const driver = require('../config/db-driver');
-const helpers = require('../helpers');
+const { capitalCaseOnlyFirst, outputPaths } = require('../helpers');
 
 const TaxonomyTerm = require('./taxonomyTerm.ctrl').TaxonomyTerm;
 
@@ -52,10 +52,10 @@ const putReference = async (req, resp) => {
       msg: 'The reference must not be empty',
     });
   }
-  let newReference = await updateReference(postData);
+  const data = await updateReference(postData);
   return resp.status(200).json({
     status: true,
-    data: newReference,
+    data,
     error: [],
     msg: 'Query results',
   });
@@ -130,17 +130,17 @@ const putReferences = async (req, resp) => {
 
 const updateReference = async (reference) => {
   const session = driver.session();
-  const srcItem = reference.items[0];
-  const targetItem = reference.items[1];
+  const { items, taxonomyTermId = '', taxonomyTermLabel = '' } = reference;
+  const [srcItem, targetItem] = items;
   let taxonomyTermQuery = '';
-  if (typeof reference.taxonomyTermId !== 'undefined') {
+  if (taxonomyTermId !== '') {
     taxonomyTermQuery = {
-      _id: reference.taxonomyTermId,
+      _id: taxonomyTermId,
     };
   }
-  if (typeof reference.taxonomyTermLabel !== 'undefined') {
+  if (taxonomyTermLabel !== '') {
     taxonomyTermQuery = {
-      labelId: reference.taxonomyTermLabel,
+      labelId: taxonomyTermLabel,
     };
   }
   let taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
@@ -157,8 +157,8 @@ const updateReference = async (reference) => {
   if (taxonomyTerm._id === null) {
     return false;
   }
-  let srcItemRole = srcItem.role || '';
-  let targetItemRole = targetItem.role || '';
+  let { role: srcItemRole = '' } = srcItem;
+  let { role: targetItemRole = '' } = targetItem;
   let srcRole = '';
   let targetRole = '';
   if (
@@ -176,48 +176,25 @@ const updateReference = async (reference) => {
     ) {
       srcItemRole = targetItemRole;
     }
-    srcRole = " SET r1={role:'" + srcItemRole + "'}";
-    targetRole = " SET r2={role:'" + targetItemRole + "'}";
+    srcRole = `SET r1={role:'${srcItemRole}'}`;
+    targetRole = `SET r2={role:'${targetItemRole}'}`;
     if (direction === 'to') {
-      srcRole = " SET r1={role:'" + targetItemRole + "'}";
-      targetRole = " SET r2={role:'" + srcItemRole + "'}";
+      srcRole = `SET r1={role:'${targetItemRole}'}`;
+      targetRole = `SET r2={role:'${srcItemRole}'}`;
     }
   }
-  let query =
-    'MATCH (n1:' +
-    srcItem.type +
-    ') WHERE id(n1)=' +
-    srcItem._id +
-    ' MATCH (n2:' +
-    targetItem.type +
-    ') WHERE id(n2)=' +
-    targetItem._id +
-    ' MERGE (n1)-[r1:' +
-    taxonomyTerm.labelId +
-    ']->(n2)' +
-    srcRole +
-    ' MERGE (n2)-[r2:' +
-    taxonomyTerm.inverseLabelId +
-    ']->(n1)' +
-    targetRole;
+  const { type: sType, _id: sId } = srcItem;
+  const { type: tType, _id: tId } = targetItem;
+  const { labelId: tLabelId, inverseLabelId: tInverseLabelId } = taxonomyTerm;
+  let query = `MATCH (n1:${sType}) WHERE id(n1)=${sId} 
+  MATCH (n2:${tType}) WHERE id(n2)=${tId} 
+  MERGE (n1)-[r1:${tLabelId}]->(n2) ${srcRole}
+  MERGE (n2)-[r2:${tInverseLabelId}]->(n1) ${targetRole}`;
   if (direction === 'to') {
-    query =
-      'MATCH (n1:' +
-      targetItem.type +
-      ') WHERE id(n1)=' +
-      targetItem._id +
-      ' MATCH (n2:' +
-      srcItem.type +
-      ') WHERE id(n2)=' +
-      srcItem._id +
-      ' MERGE (n1)-[r1:' +
-      taxonomyTerm.labelId +
-      ']->(n2)' +
-      srcRole +
-      ' MERGE (n2)-[r2:' +
-      taxonomyTerm.inverseLabelId +
-      ']->(n1)' +
-      targetRole;
+    query = `MATCH (n1:${tType}) WHERE id(n1)=${tId} 
+    MATCH (n2:${sType}) WHERE id(n2)=${sId} 
+    MERGE (n1)-[r1:${tLabelId}]->(n2) ${srcRole}
+    MERGE (n2)-[r2:${tInverseLabelId}]->(n1) ${targetRole}`;
   }
   const resultExec = await session
     .writeTransaction((tx) => tx.run(query, {}))
@@ -259,18 +236,17 @@ const updateReference = async (reference) => {
 {"status":true,"data":{"nodesCreated":0,"nodesDeleted":0,"relationshipsCreated":0,"relationshipsDeleted":2,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0},"error":[],"msg":"Query results"}
 */
 const deleteReference = async (req, resp) => {
-  let postData = req.body;
+  const { body: postData } = req;
   if (Object.keys(postData).length === 0) {
-    resp.json({
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'The reference must not be empty',
     });
-    return false;
   }
-  let delReference = await removeReference(postData);
-  resp.json({
+  const delReference = await removeReference(postData);
+  return resp.status(200).json({
     status: true,
     data: delReference,
     error: [],
@@ -279,18 +255,18 @@ const deleteReference = async (req, resp) => {
 };
 
 const removeReference = async (reference) => {
-  let session = driver.session();
-  let srcItem = reference.items[0];
-  let targetItem = reference.items[1];
+  const session = driver.session();
+  const { items = [], taxonomyTermId = '', taxonomyTermLabel = '' } = reference;
+  const [srcItem, targetItem] = items;
   let taxonomyTermQuery = '';
-  if (typeof reference.taxonomyTermId !== 'undefined') {
+  if (taxonomyTermId !== '') {
     taxonomyTermQuery = {
-      _id: reference.taxonomyTermId,
+      _id: taxonomyTermId,
     };
   }
-  if (typeof reference.taxonomyTermLabel !== 'undefined') {
+  if (taxonomyTermLabel !== '') {
     taxonomyTermQuery = {
-      labelId: reference.taxonomyTermLabel,
+      labelId: taxonomyTermLabel,
     };
   }
   let taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
@@ -298,7 +274,7 @@ const removeReference = async (reference) => {
   let direction = 'from';
   if (taxonomyTerm._id === null) {
     taxonomyTermQuery = {
-      inverseLabelId: reference.taxonomyTermLabel,
+      inverseLabelId: taxonomyTermLabel,
     };
     taxonomyTerm = new TaxonomyTerm(taxonomyTermQuery);
     await taxonomyTerm.load();
@@ -307,46 +283,28 @@ const removeReference = async (reference) => {
   if (taxonomyTerm._id === null) {
     return false;
   }
-  let query =
-    'MATCH (n1:' +
-    srcItem.type +
-    ') WHERE id(n1)=' +
-    srcItem._id +
-    ' MATCH (n2:' +
-    targetItem.type +
-    ') WHERE id(n2)=' +
-    targetItem._id +
-    ' MATCH (n1)-[r1:' +
-    taxonomyTerm.labelId +
-    ']->(n2)' +
-    ' MATCH (n2)-[r2:' +
-    taxonomyTerm.inverseLabelId +
-    ']->(n1)' +
-    ' DELETE r1 ' +
-    ' DELETE r2';
+  const { _id: sId, type: sTypeP } = srcItem;
+  const { _id: tId, type: tTypeP } = targetItem;
+  const { labelId, inverseLabelId } = taxonomyTerm;
+  const sType = capitalCaseOnlyFirst(sTypeP);
+  const tType = capitalCaseOnlyFirst(tTypeP);
+  let query = `MATCH (n1:${sType}) WHERE id(n1)=${sId} 
+  MATCH (n2:${tType}) WHERE id(n2)=${tId}
+  MATCH (n1)-[r1:${labelId}]->(n2)
+  MATCH (n2)-[r2:${inverseLabelId}]->(n1)
+  DELETE r1
+  DELETE r2`;
   if (direction === 'to') {
-    query =
-      'MATCH (n1:' +
-      targetItem.type +
-      ') WHERE id(n1)=' +
-      targetItem._id +
-      ' MATCH (n2:' +
-      srcItem.type +
-      ') WHERE id(n2)=' +
-      srcItem._id +
-      ' MATCH (n1)-[r1:' +
-      taxonomyTerm.labelId +
-      ']->(n2)' +
-      ' MATCH (n2)-[r2:' +
-      taxonomyTerm.inverseLabelId +
-      ']->(n1)' +
-      ' DELETE r1 ' +
-      ' DELETE r2';
+    query = `MATCH (n1:${tType}) WHERE id(n1)=${tId} 
+    MATCH (n2:${sType}) WHERE id(n2)=${sId}
+    MATCH (n1)-[r1:${labelId}]->(n2)
+    MATCH (n2)-[r2:${inverseLabelId}]->(n1)
+    DELETE r1
+    DELETE r2`;
   }
-  let params = {};
   const resultPromise = await new Promise((resolve) => {
     session
-      .run(query, params)
+      .run(query, {})
       .then((result) => {
         session.close();
         resolve(result.summary.counters._stats);
@@ -414,7 +372,7 @@ const getReferences = async (req, resp) => {
       if (records.length > 0) {
         for (let i in records) {
           let record = records[i].toObject().p;
-          let paths = helpers.outputPaths(record, _id);
+          let paths = outputPaths(record, _id);
           output = paths;
         }
       }

@@ -1541,11 +1541,12 @@ const getImportPreviewResults = async (req, resp) => {
   const { path = null } = filepath;
   const outputRows = [];
   if (path !== null) {
-    const fileExists = await fs.existsSync(path);
+    const absPath = path.replace('archive/', ARCHIVEPATH);
+    const fileExists = fs.existsSync(absPath);
     if (fileExists) {
-      const mtype = mimeType.lookup(path);
+      const mtype = mimeType.lookup(absPath);
       const extension = mimeType.extension(mtype);
-      const rowsData = await loadFileData(path, extension);
+      const rowsData = await loadFileData(absPath, extension);
       const rowsLength = rows.length;
       for (let i = 0; i < rowsLength; i += 1) {
         outputRows.push({ key: rows[i] + 1, data: rowsData[rows[i]] });

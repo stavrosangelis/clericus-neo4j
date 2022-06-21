@@ -64,24 +64,25 @@ const temporalsFilter = async (params) => {
 };
 
 const parseParams = async (req) => {
-  const params = req.body;
-  const entityType = params.entityType || 'Person';
-  const main = params.main || [];
-  const events = params.events || [];
-  const organisations = params.organisations || [];
-  const people = params.people || [];
-  const resources = params.resources || [];
-  const spatials = params.spatials || [];
-  const temporals = params.temporals || [];
-  let page = params.page;
-  let currentPage = page;
-  if (page === 0) {
-    currentPage = 1;
-  }
+  const { body: params } = req;
+  const {
+    entityType = 'Person',
+    main = [],
+    events = [],
+    organisations = [],
+    people = [],
+    resources = [],
+    spatials = [],
+    temporals = [],
+    page: pageParam = 1,
+    limit: limitParam = 25,
+    orderField = 'firstName',
+    orderDirection = 'asc',
+  } = params;
+  let page = Number(pageParam);
+  const limit = Number(limitParam);
+  const currentPage = page === 0 ? 1 : page;
   const queryPage = page > 0 ? page - 1 : 0;
-  const orderField = params.orderField || 'firstName';
-  const orderDirection = params.orderDirection || 'asc';
-  const limit = params.limit || 25;
   const skip = limit * queryPage;
 
   const match = entityType !== '' ? `(n:${entityType})` : '(n)';
@@ -125,7 +126,7 @@ const parseParams = async (req) => {
   }
   if (entityType === 'Event') {
     let queryText = '';
-    if (!mainQuery.includes('WHERE')) {
+    if (mainQuery !== '' && !mainQuery.includes('WHERE')) {
       queryText += ' WHERE ';
     } else if (queryText !== '') {
       queryText += ' AND ';
@@ -155,7 +156,7 @@ const parseParams = async (req) => {
   }
   if (entityType === 'Organisation') {
     let queryText = '';
-    if (!mainQuery.includes('WHERE')) {
+    if (mainQuery !== '' && !mainQuery.includes('WHERE')) {
       queryText += ' WHERE ';
     } else if (queryText !== '') {
       queryText += ' AND ';
@@ -180,7 +181,6 @@ const parseParams = async (req) => {
   if (temporalsQuery !== '') {
     temporalsQuery = `\n MATCH (n)-[r6]->(t) WHERE ${temporalsQuery}`;
   }
-
   return {
     currentPage: currentPage,
     limit: limit,
@@ -209,12 +209,11 @@ const outputDateValue = (value) => {
 const mainQueryBuilder = (main, nodeSymbol = 'n') => {
   let string = '';
   const temporalElements = ['startDate', 'endDate', 'createdAt', 'updatedAt'];
-  const length = main.length;
+  const { length } = main;
   for (let i = 0; i < length; i += 1) {
     const item = main[i];
     const { elementLabel } = item;
     const value = helpers.addslashes(item.elementValue).trim();
-    console.log(item);
     const prevIndex = i - 1;
     const prevItem = main[prevIndex] || null;
     const nextIndex = i + 1;
@@ -315,17 +314,25 @@ const mainQueryBuilder = (main, nodeSymbol = 'n') => {
       string += ' )';
     }
   }
-  return string;
+  return string.trim();
 };
 
 const getNodes = async (params) => {
-  const orderBy =
-    params.order !== ''
-      ? ` ORDER BY n.${params.order} ${params.orderDirection}`
-      : '';
-  const query = `MATCH ${params.match} ${params.mainQuery} ${params.eventsQuery} ${params.organisationsQuery} ${params.peopleQuery} ${params.resourcesQuery} RETURN distinct n ${orderBy} SKIP ${params.skip} LIMIT ${params.limit}`;
-  console.log(query);
-  const queryCount = `MATCH ${params.match} ${params.mainQuery} ${params.eventsQuery} ${params.organisationsQuery} ${params.peopleQuery} ${params.resourcesQuery} RETURN count(distinct n) as c`;
+  const {
+    match = '',
+    mainQuery = '',
+    eventsQuery = '',
+    organisationsQuery = '',
+    peopleQuery = '',
+    resourcesQuery = '',
+    order = '',
+    orderDirection = '',
+    skip = '',
+    limit = '',
+  } = params;
+  const orderBy = order !== '' ? ` ORDER BY n.${order} ${orderDirection}` : '';
+  const query = `MATCH ${match} ${mainQuery} ${eventsQuery} ${organisationsQuery} ${peopleQuery} ${resourcesQuery} RETURN distinct n ${orderBy} SKIP ${skip} LIMIT ${limit}`;
+  const queryCount = `MATCH ${match} ${mainQuery} ${eventsQuery} ${organisationsQuery} ${peopleQuery} ${resourcesQuery} RETURN count(distinct n) as c`;
   const session = driver.session();
   const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
@@ -336,9 +343,10 @@ const getNodes = async (params) => {
       console.log(error);
     });
   const nodes = helpers.normalizeRecordsOutput(nodesPromise, 'n');
+  const { length } = nodes;
 
   if (params.type === 'Event') {
-    for (let i = 0; i < nodes.length; i += 1) {
+    for (let i = 0; i < length; i += 1) {
       const node = nodes[i];
       node.temporal = await helpers.loadRelations(
         node._id,
@@ -350,7 +358,7 @@ const getNodes = async (params) => {
   }
 
   if (params.type === 'Person') {
-    for (let i = 0; i < nodes.length; i += 1) {
+    for (let i = 0; i < length; i += 1) {
       const node = nodes[i];
       node.label = helpers.stripslashes(node.label);
       node.firstName = helpers.stripslashes(node.firstName);
@@ -393,7 +401,7 @@ const getNodes = async (params) => {
   }
 
   if (params.type === 'Resource') {
-    for (let i = 0; i < nodes.length; i += 1) {
+    for (let i = 0; i < length; i += 1) {
       const node = nodes[i];
       if (typeof node.paths !== 'undefined') {
         node.paths = node.paths.map((p) => jsonStringToObject(p));

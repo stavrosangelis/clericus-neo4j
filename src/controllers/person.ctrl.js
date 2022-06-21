@@ -305,11 +305,10 @@ class Person {
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records = [] } = result;
         if (records.length > 0) {
-          let record = records[0].toObject();
-          let outputRecord = outputRecord(record.n);
-          return outputRecord;
+          const record = records[0].toObject();
+          return outputRecord(record.n);
         }
       })
       .catch((error) => {
