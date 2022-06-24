@@ -80,7 +80,7 @@ class Person {
       nameSuffix = [],
     } = props;
     let label = '';
-    if (honorificPrefix.length > 0) {
+    if (typeof honorificPrefix !== 'string' && honorificPrefix.length > 0) {
       const labelHP = honorificPrefix.filter((i) => i !== '').join(', ');
       label += `(${labelHP})`;
     }
@@ -102,7 +102,7 @@ class Person {
       }
       label += lastName.trim();
     }
-    if (nameSuffix.length > 0) {
+    if (typeof nameSuffix !== 'string' && nameSuffix.length > 0) {
       const labelNS = nameSuffix.filter((i) => i !== '').join(', ');
       if (label !== '') {
         label += ' ';
