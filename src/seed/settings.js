@@ -1,8 +1,7 @@
 const fs = require('fs');
-
 const { readJSONFile } = require('../helpers');
-
-const settingsPath = `${process.env.ABSPATH}src/seed/data/settings.json`;
+const { ABSPATH } = process.env;
+const settingsPath = `${ABSPATH}src/seed/data/settings.json`;
 
 const loadSettings = async () => {
   const settings = await readJSONFile(settingsPath);
