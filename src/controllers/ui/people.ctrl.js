@@ -115,7 +115,7 @@ const getPeopleQuery = async (query, queryCount, limit) => {
     const node = nodes[i];
     const { honorificPrefix = null } = node;
     if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
-      const newHP = honorificPrefix.split(',');
+      const newHP = honorificPrefix.split(';');
       node.honorificPrefix = newHP;
     }
     let resources =
@@ -208,7 +208,7 @@ const getPerson = async (req, resp) => {
   if (person !== null) {
     const { honorificPrefix = null } = person;
     if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
-      const newHP = honorificPrefix.split(',');
+      const newHP = honorificPrefix.split(';');
       person.honorificPrefix = newHP;
     }
     const events = await loadRelations(_id, 'Person', 'Event', true);

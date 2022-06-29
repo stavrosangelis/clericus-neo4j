@@ -654,7 +654,7 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
     const node = nodes[i];
     const { honorificPrefix = null } = node;
     if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
-      const newHP = honorificPrefix.split(',');
+      const newHP = honorificPrefix.split(';');
       node.honorificPrefix = newHP;
     }
     let relations = {};
@@ -719,7 +719,7 @@ const getPerson = async (req, resp) => {
   await person.load();
   const { honorificPrefix = null } = person;
   if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
-    const newHP = honorificPrefix.split(',');
+    const newHP = honorificPrefix.split(';');
     person.honorificPrefix = newHP;
   }
   return resp.status(200).json({
