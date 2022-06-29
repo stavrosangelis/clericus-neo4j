@@ -97,8 +97,8 @@ const getPeople = async (req, resp) => {
 };
 
 const getPeopleQuery = async (query, queryCount, limit) => {
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
@@ -107,11 +107,17 @@ const getPeopleQuery = async (query, queryCount, limit) => {
       console.log(error);
     });
 
-  let nodes = normalizeRecordsOutput(nodesPromise, 'n');
+  const nodes = normalizeRecordsOutput(nodesPromise, 'n');
 
   // get related resources/thumbnails
-  for (let i = 0; i < nodes.length; i += 1) {
+  const { length } = nodes;
+  for (let i = 0; i < length; i += 1) {
     const node = nodes[i];
+    const { honorificPrefix = null } = node;
+    if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
+      const newHP = honorificPrefix.split(',');
+      node.honorificPrefix = newHP;
+    }
     let resources =
       (await loadRelations(node._id, 'Person', 'Resource', true)) || null;
     if (resources !== null) {
@@ -144,7 +150,7 @@ const getPeopleQuery = async (query, queryCount, limit) => {
     );
   }
 
-  let count = await session
+  const count = await session
     .writeTransaction((tx) => tx.run(queryCount))
     .then((result) => {
       session.close();
@@ -154,13 +160,12 @@ const getPeopleQuery = async (query, queryCount, limit) => {
       let output = countObj['c'];
       return output;
     });
-  let totalPages = Math.ceil(count / limit);
-  let result = {
-    nodes: nodes,
-    count: count,
-    totalPages: totalPages,
+  const totalPages = Math.ceil(count / limit);
+  return {
+    nodes,
+    count,
+    totalPages,
   };
-  return result;
 };
 
 /**
@@ -195,11 +200,17 @@ const getPerson = async (req, resp) => {
         const output = outputRecord(record.n);
         return output;
       }
+      return null;
     })
     .catch((error) => {
       console.log(error);
     });
-  if (typeof person !== 'undefined') {
+  if (person !== null) {
+    const { honorificPrefix = null } = person;
+    if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
+      const newHP = honorificPrefix.split(',');
+      person.honorificPrefix = newHP;
+    }
     const events = await loadRelations(_id, 'Person', 'Event', true);
     const organisations = await loadRelations(
       _id,

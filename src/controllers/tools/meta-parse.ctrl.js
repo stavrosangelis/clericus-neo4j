@@ -4,8 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const helpers = require('../../helpers');
 const driver = require('../../config/db-driver');
-const resourcesPath = process.env.RESOURCESPATH;
-const serverURL = process.env.SERVERURL;
+const { RESOURCESPATH: resourcesPath, SERVERURL: serverURL } = process.env;
 
 /**
 * @api {get} /meta-parse-class-piece Meta-parse classpiece
@@ -18,38 +17,33 @@ const serverURL = process.env.SERVERURL;
 {"status":true,"data":"Face thumbnails created successfully","error":"","msg":""}
 */
 const metaParseClassPiece = async (req, resp) => {
-  let parameters = req.query;
-  let file = parameters.file;
-  if (typeof file === 'undefined' || file === '') {
-    resp.json({
+  const { query: parameters } = req;
+  const { file = null } = parameters;
+  if (file === null || file === '') {
+    return resp.status(400).json({
       status: false,
       data: '',
       error: true,
       msg: 'Please provide a valid file name to continue',
     });
-    return false;
   }
-
-  let fileName = path.parse(file).name;
-  let dirPath = `${resourcesPath}images/processed/compressed/`;
-  let outputDir = `${resourcesPath}output/${fileName}/`;
-  let outputThumbnailsDir = `${resourcesPath}output/${fileName}/thumbnails/`;
-  let outputThumbnailsPathDir = `${serverURL}output/${fileName}/thumbnails/`;
-  let srcPath = dirPath + file;
+  const fileName = path.parse(file).name;
+  const dirPath = `${resourcesPath}images/processed/compressed/`;
+  const outputDir = `${resourcesPath}output/${fileName}/`;
+  const outputThumbnailsDir = `${resourcesPath}output/${fileName}/thumbnails/`;
+  const outputThumbnailsPathDir = `${serverURL}output/${fileName}/thumbnails/`;
+  const srcPath = dirPath + file;
 
   // make dir to save the output files
   mkdirSync(outputDir);
 
-  var outputFacesFile =
-    outputDir + 'images/' + fileName + '-faces-processed.png';
-  var identifiedFaces = await fs.readFileSync(
-    outputDir + 'json/' + fileName + '-faces.json',
-    'utf-8'
-  );
-  if (typeof identifiedFaces === 'string') {
-    identifiedFaces = JSON.parse(identifiedFaces);
-  }
-  var identifiedFacesPath = outputDir + 'json/' + fileName + '-faces.json';
+  const outputFacesFile = `${outputDir}images/${fileName}-faces-processed.png`;
+  const identifiedFacesPath = `${outputDir}json/${fileName}-faces.json`;
+  const identifiedFacesJSON = fs.readFileSync(identifiedFacesPath, 'utf-8');
+  const identifiedFaces =
+    typeof identifiedFaces === 'string'
+      ? JSON.parse(identifiedFacesJSON)
+      : identifiedFacesJSON;
 
   let msg = 'Highlighting faces...';
 
@@ -63,9 +57,9 @@ const metaParseClassPiece = async (req, resp) => {
     outputThumbnailsPathDir
   );
   msg = 'Finished highlighting faces!';
-  // console.log(msg);
+
   // 05. return results
-  resp.json({
+  return resp.status(200).json({
     status: true,
     data: 'Face thumbnails created successfully',
     error: '',
@@ -74,70 +68,70 @@ const metaParseClassPiece = async (req, resp) => {
 };
 
 const associateThumbToLabels = async (req, resp) => {
-  let parameters = req.query;
-  let file = parameters.file;
-  let bottomDistance = parameters.bottom || 0;
-  let sideDistance = parameters.side || 0;
-  if (typeof file === 'undefined' || file === '') {
-    resp.json({
+  const { query: parameters } = req;
+  const {
+    file = null,
+    bottom: bottomDistance = 0,
+    side: sideDistance = 0,
+  } = parameters;
+  if (file === null || file === '') {
+    return resp.status(400).json({
       status: false,
       data: '',
       error: true,
       msg: 'Please provide a valid file name to continue',
     });
-    return false;
   }
 
-  let fileName = path.parse(file).name;
-  let outputDir = resourcesPath + 'output/' + fileName + '/';
+  const fileName = path.parse(file).name;
+  const outputDir = `${resourcesPath}output/${fileName}/`;
 
-  var response = [];
+  const response = [];
 
   // get faces
-  var faces = require(outputDir + fileName + '-faces.json');
+  const faces = fs.readFileSync(`${outputDir}${fileName}-faces.json`, 'utf-8');
 
   // get text
-  var text = require(outputDir + fileName + '-text.json');
+  const text = fs.readFileSync(`${outputDir}${fileName}-text.json`, 'utf-8');
 
   let i = 0;
   faces.forEach((face) => {
     // 01. find face boundaries
-    let rectangle = face.faceRectangle;
-    let width = rectangle.width;
+    const { faceRectangle: rectangle } = face;
+    let { width, height, top, left } = rectangle;
     if (typeof width === 'string') {
       width = width.replace('px', '');
-      width = parseInt(width, 10);
+      width = Number(width);
     }
-    let height = rectangle.height;
     if (typeof height === 'string') {
       height = height.replace('px', '');
-      height = parseInt(width, 10);
+      height = Number(height);
     }
 
     // 02. find face top-bottom points
     // let topY = rectangle.top;
-    let bottomY = rectangle.top + height;
+    const bottomY = top + height;
 
     // 03 find face left-right points
-    let leftX = rectangle.left;
-    let rightX = rectangle.left + width;
+    const leftX = left;
+    const rightX = left + width;
 
-    let newBottomPoint = bottomY + parseInt(bottomDistance, 10);
-    let newLeftPoint = leftX - parseInt(sideDistance, 10);
-    let newRightPoint = rightX + parseInt(sideDistance, 10);
+    const newBottomPoint = bottomY + Number(bottomDistance);
+    const newLeftPoint = leftX - Number(sideDistance);
+    const newRightPoint = rightX + Number(sideDistance);
 
-    let facePosition = {};
+    const facePosition = {};
     facePosition.topY = bottomY;
     facePosition.bottomY = newBottomPoint;
     facePosition.leftX = newLeftPoint;
     facePosition.rightX = newRightPoint;
 
-    let association = compareTextPosition(text, facePosition, i);
+    const association = compareTextPosition(text, facePosition, i);
     response.push(association);
-    i++;
+    i += 1;
   });
 
-  resp.json({
+  return resp.status(200).json({
     status: true,
     data: response,
     error: true,
@@ -145,7 +139,7 @@ const associateThumbToLabels = async (req, resp) => {
   });
 };
 
-var highlightFaces = async (
+const highlightFaces = async (
   inputFile,
   faces,
   outputFile,
@@ -172,7 +166,7 @@ var highlightFaces = async (
   let newFaces = [];
 
   // clear dir of existing thumbnails
-  await fs.readdir(outputDir, (err, files) => {
+  fs.readdirSync(outputDir, (err, files) => {
     if (err) throw err;
     for (let file of files) {
       fs.unlink(path.join(outputDir, file), (err) => {
@@ -187,29 +181,23 @@ var highlightFaces = async (
   }
   faces.forEach((face) => {
     context.beginPath();
-    let rectangle = face.faceRectangle;
-    let width = rectangle.width;
+    const { faceRectangle: rectangle, rotate = 0 } = face;
+    let { width, height } = rectangle;
     if (typeof width === 'string') {
       width = width.replace('px', '');
-      width = parseInt(width, 10);
+      width = Number(width);
     }
-    let height = rectangle.height;
     if (typeof height === 'string') {
       height = height.replace('px', '');
-      height = parseInt(height, 10);
+      height = Number(height);
     }
-    height = parseInt(height, 10);
+    height = Number(height);
     context.moveTo(rectangle.left, rectangle.top);
     context.lineTo(rectangle.left + width, rectangle.top);
     context.lineTo(rectangle.left + width, rectangle.top + height);
     context.lineTo(rectangle.left, rectangle.top + height);
     context.lineTo(rectangle.left, rectangle.top);
     context.stroke();
-
-    let rotate = 0;
-    if (typeof face.rotate !== 'undefined') {
-      rotate = face.rotate;
-    }
 
     // create face thumbnail
     let cropImgPromise = new Promise((resolve) => {
@@ -231,15 +219,15 @@ var highlightFaces = async (
     });
     facesCropPromises.push(cropImgPromise);
 
-    let newFileSrc = outputDir + i + '.jpg';
-    let newFilePath = pathDir + i + '.jpg';
-    let newFace = face;
+    const newFileSrc = `${outputDir}${i}.jpg`;
+    const newFilePath = `${pathDir}${i}.jpg`;
+    const newFace = { ...face };
     newFace.thumbnail = {
       path: newFilePath,
       src: newFileSrc,
     };
-    newFaces.push(newFace);
-    i++;
+    newFaces.push(face);
+    i += 1;
   });
 
   await Promise.all(facesCropPromises).then((data) => {
@@ -251,16 +239,15 @@ var highlightFaces = async (
   let fileWriteStatus = true;
   let fileWriteError = '';
   try {
-    await fs.writeFileSync(facesPath, JSON.stringify(newFaces), 'utf8');
+    fs.writeFileSync(facesPath, JSON.stringify(newFaces), 'utf8');
   } catch (e) {
     fileWriteStatus = false;
     fileWriteError = e;
   }
-  let output = {
+  return {
     status: fileWriteStatus,
     error: fileWriteError,
   };
-  return output;
 };
 
 const cropImg = async (
@@ -274,9 +261,6 @@ const cropImg = async (
   rotate = 0,
   outputDir
 ) => {
-  if (rotate !== 0) {
-    // console.log(i, total, inputFile, initialX, initialY, width, height, rotate=0, outputDir)
-  }
   const readFile = promisify(fs.readFile);
   const image = await readFile(inputFile);
   const Image = Canvas.Image;
@@ -290,17 +274,13 @@ const cropImg = async (
   if (height < 0) {
     height = Math.abs(height);
   }
-  var canvas = Canvas.createCanvas(width, height);
-  var ctx = canvas.getContext('2d');
+  const canvas = Canvas.createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
   if (rotate !== 0) {
-    let rotateDegrees = rotate;
-    let radians = degreesToRadians(rotateDegrees);
-    // let imageWidth = image.width;
-    // let imageHeight = image.height;
-
-    let cx = initialX + width * 0.5;
-    let cy = initialY + height * 0.5;
-    let newCoordinates = rotateCoordinates(
+    const radians = degreesToRadians(rotate);
+    const cx = initialX + width * 0.5;
+    const cy = initialY + height * 0.5;
+    const newCoordinates = rotateCoordinates(
       cx,
       cy,
       initialX,
@@ -308,24 +288,19 @@ const cropImg = async (
       radians,
       width,
       height,
-      rotateDegrees
+      rotate
     );
-    let newX = newCoordinates.x;
-    let newY = newCoordinates.y;
-
-    let newWidth = newCoordinates.width;
-    let newHeight = newCoordinates.height;
-
+    const {
+      x: newX,
+      y: newY,
+      width: newWidth,
+      height: newHeight,
+    } = newCoordinates;
     canvas.width = width;
     canvas.height = height;
 
-    let left = width - newWidth - 12;
-    let top = width - newWidth - 5;
-    if (rotateDegrees < 180) {
-      top = 0;
-    } else {
-      left = 0;
-    }
+    const left = rotate < 180 ? 0 : width - newWidth - 12;
+    const top = rotate < 180 ? 0 : width - newWidth - 5;
     ctx.rotate(radians);
     ctx.drawImage(
       img,
@@ -342,18 +317,14 @@ const cropImg = async (
     ctx.drawImage(img, initialX, initialY, width, height, 0, 0, width, height);
   }
 
-  var out = fs.createWriteStream(outputDir + i + '.jpg');
-  var stream = canvas.createJPEGStream({
+  const out = fs.createWriteStream(`${outputDir}${i}.jpg`);
+  const stream = canvas.createJPEGStream({
     bufsize: 2048,
     quality: 90,
   });
 
   stream.pipe(out);
-  // console.log(i+'.jpg cropped successfully!');
-  if (i === parseInt(total, 10) - 1) {
-    // console.log('Images cropping completed successfully!');
-  }
-  return i + '.jpg cropped successfully!';
+  return `${i}.jpg cropped successfully!`;
 };
 
 async (inputFile, labels, outputFile, Canvas) => {
@@ -1025,11 +996,11 @@ const countWordType = async (word = '', type) => {
 };
 
 module.exports = {
-  metaParseClassPiece: metaParseClassPiece,
-  associateThumbToLabels: associateThumbToLabels,
-  listClassPieces: listClassPieces,
-  listClassPiece: listClassPiece,
-  createThumbnails: createThumbnails,
-  updateClassPieceFaces: updateClassPieceFaces,
-  queryTexts: queryTexts,
+  metaParseClassPiece,
+  associateThumbToLabels,
+  listClassPieces,
+  listClassPiece,
+  createThumbnails,
+  updateClassPieceFaces,
+  queryTexts,
 };

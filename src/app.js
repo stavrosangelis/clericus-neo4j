@@ -18,6 +18,7 @@ switch (NODE_ENV) {
     envPath = '.env.production';
     break;
 }
+
 require('dotenv').config({ path: envPath });
 
 const compression = require('compression');

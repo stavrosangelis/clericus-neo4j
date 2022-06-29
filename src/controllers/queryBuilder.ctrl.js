@@ -237,7 +237,7 @@ const mainQueryBuilder = (main, nodeSymbol = 'n') => {
       switch (item.qualifier) {
         case 'contains': {
           if (elementLabel === '_id') {
-            string += ` id(${nodeSymbol}) =~ ".*${value}.*" `;
+            string += ` id(${nodeSymbol}) = ${Number(value)}`;
           } else {
             string += ` exists(${nodeSymbol}.${item.elementLabel}) AND toLower(${nodeSymbol}.${item.elementLabel}) =~ toLower(".*${value}.*") `;
           }
@@ -254,7 +254,7 @@ const mainQueryBuilder = (main, nodeSymbol = 'n') => {
         }
         case 'not_contains': {
           if (elementLabel === '_id') {
-            string += ` NOT id(${nodeSymbol}) =~ ".*${value}.*" `;
+            string += ` NOT id(${nodeSymbol}) = ${Number(value)} `;
           } else {
             string += ` exists(${nodeSymbol}.${item.elementLabel}) AND NOT toLower(${nodeSymbol}.${item.elementLabel}) =~ toLower(".*${value}.*") `;
           }

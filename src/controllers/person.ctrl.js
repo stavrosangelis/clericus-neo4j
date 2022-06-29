@@ -636,8 +636,8 @@ const getPeople = async (req, resp) => {
 };
 
 const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
-  let session = driver.session();
-  let nodesPromise = await session
+  const session = driver.session();
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
@@ -646,11 +646,17 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
       console.log(error);
     });
 
-  let nodes = normalizeRecordsOutput(nodesPromise);
+  const nodes = normalizeRecordsOutput(nodesPromise);
 
   // get related resources
-  for (let i = 0; i < nodes.length; i += 1) {
-    let node = nodes[i];
+  const { length } = nodes;
+  for (let i = 0; i < length; i += 1) {
+    const node = nodes[i];
+    const { honorificPrefix = null } = node;
+    if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
+      const newHP = honorificPrefix.split(',');
+      node.honorificPrefix = newHP;
+    }
     let relations = {};
     relations.nodeId = node._id;
     node.resources =
@@ -670,7 +676,7 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
     queryCount = `MATCH (n:Person)-->(r:Resource) ${queryParams} RETURN count(*)`;
   }
 
-  let count = await session
+  const count = await session
     .writeTransaction((tx) => tx.run(queryCount))
     .then((result) => {
       session.close();
@@ -681,13 +687,12 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
       return output;
     });
 
-  let totalPages = Math.ceil(count / limit);
-  let result = {
-    nodes: nodes,
-    count: count,
-    totalPages: totalPages,
+  const totalPages = Math.ceil(count / limit);
+  return {
+    nodes,
+    count,
+    totalPages,
   };
-  return result;
 };
 
 /**
@@ -700,20 +705,24 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
 {"status":true,"data":{"_id":"2069","honorificPrefix":["My"],"firstName":"fname","middleName":"mname","lastName":"lname","label":"fname mname lname","fnameSoundex":"F550","lnameSoundex":"L550","description":"description","status":"private","alternateAppelations":[{"appelation":"","firstName":"altfname","middleName":"altmname","lastName":"altlname","note":"note","language":{"value":"en","label":"English"}}],"createdBy":"260","createdAt":"2020-01-14T15:39:10.638Z","updatedBy":"260","updatedAt":"2020-01-14T15:42:42.939Z","events":[],"organisations":[],"people":[],"resources":[]},"error":[],"msg":"Query results"}
 */
 const getPerson = async (req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+  const { query: parameters } = req;
+  const { _id = '' } = parameters;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let _id = parameters._id;
-  let person = new Person({ _id: _id });
+  const person = new Person({ _id });
   await person.load();
-  resp.json({
+  const { honorificPrefix = null } = person;
+  if (typeof honorificPrefix === 'string' && honorificPrefix !== '') {
+    const newHP = honorificPrefix.split(',');
+    person.honorificPrefix = newHP;
+  }
+  return resp.status(200).json({
     status: true,
     data: person,
     error: [],

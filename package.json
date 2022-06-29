@@ -16,7 +16,8 @@
     "docs": "apidoc -f '.*\\.js$' -i src/ -o documentation/",
     "lint": "eslint --ext .js --ignore-path .eslintignore .",
     "lint:fix": "eslint --fix --ext .js --ignore-path .eslintignore .",
-    "package": "NODE_ENV=production pkg ./src/app.js"
+    "package": "./src/app.js --out-path ./packages --targets node16",
+    "package:dev": "pkg ./packages/bundle.js --out-path ./packages --targets node16-macos-x64"
   },
   "dependencies": {
     "argon2": "^0.24.1",
