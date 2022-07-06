@@ -8,13 +8,14 @@ const { SERVERURL, UPLOADSPATH, ARCHIVEPATH } = process.env;
 
 const returnPaths = (item) => {
   const paths = [];
-  if (typeof item.type === 'undefined' || item.type === 'image') {
+  const { type, year, month, hashedName } = item;
+  if (typeof type === 'undefined' || type === 'image') {
     paths.push({
-      path: `${SERVERURL}uploads/${item.year}/${item.month}/images/${item.hashedName}`,
+      path: `${SERVERURL}uploads/${year}/${month}/images/${hashedName}`,
       pathType: 'source',
     });
     paths.push({
-      path: `${SERVERURL}uploads/${item.year}/${item.month}/thumbnails/${item.hashedName}`,
+      path: `${SERVERURL}uploads/${year}/${month}/thumbnails/${hashedName}`,
       pathType: 'thumbnail',
     });
   }
@@ -74,16 +75,16 @@ class UploadedFile {
     if (this._id === null) {
       return false;
     }
-    let query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} return n`;
-    let session = driver.session();
-    let node = await session
+    const query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} return n`;
+    const session = driver.session();
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0];
-          let key = record.keys[0];
+          const [record] = records;
+          const [key] = record.keys;
           let output = record.toObject()[key];
           output = helpers.outputRecord(output);
           return output;
@@ -99,19 +100,19 @@ class UploadedFile {
   }
 
   async save(userId) {
-    let validateFile = this.validate();
+    const validateFile = this.validate();
     if (!validateFile.status) {
       return validateFile;
     } else {
-      let session = driver.session();
+      const session = driver.session();
 
       // timestamps
-      let now = new Date().toISOString();
+      const now = new Date().toISOString();
       if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
       } else {
-        let original = new UploadedFile({ _id: this._id });
+        const original = new UploadedFile({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
@@ -121,22 +122,17 @@ class UploadedFile {
       if (typeof this.type === 'undefined') {
         this.type = 'image';
       }
-      let nodeProperties = helpers.prepareNodeProperties(this);
-      let params = helpers.prepareParams(this);
+      const nodeProperties = helpers.prepareNodeProperties(this);
+      const params = helpers.prepareParams(this);
       let query = '';
       if (typeof this._id === 'undefined' || this._id === null) {
-        query = 'CREATE (n:UploadedFile ' + nodeProperties + ') RETURN n';
+        query = `CREATE (n:UploadedFile ${nodeProperties}) RETURN n`;
       } else {
-        query =
-          'MATCH (n:UploadedFile) WHERE id(n)=' +
-          this._id +
-          ' SET n=' +
-          nodeProperties +
-          ' RETURN n';
+        query = `MATCH (n:UploadedFile) WHERE id(n)=${this._id} SET n=${nodeProperties} RETURN n'`;
       }
-      let resultPromise = await session.run(query, params).then((result) => {
+      const resultPromise = await session.run(query, params).then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         let output = {
           error: true,
           msg: ['The record cannot be updated'],
@@ -144,8 +140,8 @@ class UploadedFile {
           data: [],
         };
         if (records.length > 0) {
-          let record = records[0];
-          let key = record.keys[0];
+          const [record] = records;
+          const [key] = record.keys;
           let resultRecord = record.toObject()[key];
           resultRecord = helpers.outputRecord(resultRecord);
           resultRecord.paths = returnPaths(resultRecord);
@@ -161,17 +157,16 @@ class UploadedFile {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query =
-      'MATCH (n)-[r]->() WHERE id(n)=' + this._id + ' RETURN count(*) AS c';
-    let count = await session
+    const session = driver.session();
+    const query = `MATCH (n)-[r]->() WHERE id(n)=${this._id} RETURN count(*) AS c`;
+    const count = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
-        let records = result.records;
+        const { records } = result;
         if (records.length > 0) {
-          let record = records[0];
-          let key = record.keys[0];
+          const [record] = records;
+          const [key] = record.keys;
           let output = record.toObject();
           helpers.prepareOutput(output);
           output = output[key];
@@ -182,16 +177,15 @@ class UploadedFile {
   }
 
   async delete() {
-    let session = driver.session();
+    const session = driver.session();
     await this.countRelations();
-    if (parseInt(this.count, 10) > 0) {
-      let output = {
+    if (Number(this.count) > 0) {
+      return {
         error: true,
         msg: ["You must remove the record's relations before deleting"],
         status: false,
         data: [],
       };
-      return output;
     }
     // 1. load file to get details
     const file = new UploadedFile({ _id: this._id });
@@ -492,14 +486,23 @@ const postUploadedFile = async (req, resp) => {
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Article) WHERE id(n)=2880 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":3,"high":0}}},"error":[],"msg":"Query results"}
  */
 const deleteUploadedFile = async (req, resp) => {
-  let postData = req.body;
-  let content = new UploadedFile(postData);
-  let data = await content.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: false,
-    msg: 'Query results',
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
+      status: false,
+      data: [],
+      error: true,
+      msg: 'Please select a valid id to continue.',
+    });
+  }
+  const file = new UploadedFile({ _id });
+  const { data = null, error = [], status = true } = await file.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
   });
 };
 
@@ -644,9 +647,9 @@ const createThumbnail = async (
 };
 
 module.exports = {
-  UploadedFile: UploadedFile,
-  getUploadedFiles: getUploadedFiles,
-  getUploadedFile: getUploadedFile,
-  postUploadedFile: postUploadedFile,
-  deleteUploadedFile: deleteUploadedFile,
+  UploadedFile,
+  getUploadedFiles,
+  getUploadedFile,
+  postUploadedFile,
+  deleteUploadedFile,
 };

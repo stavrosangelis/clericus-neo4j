@@ -439,15 +439,14 @@ const extractDirPath = (path) => {
  **/
 const deleteInstance = async (req, resp) => {
   const parameters = req.body;
-  const { _id } = parameters;
-  if (typeof _id === 'undefined' || _id === '') {
-    resp.json({
+  const { _id = '' } = parameters;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
   const instance = new DataCleaning({ _id });
   await instance.load();
@@ -457,12 +456,12 @@ const deleteInstance = async (req, resp) => {
     unlinkFile(existingFilePath);
   }
 
-  const data = await instance.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: 'Query results',
+  const { data = null, error = [], status = true } = await instance.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
   });
 };
 

@@ -444,33 +444,39 @@ const putEntity = async (req, resp) => {
 {"status":true,"data":{"relations":{"nodesCreated":0,"nodesDeleted":0,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0},"node":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"error":[],"msg":"Query results"}
 */
 const deleteEntity = async (req, resp) => {
-  let parameters = req.query;
-  if (
-    (typeof parameters._id === 'undefined' || parameters._id === '') &&
-    (typeof parameters.labelId === 'undefined' || parameters.labelId === '')
-  ) {
-    resp.json({
-      status: false,
-      data: [],
-      error: true,
-      msg: 'Please select a valid id or a valid label to continue.',
-    });
-    return false;
+  const { body } = req;
+  const { _id = '', labelId = '' } = body;
+  if (_id === '' && labelId === '') {
+    if (_id === '') {
+      return resp.status(400).json({
+        status: false,
+        data: [],
+        error: true,
+        msg: 'Please select a valid id to continue.',
+      });
+    } else if (labelId === '') {
+      return resp.status(400).json({
+        status: false,
+        data: [],
+        error: true,
+        msg: 'Please select a valid label id to continue.',
+      });
+    }
   }
-  let entity = new Entity({ _id: parameters._id });
-  let data = await entity.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: 'Query results',
+  const entity = new Entity({ _id });
+  const { data = null, error = [], status = true } = await entity.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
   });
 };
 
 module.exports = {
-  Entity: Entity,
-  getEntities: getEntities,
-  getEntity: getEntity,
-  putEntity: putEntity,
-  deleteEntity: deleteEntity,
+  Entity,
+  getEntities,
+  getEntity,
+  putEntity,
+  deleteEntity,
 };

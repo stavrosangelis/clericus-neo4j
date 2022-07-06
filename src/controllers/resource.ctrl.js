@@ -678,12 +678,12 @@ const deleteResource = async (req, resp) => {
     });
   }
   const resource = new Resource({ _id });
-  const data = await resource.delete();
-  resp.status(200).json({
-    status: true,
+  const { data = null, error = [], status = true } = await resource.delete();
+  return resp.status(200).json({
+    status,
     data,
-    error: [],
-    msg: 'Query results',
+    error,
+    msg: '',
   });
 };
 
@@ -1624,15 +1624,15 @@ const classpieceCompiledEvent = async (req, resp) => {
 };
 
 module.exports = {
-  Resource: Resource,
-  getResources: getResources,
-  getResource: getResource,
-  putResource: putResource,
-  uploadResource: uploadResource,
+  Resource,
+  getResources,
+  getResource,
+  putResource,
+  uploadResource,
   deleteResource,
-  deleteResources: deleteResources,
-  deleteClasspiece: deleteClasspiece,
-  updateAnnotationImage: updateAnnotationImage,
-  updateStatus: updateStatus,
-  classpieceCompiledEvent: classpieceCompiledEvent,
+  deleteResources,
+  deleteClasspiece,
+  updateAnnotationImage,
+  updateStatus,
+  classpieceCompiledEvent,
 };

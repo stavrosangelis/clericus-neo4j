@@ -249,13 +249,12 @@ class Article {
   async delete() {
     const session = driver.session();
     await this.countRelations();
-    if (parseInt(this.count, 10) > 0) {
-      let output = {
+    if (Number(this.count) > 0) {
+      return {
         errors: ["You must remove the record's relations before deleting"],
         status: false,
         data: [],
       };
-      return output;
     }
 
     const query = `MATCH (n:Article) WHERE id(n)=${this._id} DELETE n`;
@@ -577,13 +576,23 @@ const putArticle = async (req, resp) => {
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Article) WHERE id(n)=2880 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":3,"high":0}}},"errors":[]}
  */
 const deleteArticle = async (req, resp) => {
-  const { body: postData } = req;
-  const content = new Article(postData);
-  const data = await content.delete();
-  resp.status(200).json({
-    status: true,
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
+      status: false,
+      data: [],
+      error: true,
+      msg: 'Please select a valid id to continue.',
+    });
+  }
+  const content = new Article({ _id });
+  const { data = null, error = [], status = true } = await content.delete();
+  return resp.status(200).json({
+    status,
     data,
-    errors: [],
+    error,
+    msg: '',
   });
 };
 

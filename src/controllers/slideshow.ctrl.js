@@ -339,21 +339,30 @@ const putSlideshowItem = async (req, resp) => {
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Slideshow) WHERE id(n)=3193 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":50,"high":0}}},"error":[],"msg":"Query results"}
  */
 const deleteSlideshowItem = async (req, resp) => {
-  let postData = req.body;
-  let item = new Slideshow(postData);
-  let data = await item.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: 'Query results',
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
+      status: false,
+      data: [],
+      error: true,
+      msg: 'Please select a valid id to continue.',
+    });
+  }
+  let item = new Slideshow({ _id });
+  const { data = null, error = [], status = true } = await item.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
   });
 };
 
 module.exports = {
-  Slideshow: Slideshow,
-  getSlideshowItems: getSlideshowItems,
-  getSlideshowItem: getSlideshowItem,
-  putSlideshowItem: putSlideshowItem,
-  deleteSlideshowItem: deleteSlideshowItem,
+  Slideshow,
+  getSlideshowItems,
+  getSlideshowItem,
+  putSlideshowItem,
+  deleteSlideshowItem,
 };

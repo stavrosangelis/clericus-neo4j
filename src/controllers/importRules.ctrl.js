@@ -357,24 +357,23 @@ const putImportRule = async (req, resp) => {
  * @apiParam {string} _id The id of the import rule for deletion.
  **/
 const deleteImportRule = async (req, resp) => {
-  const parameters = req.body;
-  const { _id } = parameters;
-  if (typeof _id === 'undefined' || _id === '') {
-    resp.json({
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
   const instance = new ImportRule({ _id });
-  const data = await instance.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: 'Query results',
+  const { data = null, error = [], status = true } = await instance.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
   });
 };
 

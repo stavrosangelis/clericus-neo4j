@@ -527,19 +527,24 @@ const putUser = async (req, resp) => {
 {"status":true,"error":[],"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:User) WHERE id(n)=2656 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":20,"high":0}}}}
 */
 const deleteUser = async (req, resp) => {
-  let parameters = req.body;
-  if (typeof parameters._id === 'undefined') {
-    resp.json({
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
-      msg: 'Please provide a valid user id to continue.',
+      msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let user = new User({ _id: parameters._id });
-  let output = await user.delete();
-  resp.json(output);
+  const user = new User({ _id });
+  const { data = null, error = [], status = true } = await user.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
+  });
 };
 
 /**
@@ -593,10 +598,10 @@ const updateUserPassword = async (req, resp) => {
 };
 
 module.exports = {
-  User: User,
-  getUsers: getUsers,
-  getUser: getUser,
-  putUser: putUser,
-  deleteUser: deleteUser,
-  updateUserPassword: updateUserPassword,
+  User,
+  getUsers,
+  getUser,
+  putUser,
+  deleteUser,
+  updateUserPassword,
 };

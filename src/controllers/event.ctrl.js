@@ -593,11 +593,11 @@ const updateStatus = async (req, resp) => {
 };
 
 module.exports = {
-  Event: Event,
-  getEvents: getEvents,
-  getEvent: getEvent,
-  putEvent: putEvent,
-  deleteEvent: deleteEvent,
-  deleteEvents: deleteEvents,
-  updateStatus: updateStatus,
+  Event,
+  getEvents,
+  getEvent,
+  putEvent,
+  deleteEvent,
+  deleteEvents,
+  updateStatus,
 };

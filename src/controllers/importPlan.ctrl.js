@@ -74,8 +74,14 @@ const uploadFile = async (
     return false;
   }
   // patch for the case when the archive path is in a different drive
-  const tempPath = `${ARCHIVEPATH}temp/${hashedName}`;
-  await fs.copyFileSync(uploadedFile.path, tempPath);
+  const tempDir = `${ARCHIVEPATH}temp/`;
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true }, (err) => {
+      console.log(err);
+    });
+  }
+  const tempPath = `${tempDir}${hashedName}`;
+  fs.copyFileSync(uploadedFile.path, tempPath);
   uploadedFile.path = tempPath;
 
   const sourcePath = uploadedFile.path;
@@ -84,7 +90,7 @@ const uploadFile = async (
   uploadedFile.path = targetPath;
 
   if (!fs.existsSync(newDir)) {
-    await fs.mkdirSync(newDir, { recursive: true }, (err) => {
+    fs.mkdirSync(newDir, { recursive: true }, (err) => {
       console.log(err);
     });
   }
@@ -861,24 +867,23 @@ const putImportPlan = async (req, resp) => {
  * @apiParam {string} _id The id of the import for deletion.
  **/
 const deleteImportPlan = async (req, resp) => {
-  const parameters = req.body;
-  const { _id } = parameters;
-  if (typeof _id === 'undefined' || _id === '') {
-    resp.json({
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
   const importData = new ImportPlan({ _id });
-  const data = await importData.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: 'Query results',
+  const { data = null, error = [], status = true } = await importData.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
   });
 };
 

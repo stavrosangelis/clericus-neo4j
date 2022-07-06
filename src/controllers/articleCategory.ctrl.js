@@ -356,17 +356,31 @@ const putArticleCategory = async (req, resp) => {
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Article) WHERE id(n)=2880 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":3,"high":0}}},"error":[],"msg":"Query results"}
  */
 const deleteArticleCategory = async (req, resp) => {
-  let postData = req.body;
-  let content = new ArticleCategory(postData);
-  let output = await content.delete();
-  resp.json(output);
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
+      status: false,
+      data: [],
+      error: true,
+      msg: 'Please select a valid id to continue.',
+    });
+  }
+  const content = new ArticleCategory({ _id });
+  const { data = null, error = [], status = true } = await content.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
+  });
 };
 
 module.exports = {
-  ArticleCategory: ArticleCategory,
-  getArticleCategories: getArticleCategories,
-  getArticleCategoriesChildren: getArticleCategoriesChildren,
-  getArticleCategory: getArticleCategory,
-  putArticleCategory: putArticleCategory,
-  deleteArticleCategory: deleteArticleCategory,
+  ArticleCategory,
+  getArticleCategories,
+  getArticleCategoriesChildren,
+  getArticleCategory,
+  putArticleCategory,
+  deleteArticleCategory,
 };

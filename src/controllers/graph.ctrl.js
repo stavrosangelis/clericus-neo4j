@@ -413,6 +413,6 @@ const getRelatedNodes = async (req, resp) => {
 };
 
 module.exports = {
-  getGraphData: getGraphData,
-  getRelatedNodes: getRelatedNodes,
+  getGraphData,
+  getRelatedNodes,
 };

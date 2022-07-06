@@ -159,60 +159,52 @@ class Temporal {
     } else {
       const session = driver.session();
       let query = '';
-      let params = {};
 
       // timestamps
-      let now = new Date().toISOString();
+      const now = new Date().toISOString();
       if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
       } else {
-        let original = new Temporal({ _id: this._id });
+        const original = new Temporal({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
       }
       this.updatedBy = userId;
       this.updatedAt = now;
+      if (this.label === null || this.label === '') {
+        let label = this.startDate;
+        if (
+          this.endDate !== null &&
+          this.endDate !== '' &&
+          this.endDate !== this.startDate
+        ) {
+          label += ` - ${this.endDate}`;
+        }
+        this.label = label;
+      }
+      const nodeProperties = helpers.prepareNodeProperties(this);
+      const params = helpers.prepareParams(this);
 
       if (typeof this._id === 'undefined' || this._id === null) {
-        let nodeProperties = helpers.prepareNodeProperties(this);
-        params = helpers.prepareParams(this);
         query = 'CREATE (n:Temporal ' + nodeProperties + ') RETURN n';
       } else {
-        let update = '';
-        let i = 0;
-        for (let key in this) {
-          if (i > 0) {
-            update += ',';
-          }
-          if (typeof this[key] === 'string') {
-            update += ' n.' + key + "='" + this[key] + "'";
-          } else {
-            update += ' n.' + key + '=' + this[key];
-          }
-          i++;
-        }
-        query =
-          'MATCH (n:Temporal) WHERE id(n)=' +
-          this._id +
-          ' SET ' +
-          update +
-          ' RETURN n';
+        query = `MATCH (n:Temporal) WHERE id(n)=${this._id} SET n=${nodeProperties} RETURN n`;
       }
-      let resultPromise = await session
+      const resultPromise = await session
         .run(query, params)
         .then((result) => {
           session.close();
-          let records = result.records;
+          const { records } = result;
           let output = {
             error: ['The record cannot be updated'],
             status: false,
             data: [],
           };
           if (records.length > 0) {
-            let record = records[0];
-            let key = record.keys[0];
+            const [record] = records;
+            const [key] = record.keys;
             let resultRecord = record.toObject()[key];
             resultRecord = helpers.outputRecord(resultRecord);
             output = { error: [], status: true, data: resultRecord };
@@ -503,30 +495,30 @@ http://localhost:5100/api/temporal?_id=2514
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Temporal) WHERE id(n)=2514 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":1,"high":0}}},"error":[],"msg":"Query results"}
 */
 const deleteTemporal = async (req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let temporal = new Temporal({ _id: parameters._id });
-  let data = await temporal.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
+  const temporal = new Temporal({ _id });
+  const { data = null, error = [], status = true } = await temporal.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
     msg: 'Query results',
   });
 };
 
 module.exports = {
-  Temporal: Temporal,
-  getTemporals: getTemporals,
-  getTemporal: getTemporal,
-  putTemporal: putTemporal,
-  deleteTemporal: deleteTemporal,
+  Temporal,
+  getTemporals,
+  getTemporal,
+  putTemporal,
+  deleteTemporal,
 };

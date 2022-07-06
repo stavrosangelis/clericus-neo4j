@@ -220,18 +220,17 @@ class Spatial {
   }
 
   async delete() {
-    let session = driver.session();
+    const session = driver.session();
     await this.countRelations();
-    if (parseInt(this.count, 10) > 0) {
-      let output = {
+    if (Number(this.count) > 0) {
+      return {
         error: ["You must remove the record's relations before deleting"],
         status: false,
         data: [],
       };
-      return output;
     }
-    let query = 'MATCH (n:Spatial) WHERE id(n)=' + this._id + ' DELETE n';
-    let deleteRecord = await session
+    const query = `MATCH (n:Spatial) WHERE id(n)=${this._id} DELETE n`;
+    const deleteRecord = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
@@ -499,30 +498,30 @@ http://localhost:5100/api/spatial?_id=2514
 {"status":true,"data":{"records":[],"summary":{"statement":{"text":"MATCH (n:Spatial) WHERE id(n)=2514 DELETE n","parameters":{}},"statementType":"w","counters":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"updateStatistics":{"_stats":{"nodesCreated":0,"nodesDeleted":1,"relationshipsCreated":0,"relationshipsDeleted":0,"propertiesSet":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0}},"plan":false,"profile":false,"notifications":[],"server":{"address":"localhost:7687","version":"Neo4j/3.5.12"},"resultConsumedAfter":{"low":0,"high":0},"resultAvailableAfter":{"low":30,"high":0}}},"error":[],"msg":"Query results"}
 */
 const deleteSpatial = async (req, resp) => {
-  let parameters = req.query;
-  if (typeof parameters._id === 'undefined' || parameters._id === '') {
-    resp.json({
+  const { body } = req;
+  const { _id = '' } = body;
+  if (_id === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please select a valid id to continue.',
     });
-    return false;
   }
-  let spatial = new Spatial({ _id: parameters._id });
-  let data = await spatial.delete();
-  resp.json({
-    status: true,
-    data: data,
-    error: [],
-    msg: 'Query results',
+  const spatial = new Spatial({ _id });
+  const { data = null, error = [], status = true } = await spatial.delete();
+  return resp.status(200).json({
+    status,
+    data,
+    error,
+    msg: '',
   });
 };
 
 module.exports = {
-  Spatial: Spatial,
-  getSpatials: getSpatials,
-  getSpatial: getSpatial,
-  putSpatial: putSpatial,
-  deleteSpatial: deleteSpatial,
+  Spatial,
+  getSpatials,
+  getSpatial,
+  putSpatial,
+  deleteSpatial,
 };

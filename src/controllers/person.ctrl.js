@@ -114,7 +114,7 @@ class Person {
   }
 
   normalizeAppelations(alternateAppelations) {
-    let appelations = alternateAppelations.map((appelation) => {
+    const appelations = alternateAppelations.map((appelation) => {
       const {
         firstName = null,
         middleName = null,
@@ -299,9 +299,9 @@ class Person {
     if (this._id === null) {
       return false;
     }
-    let session = driver.session();
-    let query = 'MATCH (n:Person) WHERE id(n)=' + this._id + ' return n';
-    let node = await session
+    const session = driver.session();
+    const query = `MATCH (n:Person) WHERE id(n)=${this._id} RETURN n`;
+    const node = await session
       .writeTransaction((tx) => tx.run(query, {}))
       .then((result) => {
         session.close();
@@ -316,7 +316,7 @@ class Person {
       });
     for (let key in node) {
       this[key] = node[key];
-      let newAppelations = [];
+      const newAppelations = [];
       if (key === 'alternateAppelations' && node[key].length > 0) {
         for (let akey in node[key]) {
           let alternateAppelation = JSON.parse(node[key][akey]);
@@ -383,12 +383,12 @@ class Person {
       this.label = this.personLabel(this);
 
       // timestamps
-      let now = new Date().toISOString();
+      const now = new Date().toISOString();
       if (typeof this._id === 'undefined' || this._id === null) {
         this.createdBy = userId;
         this.createdAt = now;
       } else {
-        let original = new Person({ _id: this._id });
+        const original = new Person({ _id: this._id });
         await original.load();
         this.createdBy = original.createdBy;
         this.createdAt = original.createdAt;
@@ -396,33 +396,28 @@ class Person {
       this.updatedBy = userId;
       this.updatedAt = now;
 
-      let nodeProperties = prepareNodeProperties(this);
-      let params = prepareParams(this);
+      const nodeProperties = prepareNodeProperties(this);
+      const params = prepareParams(this);
 
       let query = '';
       if (typeof this._id === 'undefined' || this._id === null) {
-        query = 'CREATE (n:Person ' + nodeProperties + ') RETURN n';
+        query = `CREATE (n:Person ${nodeProperties}) RETURN n`;
       } else {
-        query =
-          'MATCH (n:Person) WHERE id(n)=' +
-          this._id +
-          ' SET n=' +
-          nodeProperties +
-          ' RETURN n';
+        query = `MATCH (n:Person) WHERE id(n)=${this._id} SET n=${nodeProperties} RETURN n`;
       }
       const resultPromise = await session
         .run(query, params)
         .then((result) => {
           session.close();
-          let records = result.records;
+          const { records } = result;
           let output = {
             error: ['The record cannot be updated'],
             status: false,
             data: [],
           };
           if (records.length > 0) {
-            let record = records[0];
-            let key = record.keys[0];
+            const [record] = records;
+            const [key] = record.keys;
             let resultRecord = record.toObject()[key];
             resultRecord = outputRecord(resultRecord);
             output = { error: [], status: true, data: resultRecord };
@@ -680,11 +675,10 @@ const getPeopleQuery = async (query, queryParams, limit, classpieceId) => {
     .writeTransaction((tx) => tx.run(queryCount))
     .then((result) => {
       session.close();
-      let resultRecord = result.records[0];
+      const [resultRecord] = result.records;
       let countObj = resultRecord.toObject();
       prepareOutput(countObj);
-      let output = countObj['count(*)'];
-      return output;
+      return countObj['count(*)'];
     });
 
   const totalPages = Math.ceil(count / limit);
@@ -805,12 +799,12 @@ const deletePerson = async (req, resp) => {
     });
   }
   const person = new Person({ _id });
-  const data = await person.delete();
-  resp.status(200).json({
-    status: true,
+  const { data = null, error = [], status = true } = await person.delete();
+  return resp.status(200).json({
+    status,
     data,
-    error: [],
-    msg: 'Query results',
+    error,
+    msg: '',
   });
 };
 /**
@@ -1011,13 +1005,13 @@ const fixLabels = async (req, resp) => {
   });
 };
 module.exports = {
-  Person: Person,
-  getPeople: getPeople,
-  getPerson: getPerson,
-  putPerson: putPerson,
-  deletePerson: deletePerson,
-  deletePeople: deletePeople,
-  patchUnknown: patchUnknown,
-  updateStatus: updateStatus,
-  fixLabels: fixLabels,
+  Person,
+  getPeople,
+  getPerson,
+  putPerson,
+  deletePerson,
+  deletePeople,
+  patchUnknown,
+  updateStatus,
+  fixLabels,
 };
