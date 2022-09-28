@@ -11,39 +11,36 @@ const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 */
 
 const search = async (req, resp) => {
-  let parameters = req.body;
-  let term = '';
-  if (typeof parameters.term !== 'undefined') {
-    term = parameters.term;
-  } else {
-    resp.json({
+  const { body: params } = req;
+  const { term = '' } = params;
+  if (term === '') {
+    return resp.status(400).json({
       status: false,
       data: [],
       error: true,
       msg: 'Please provide a valid search term to continue',
     });
-    return false;
   }
-  let results = await fulltextSearch(term);
-  let articles = results.filter((n) => n.type === 'Article');
-  let events = results.filter((n) => n.type === 'Event');
-  let organisations = results.filter((n) => n.type === 'Organisation');
-  let people = results.filter((n) => n.type === 'Person');
-  let classpieces = results.filter((n) => n.type === 'Classpiece');
-  let resources = results.filter((n) => n.type === 'Resource');
-  let spatial = results.filter((n) => n.type === 'Spatial');
-  let temporal = results.filter((n) => n.type === 'Temporal');
-  let response = {
-    articles: articles,
-    events: events,
-    organisations: organisations,
-    people: people,
-    classpieces: classpieces,
-    resources: resources,
-    spatial: spatial,
-    temporal: temporal,
+  const results = await fulltextSearch(term);
+  const articles = results.filter((n) => n.type === 'Article');
+  const events = results.filter((n) => n.type === 'Event');
+  const organisations = results.filter((n) => n.type === 'Organisation');
+  const people = results.filter((n) => n.type === 'Person');
+  const classpieces = results.filter((n) => n.type === 'Classpiece');
+  const resources = results.filter((n) => n.type === 'Resource');
+  const spatial = results.filter((n) => n.type === 'Spatial');
+  const temporal = results.filter((n) => n.type === 'Temporal');
+  const response = {
+    articles,
+    events,
+    organisations,
+    people,
+    classpieces,
+    resources,
+    spatial,
+    temporal,
   };
-  resp.json({
+  return resp.status(200).json({
     status: true,
     data: response,
     error: false,
@@ -53,10 +50,10 @@ const search = async (req, resp) => {
 
 const fulltextSearch = async (term) => {
   term = term.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
-  let session = driver.session();
-  let query = `CALL db.index.fulltext.queryNodes("fulltextSearch", "${term}") YIELD node, score
+  const session = driver.session();
+  const query = `CALL db.index.fulltext.queryNodes("fulltextSearch", "${term}") YIELD node, score
 RETURN node, node.label, node.description, node.content, score`;
-  let nodesPromise = await session
+  const nodesPromise = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
       return result.records;
@@ -64,18 +61,19 @@ RETURN node, node.label, node.description, node.content, score`;
     .catch((error) => {
       console.log(error);
     });
-  let nodes = [];
-  for (let i = 0; i < nodesPromise.length; i++) {
-    let node = nodesPromise[i];
-    let output = {};
-    let record = node.toObject();
+  const nodes = [];
+  const { length } = nodesPromise;
+  for (let i = 0; i < length; i += 1) {
+    const node = nodesPromise[i];
+    const output = {};
+    const record = node.toObject();
     output.label = record['node.label'];
     output.score = record.score;
     helpers.prepareOutput(record);
-    let details = helpers.outputRecord(record.node);
+    const details = helpers.outputRecord(record.node);
     output.type = record.node.labels[0];
     if (output.type === 'Resource') {
-      let classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
+      const classpieceSystemType = new TaxonomyTerm({ labelId: 'Classpiece' });
       await classpieceSystemType.load();
       if (details.systemType === classpieceSystemType._id) {
         output.type = 'Classpiece';
@@ -94,5 +92,5 @@ RETURN node, node.label, node.description, node.content, score`;
 };
 
 module.exports = {
-  search: search,
+  search,
 };

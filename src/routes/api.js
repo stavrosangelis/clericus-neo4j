@@ -128,6 +128,7 @@ server.get('/ui-temporal', temporalsUiController.getTemporal);
 server.get('/timeline', visualisationsController.getTimeline);
 server.get('/item-timeline', visualisationsController.getItemTimeline);
 server.get('/heatmap', visualisationsController.getHeatmap);
+server.get('/graph-network-size', visualisationsController.getGraphNetworkSize);
 server.get('/graph-network', visualisationsController.getGraphNetwork);
 server.get('/item-network', visualisationsController.getItemNetwork);
 server.get(
@@ -141,6 +142,11 @@ server.get(
 server.post(
   '/item-network-simulation',
   visualisationsController.itemGraphSimulation
+);
+server.get('/network-find-node', visualisationsController.findNode);
+server.post(
+  '/network-find-shortest-path',
+  visualisationsController.findShortestPath
 );
 server.get('/sample-map-data', visualisationsController.getMapSampleData);
 

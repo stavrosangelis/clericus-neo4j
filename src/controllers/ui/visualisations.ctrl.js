@@ -1,16 +1,27 @@
 const driver = require('../../config/db-driver');
 const helpers = require('../../helpers');
 const fs = require('fs');
-const archivePath = process.env.ARCHIVEPATH;
-const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
 // const schedule = require('node-schedule');
 const d3 = require('d3');
 const d32 = require('d3-force-reuse');
 const { performance } = require('perf_hooks');
+const { ARCHIVEPATH: archivePath } = process.env;
+const { TaxonomyTerm } = require('../taxonomyTerm.ctrl');
+
+const getGraphNetworkSize = async (req, resp) => {
+  const networkFileDir = `${archivePath}network-graph.json`;
+  const file = await helpers.readJSONFile(networkFileDir);
+  resp.json({
+    status: true,
+    data: JSON.stringify(file.data).length,
+    error: [],
+    msg: 'Query results',
+  });
+};
 
 const getGraphNetwork = async (req, resp) => {
-  let networkFileDir = `${archivePath}network-graph.json`;
-  let file = await helpers.readJSONFile(networkFileDir);
+  const networkFileDir = `${archivePath}network-graph.json`;
+  const file = await helpers.readJSONFile(networkFileDir);
   resp.json({
     status: true,
     data: JSON.stringify(file.data),
@@ -690,28 +701,22 @@ const nodeColors = (type) => {
 };
 
 const getRelatedNodes = async (req, resp) => {
-  let params = req.query;
-  if (typeof params._id === 'undefined') {
-    resp.json({
+  const { query: params } = req;
+  const { _id = '' } = params;
+  if (_id === '') {
+    return resp.status(500).json({
       status: false,
       data: [],
       error: 'Please provide a valid node id to continue',
       msg: 'Query results',
     });
-    return false;
   }
-  let _id = params._id;
-  let step = 1;
-  if (typeof params.step !== 'undefined' || params.step === '') {
-    step = parseInt(params.step, 10);
-    if (step < 1) step = 1;
-    if (step > 6) step = 6;
-  }
-  let relatedNodes = await loadRelatedNodes(_id, step);
-  let classpieceTerm = new TaxonomyTerm({ labelId: 'Classpiece' });
+  const relatedNodes = await loadRelatedNodes(_id);
+  const classpieceTerm = new TaxonomyTerm({ labelId: 'Classpiece' });
   await classpieceTerm.load();
-  for (let i = 0; i < relatedNodes.length; i++) {
-    let relatedNode = relatedNodes[i];
+  const { length } = relatedNodes;
+  for (let i = 0; i < length; i += 1) {
+    const relatedNode = relatedNodes[i];
     if (
       relatedNode.type === 'Resource' &&
       relatedNode.systemType === classpieceTerm._id
@@ -719,7 +724,8 @@ const getRelatedNodes = async (req, resp) => {
       relatedNode.type = 'Classpiece';
     }
   }
-  resp.json({
+
+  return resp.status(200).json({
     status: true,
     data: relatedNodes,
     error: [],
@@ -768,17 +774,14 @@ const getRelatedPaths = async (req, resp) => {
   });
 };
 
-const loadRelatedNodes = async (_id, step) => {
-  let session = driver.session();
-  let query = `MATCH (n)-[*..${step}]->(rn) WHERE id(n)=${_id} AND n.status='public' AND rn.status='public' AND NOT id(rn)=${_id} RETURN distinct rn ORDER BY rn.label`;
-  let results = await session
+const loadRelatedNodes = async (_id) => {
+  const session = driver.session();
+  const query = `MATCH (n {status:'public'})-[r]->(rn {status:'public'}) WHERE id(n)=${_id} AND NOT id(rn)=${_id} RETURN distinct rn ORDER BY rn.label`;
+  const results = await session
     .writeTransaction((tx) => tx.run(query, {}))
-    .then((result) => {
-      session.close();
-      return result.records;
-    });
-  let relatedNodes = normalizeRelatedRecordsOutput(results);
-  return relatedNodes;
+    .then((result) => result.records);
+  session.close();
+  return normalizeRelatedRecordsOutput(results);
 };
 
 const normalizeRelatedRecordsOutput = (records) => {
@@ -1000,15 +1003,168 @@ const getMapSampleData = async (req, resp) => {
   });
 };
 
+const findNode = async (req, resp) => {
+  const { query: params } = req;
+  const { label: labelParam, type = '', page = 1 } = params;
+  const label = labelParam !== '' ? helpers.addslashes(labelParam).trim() : '';
+
+  let match = `MATCH (n {status: 'public'})`;
+  let filter = `(n:Event OR n:Organisation OR n:Person OR n:Resource) AND `;
+  const classpieceTerm = new TaxonomyTerm({ labelId: 'Classpiece' });
+  await classpieceTerm.load();
+  const { _id: classpieceTermId = 0 } = classpieceTerm;
+  if (type !== '') {
+    filter = '';
+    if (type === 'Classpiece') {
+      match = `MATCH (n:Resource {status: 'public', systemType: '${classpieceTermId}'})`;
+    } else {
+      match = `MATCH (n:${type} {status: 'public'})`;
+    }
+  }
+  let queryParams = `toLower(n.label) =~ toLower('.*${label}.*')`;
+  const queryPage = page - 1;
+  const skip = 25 * queryPage;
+  const query = `${match} WHERE ${filter}${queryParams} RETURN n ORDER BY n.label SKIP ${skip} LIMIT 25`;
+  const session = driver.session();
+  const nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => result.records)
+    .catch((error) => {
+      console.log(error);
+    });
+  const data = helpers.normalizeRecordsOutput(nodesPromise);
+  const { length } = data;
+  for (let i = 0; i < length; i += 1) {
+    const n = data[i];
+    const { systemLabels, systemType = '' } = n;
+    let [systemLabel] = systemLabels;
+    if (
+      systemLabel === 'Resource' &&
+      systemType === classpieceTermId.toString()
+    ) {
+      systemLabel = 'Classpiece';
+    }
+    n.systemLabels = null;
+    n.systemLabel = systemLabel;
+    if (systemLabel === 'Event') {
+      n.temporal = await helpers.loadRelations(
+        n._id,
+        'Event',
+        'Temporal',
+        true
+      );
+      n.spatial = await helpers.loadRelations(n._id, 'Event', 'Spatial', true);
+      n.organisations = await helpers.loadRelations(
+        n._id,
+        'Event',
+        'Organisation',
+        true
+      );
+      n.people = await helpers.loadRelations(
+        n._id,
+        'Event',
+        'Person',
+        true,
+        null,
+        'rn.lastName'
+      );
+    } else if (systemLabel === 'Organisation') {
+      n.resources = await helpers.loadRelations(
+        n._id,
+        'Organisation',
+        'Resource',
+        true
+      );
+    } else if (systemLabel === 'Person') {
+      n.resources = await helpers.loadRelations(
+        n._id,
+        'Person',
+        'Resource',
+        true
+      );
+      n.affiliations = await helpers.loadRelations(
+        n._id,
+        'Person',
+        'Organisation',
+        false,
+        'hasAffiliation'
+      );
+    }
+  }
+  // counts
+  const queryCount = `${match} WHERE ${filter}${queryParams} RETURN count(distinct n) as c`;
+  const count = await session
+    .writeTransaction((tx) => tx.run(queryCount))
+    .then((result) => {
+      session.close();
+      const [resultRecord] = result.records;
+      let countObj = resultRecord.toObject();
+      helpers.prepareOutput(countObj);
+      return Number(countObj['c']);
+    });
+  const totalPages = Math.ceil(count / 25);
+  const result = {
+    data,
+    count: count,
+    totalPages: totalPages,
+  };
+  return resp.status(200).json({
+    status: true,
+    data: result,
+    error: [],
+    msg: 'Query results',
+  });
+};
+
+const findShortestPath = async (req, resp) => {
+  const { body: params } = req;
+  const { source = null, target = null } = params;
+
+  const { _id: sId = '', systemLabel: sSystemLabel = 'Person' } = source;
+  const { _id: tId = '', systemLabel: tSystemLabel = 'Person' } = target;
+
+  if (sId === tId) {
+    return resp
+      .status(400)
+      .json('The source entity must be different than the target entity');
+  }
+
+  const query = `MATCH (n:${sSystemLabel} {status: 'public'}),
+  (t:${tSystemLabel} {status: 'public'}),
+  p = shortestPath((n {status: 'public'})-[*..6]->(t {status: 'public'}))
+  WHERE id(n)=${sId} AND id(t)=${tId}
+  RETURN p`;
+  const session = driver.session();
+  const nodesPromise = await session
+    .writeTransaction((tx) => tx.run(query, {}))
+    .then((result) => result.records)
+    .catch((error) => {
+      console.log(error);
+    });
+  helpers.normalizeRecordsOutput(nodesPromise);
+
+  const [field = null] = nodesPromise[0]._fields;
+  const { segments: data = [] } = field;
+  return resp.status(200).json({
+    status: true,
+    data,
+    error: [],
+    msg: 'Query results',
+  });
+};
+
 module.exports = {
   getItemNetwork,
   getRelatedNodes,
   getRelatedPaths,
   getHeatmap,
+  getGraphNetworkSize,
   getGraphNetwork,
   getTimeline,
   getItemTimeline,
   produceGraphNetwork,
   itemGraphSimulation,
   getMapSampleData,
+  findNode,
+  findShortestPath,
 };

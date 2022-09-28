@@ -9,8 +9,8 @@ const driver = require('../../config/db-driver');
 const fs = require('fs');
 const archivePath = process.env.ARCHIVEPATH;
 const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
-const produceGraphNetwork = require('../ui/visualisations.ctrl')
-  .produceGraphNetwork;
+const produceGraphNetwork =
+  require('../ui/visualisations.ctrl').produceGraphNetwork;
 
 // parse arguments
 const argv = yargs

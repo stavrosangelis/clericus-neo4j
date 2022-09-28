@@ -1,18 +1,41 @@
-if (process.env.NODE_ENV === 'production') {
-  require('dotenv').config({ path: '../../../.env.production' });
-} else {
-  require('dotenv').config({ path: '../../../.env.development' });
+const { NODE_ENV } = process.env;
+// load the appropriate environment variables
+let envPath;
+const absPath = '/Users/stavrosangelis/htdocs/ahi/clericus-neo4j/';
+switch (NODE_ENV) {
+  case 'production':
+    envPath = `${absPath}.env.production`;
+    break;
+  case 'development':
+    envPath = `${absPath}.env.development`;
+    break;
+  case 'development.ssl':
+    envPath = `${absPath}.env.development.ssl`;
+    break;
+  case 'devserver':
+    envPath = `${absPath}.env.develserver`;
+    break;
+  default:
+    envPath = `${absPath}.env.production`;
+    break;
 }
+require('dotenv').config({ path: envPath });
+
+// cli command
+// NODE_ENV=development.ssl node visualisations.cli.js graph
+
 const driver = require('../../config/db-driver');
 const { prepareOutput, readJSONFile } = require('../../helpers');
 const fs = require('fs');
 const yargs = require('yargs');
 const d3 = require('d3');
 const { performance } = require('perf_hooks');
+const { createGzip } = require('node:zlib');
+const { pipeline } = require('node:stream');
 
-const TaxonomyTerm = require('../taxonomyTerm.ctrl').TaxonomyTerm;
+const { TaxonomyTerm } = require('../taxonomyTerm.ctrl');
 
-const archivePath = process.env.ARCHIVEPATH;
+const { ARCHIVEPATH: archivePath } = process.env;
 
 const argv = yargs
   .command(
@@ -27,7 +50,7 @@ const countQuery = async (query) => {
   const count = await session
     .writeTransaction((tx) => tx.run(query, {}))
     .then((result) => {
-      const resultRecord = result.records[0];
+      const [resultRecord] = result.records;
       const countObj = resultRecord.toObject();
       prepareOutput(countObj);
       return Number(countObj['count']);
@@ -80,12 +103,18 @@ const compareCount = async () => {
       });
     });
   } else {
-    const fileData = readFile.data;
+    const { data: fileData } = readFile;
+    const {
+      events: fEvents = 0,
+      organisations: fOrganisations = 0,
+      people: fPeople = 0,
+      resources: fResources = 0,
+    } = fileData;
     if (
-      fileData.events === count.events &&
-      fileData.organisations === count.organisations &&
-      fileData.people === count.people &&
-      fileData.resources === count.resources
+      fEvents === eventsCount &&
+      fOrganisations === organisationsCount &&
+      fPeople === peopleCount &&
+      fResources === resourcesCount
     ) {
       output = false;
     } else {
@@ -100,40 +129,15 @@ const compareCount = async () => {
   return output;
 };
 
-const nodeColors = (type) => {
-  let colors = {
-    Event: {
-      color: '#f9cd1b',
-      strokeColor: '#c9730a',
-    },
-    Organisation: {
-      color: '#9b8cf2',
-      strokeColor: '#5343b7',
-    },
-    Person: {
-      color: '#5dc910',
-      strokeColor: '#519b1b',
-    },
-    Resource: {
-      color: '#00cbff',
-      strokeColor: '#0982a0',
-    },
-    Classpiece: {
-      color: '#1ed8bf',
-      strokeColor: '#1e9dd8',
-    },
-  };
-  return colors[type];
-};
-
 const prepareNodesOutput = async (records) => {
   console.log('preparing nodes output');
   const t0 = performance.now();
+
   const classpieceTerm = new TaxonomyTerm({ labelId: 'Classpiece' });
   await classpieceTerm.load();
   const nodes = [];
-  const length = records.length;
-  const firstRecord = records[0];
+  const { length } = records;
+  const [firstRecord] = records;
   prepareOutput(firstRecord);
   const firstRecordObject = firstRecord.toObject();
   const sizeMulti = 20 / Number(firstRecordObject.size);
@@ -141,21 +145,19 @@ const prepareNodesOutput = async (records) => {
     const record = records[i];
     prepareOutput(record);
     const recordObject = record.toObject();
-    let nType = recordObject.type[0];
+    const { _id = '', label = '', type, systemType = null } = recordObject;
+    let [nType] = type;
     if (
-      recordObject.systemType !== null &&
-      Number(recordObject.systemType) === Number(classpieceTerm._id)
+      systemType !== null &&
+      Number(systemType) === Number(classpieceTerm._id)
     ) {
       nType = 'Classpiece';
     }
-    const colors = nodeColors(nType);
     const size = Number(recordObject.size) * sizeMulti;
     const node = {
-      id: recordObject._id,
-      label: recordObject.label,
+      id: _id,
+      label,
       type: nType,
-      color: colors.color,
-      strokeColor: colors.strokeColor,
       size: 30 + size,
     };
     nodes.push(node);
@@ -180,14 +182,21 @@ const prepareRelationsOutput = async (records) => {
     prepareOutput(record);
     const recordObject = record.toObject();
 
+    const {
+      relId: refId = '',
+      _id: source = '',
+      t_id: target = '',
+      relType: label = '',
+    } = recordObject;
+
     const relation = {
-      refId: recordObject.relId,
-      source: recordObject._id,
-      target: recordObject.t_id,
-      label: recordObject.relType,
+      refId,
+      source,
+      target,
+      label,
     };
-    const pair = `${relation.source},${relation.target}`;
-    let reversePair = `${relation.target},${relation.source}`;
+    const pair = `${source},${target}`;
+    let reversePair = `${target},${source}`;
     if (
       relationsPairs.indexOf(pair) === -1 &&
       relationsPairs.indexOf(reversePair) === -1
@@ -208,9 +217,7 @@ const prepareRelationsOutput = async (records) => {
 const graphSimulation = async (data) => {
   console.log('starting simulation');
   const t0 = performance.now();
-  const nodes = data.nodes;
-  const links = data.links;
-  const statistics = data.statistics;
+  const { nodes = [], links = [], statistics } = data;
   nodes[0].x = 0;
   nodes[0].y = 0;
   const simulation = d3
@@ -246,21 +253,12 @@ const graphSimulation = async (data) => {
   const t1 = performance.now();
   const diff = t1 - t0;
   const now = new Date();
-  const dateString =
-    now.getUTCFullYear() +
-    '/' +
-    (now.getUTCMonth() + 1) +
-    '/' +
-    now.getUTCDate() +
-    ' ' +
-    now.getUTCHours() +
-    ':' +
-    now.getUTCMinutes() +
-    ':' +
-    now.getUTCSeconds();
+  const dateString = `${now.getUTCFullYear()}/${
+    now.getUTCMonth() + 1
+  }/${now.getUTCDate()}/${now.getUTCHours()}/${now.getUTCMinutes()}/${now.getUTCSeconds()}`;
   const newData = {
-    nodes: nodes,
-    links: links,
+    nodes,
+    links,
     statistics: {
       fileCreateTime: statistics.fileCreateTime,
       simulationTime: diff + 'ms',
@@ -275,6 +273,17 @@ const graphSimulation = async (data) => {
       resolve(true);
     });
   });
+  // zip file
+  const gzip = createGzip();
+  const source = fs.createReadStream(targetDir);
+  const destination = fs.createWriteStream(`${archivePath}network-graph.zip`);
+
+  pipeline(source, gzip, destination, (err) => {
+    if (err) {
+      console.error('An error occurred:', err);
+      process.exitCode = 1;
+    }
+  });
   return writeFile;
 };
 
@@ -283,6 +292,7 @@ const produceGraphNetwork = async () => {
 
   // remove the exclamation mark
   if (!compareContinue) {
+    console.log('starting...');
     const t0 = performance.now();
     // fetch nodes
     const queryNodes = `MATCH (n {status: 'public'})-[r]-() WHERE n:Event OR n:Organisation OR n:Person OR n:Resource RETURN LABELS(n) as type, id(n) as _id, n.label as label, n.systemType as systemType, count(r) as size ORDER BY size DESC`;
