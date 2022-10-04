@@ -1132,7 +1132,7 @@ const findShortestPath = async (req, resp) => {
   const query = `MATCH (n:${sSystemLabel} {status: 'public'}),
   (t:${tSystemLabel} {status: 'public'}),
   p = shortestPath((n {status: 'public'})-[*..6]->(t {status: 'public'}))
-  WHERE id(n)=${sId} AND id(t)=${tId}
+  WHERE id(n)=${sId} AND id(t)=${tId} AND none(x IN nodes(p) WHERE x.status = 'private')
   RETURN p`;
   const session = driver.session();
   const nodesPromise = await session
