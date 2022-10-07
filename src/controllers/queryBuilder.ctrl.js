@@ -360,19 +360,26 @@ const getNodes = async (params) => {
   if (params.type === 'Person') {
     for (let i = 0; i < length; i += 1) {
       const node = nodes[i];
-      node.label = helpers.stripslashes(node.label);
-      node.firstName = helpers.stripslashes(node.firstName);
-      node.middleName = helpers.stripslashes(node.middleName);
-      node.lastName = helpers.stripslashes(node.lastName);
-      node.description = helpers.stripslashes(node.description);
+      const {
+        _id = '',
+        label = '',
+        firstName = '',
+        middleName = '',
+        lastName = '',
+        description = '',
+      } = node;
+      node.label = helpers.stripslashes(label);
+      node.firstName = helpers.stripslashes(firstName);
+      node.middleName = helpers.stripslashes(middleName);
+      node.lastName = helpers.stripslashes(lastName);
+      node.description = helpers.stripslashes(description);
       const relatedResources =
-        (await helpers.loadRelations(node._id, 'Person', 'Resource', true)) ||
-        null;
+        (await helpers.loadRelations(_id, 'Person', 'Resource', true)) || null;
       let resources = [];
       if (relatedResources !== null) {
         resources = relatedResources.map((item) => {
-          let ref = item.ref;
-          let paths = ref.paths.map((path) => {
+          const { ref } = item;
+          const paths = ref.paths.map((path) => {
             let pathOut = null;
             if (typeof path === 'string') {
               pathOut = JSON.parse(path);
@@ -390,12 +397,11 @@ const getNodes = async (params) => {
         });
       }
       node.resources = resources;
-      node.affiliations = await helpers.loadRelations(
-        node._id,
+      node.organisations = await helpers.loadRelations(
+        _id,
         'Person',
         'Organisation',
-        false,
-        'hasAffiliation'
+        false
       );
     }
   }

@@ -145,7 +145,13 @@ const prepareNodesOutput = async (records) => {
     const record = records[i];
     prepareOutput(record);
     const recordObject = record.toObject();
-    const { _id = '', label = '', type, systemType = null } = recordObject;
+    const {
+      _id = '',
+      label = '',
+      size: rSize = 0,
+      type,
+      systemType = null,
+    } = recordObject;
     let [nType] = type;
     if (
       systemType !== null &&
@@ -153,7 +159,7 @@ const prepareNodesOutput = async (records) => {
     ) {
       nType = 'Classpiece';
     }
-    const size = Number(recordObject.size) * sizeMulti;
+    const size = Number(rSize) * sizeMulti;
     const node = {
       id: _id,
       label,
@@ -176,7 +182,7 @@ const prepareRelationsOutput = async (records) => {
   const t0 = performance.now();
   const relationsPairs = [];
   const relations = [];
-  const length = records.length;
+  const { length } = records;
   for (let i = 0; i < length; i += 1) {
     const record = records[i];
     prepareOutput(record);
