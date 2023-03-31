@@ -378,6 +378,7 @@ const deleteImportRule = async (req, resp) => {
 };
 
 module.exports = {
+  ImportRule,
   getImportRules,
   getImportRule,
   putImportRule,

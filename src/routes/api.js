@@ -509,6 +509,12 @@ server.get(
 );
 // import
 server.get(
+  '/export-import-plan/:_id',
+  auth.checkAdminToken,
+  importPlanController.exportImportPlan
+);
+
+server.get(
   '/import-plans',
   auth.checkAdminToken,
   importPlanController.getImportPlans
@@ -565,7 +571,18 @@ server.get(
 );
 server.get(
   '/import-plan-file-download/:_id',
+  auth.checkAdminToken,
   importPlanController.importPlanFileDownload
+);
+server.get(
+  '/import-plan-backup-download/:_id',
+  auth.checkAdminToken,
+  importPlanController.importPlanBackupDownload
+);
+server.post(
+  '/import-plan-backup-upload/',
+  auth.checkAdminToken,
+  importPlanController.importPlanFileUpload
 );
 
 // import rules

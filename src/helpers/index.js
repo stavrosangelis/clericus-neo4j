@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const sizeOfImage = require('image-size');
 const { ExifImage } = require('exif');
 const IptcImage = require('node-iptc');
+const { tar } = require('zip-a-folder');
+const { exec } = require('node:child_process');
 
 const driver = require('../config/db-driver');
 
@@ -602,7 +604,49 @@ const prepareDate = (dateParam = null) => {
   return { startDate, endDate, label };
 };
 
+const compressDirectory = async (directory) => {
+  try {
+    await tar(directory, `${directory}.tar.gz`);
+    return true;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+};
+
+const expandDirectory = async (source = '') => {
+  try {
+    if (source === '') {
+      throw new Error('Source path is not defined');
+    }
+    if (!fs.existsSync(source)) {
+      throw new Error(
+        'Please provide a valid path to the compressed directory'
+      );
+    }
+    const pathArray = source.split(`/`);
+    const { length } = pathArray;
+    const sliced = pathArray.slice(0, length - 1);
+    const path = sliced.join('/');
+    const expand = await new Promise((resolve, reject) => {
+      exec(`tar -xf ${source} -C ${path}`, (error) => {
+        if (error) {
+          console.error(`exec error: ${error}`);
+          reject(false);
+        }
+        resolve(true);
+      });
+    });
+    return expand;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+};
+
 module.exports = {
+  compressDirectory,
+  expandDirectory,
   soundex,
   hashFileName,
   imageIptc,

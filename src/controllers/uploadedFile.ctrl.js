@@ -90,13 +90,17 @@ class UploadedFile {
           return output;
         }
       });
-    // assign results to class values
-    for (let key in node) {
-      this[key] = node[key];
+    if (typeof node !== 'undefined') {
+      // assign results to class values
+      for (let key in node) {
+        this[key] = node[key];
+      }
+      if (this.paths.length === 0) {
+        this.paths = returnPaths(this);
+      }
+      return this;
     }
-    if (this.paths.length === 0) {
-      this.paths = returnPaths(this);
-    }
+    return null;
   }
 
   async save(userId) {
@@ -218,19 +222,21 @@ class UploadedFile {
     return deleteRecord;
   }
 
-  unlinkFile(path) {
+  async unlinkFile(path) {
     return new Promise((resolve) => {
-      fs.unlink(path, (err) => {
-        let output = {};
-        if (err) {
-          output.error = err;
-          output.status = false;
-        } else {
-          output.status = true;
-          output.message = 'File "' + path + '" deleted successfully';
-        }
-        resolve(output);
-      });
+      if (fs.existsSync(path)) {
+        fs.unlink(path, (err) => {
+          let output = {};
+          if (err) {
+            output.error = err;
+            output.status = false;
+          } else {
+            output.status = true;
+            output.message = 'File "' + path + '" deleted successfully';
+          }
+          resolve(output);
+        });
+      }
     }).catch((error) => {
       return error;
     });

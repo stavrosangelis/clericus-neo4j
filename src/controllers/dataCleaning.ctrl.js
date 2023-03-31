@@ -10,7 +10,7 @@ const {
   prepareParams,
   splitMultiString,
 } = require('../helpers');
-const { ImportPlan } = require('./importPlan.ctrl');
+const { UploadedFile } = require('./uploadedFile.ctrl');
 const mimeType = require('mime-types');
 const readXlsxFile = require('read-excel-file/node');
 const csvParser = require('csv-parser');
@@ -18,7 +18,7 @@ const fs = require('fs');
 
 const { ARCHIVEPATH } = process.env;
 
-const unlinkFile = (path) => {
+const unlinkFile = async (path) => {
   return new Promise((resolve) => {
     fs.unlink(path, (err) => {
       let output = {};
@@ -559,6 +559,36 @@ const mergeArrayValues = (array, key) => {
   }
   return texts;
 };
+
+const loadImportPlanData = async (_id = '') => {
+  if (_id === '') {
+    return false;
+  }
+  const session = driver.session();
+  const query = `MATCH (n:ImportPlan) WHERE id(n)=$_id RETURN n`;
+  const node = await session
+    .writeTransaction((tx) => tx.run(query, { _id }))
+    .then((result) => {
+      session.close();
+      const { records } = result;
+      let record = null;
+      if (records.length > 0) {
+        const recordObj = records[0].toObject();
+        record = outputRecord(recordObj.n);
+      }
+      return record;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+
+  if (typeof node.uploadedFile !== 'undefined' && node.uploadedFile !== '') {
+    const uploadedFileDetails = new UploadedFile({ _id: node.uploadedFile });
+    await uploadedFileDetails.load();
+    node.uploadedFileDetails = uploadedFileDetails;
+  }
+  return node;
+};
 /**
 * @api {get} /data-cleaning-unique Get Data cleaning / disambiguation unique values
 * @apiName get data-cleaning unique values
@@ -593,8 +623,7 @@ const getUnique = async (req, resp) => {
   const instance = new DataCleaning({ _id });
   await instance.load();
 
-  const importData = new ImportPlan({ _id: instance.importPlanId });
-  await importData.load();
+  const importData = await loadImportPlanData(instance.importPlanId);
 
   const paths = importData.uploadedFileDetails.paths[0];
   const path = typeof paths === 'string' ? JSON.parse(paths).path : paths.path;
@@ -768,8 +797,7 @@ const getDBentries = async (req, resp) => {
   const instance = new DataCleaning({ _id });
   await instance.load();
 
-  const importData = new ImportPlan({ _id: instance.importPlanId });
-  await importData.load();
+  const importData = await loadImportPlanData(instance.importPlanId);
 
   const paths = importData.uploadedFileDetails.paths[0];
   const path = typeof paths === 'string' ? JSON.parse(paths).path : paths.path;
@@ -983,8 +1011,7 @@ const getWFDates = async (req, resp) => {
   const instance = new DataCleaning({ _id });
   await instance.load();
 
-  const importData = new ImportPlan({ _id: instance.importPlanId });
-  await importData.load();
+  const importData = await loadImportPlanData(instance.importPlanId);
 
   const paths = importData.uploadedFileDetails.paths[0];
   const path = typeof paths === 'string' ? JSON.parse(paths).path : paths.path;

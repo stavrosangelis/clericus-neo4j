@@ -1,8 +1,8 @@
-// const util = require('util');
-// console.log(util.inspect(myObject, false, null, true));
 const driver = require('../config/db-driver');
 const {
   addslashes,
+  compressDirectory,
+  expandDirectory,
   hashFileName,
   normalizeLabelId,
   normalizeRecordsOutput,
@@ -11,6 +11,7 @@ const {
   prepareNodeProperties,
   prepareOutput,
   prepareParams,
+  readJSONFile,
 } = require('../helpers');
 const fs = require('fs');
 const mimeType = require('mime-types');
@@ -18,6 +19,8 @@ const formidable = require('formidable');
 const readXlsxFile = require('read-excel-file/node');
 const csvParser = require('csv-parser');
 const { UploadedFile } = require('./uploadedFile.ctrl');
+const { DataCleaning } = require('./dataCleaning.ctrl');
+const { ImportRule } = require('./importRules.ctrl');
 const { Job } = require('./jobs.ctrl');
 const { Event } = require('./event.ctrl');
 const { Organisation } = require('./organisation.ctrl');
@@ -26,7 +29,7 @@ const { Resource } = require('./resource.ctrl');
 const { Spatial } = require('./spatial.ctrl');
 const { Temporal } = require('./temporal.ctrl');
 const { updateReference } = require('./references.ctrl');
-const TaxonomyTerm = require('./taxonomyTerm.ctrl').TaxonomyTerm;
+const { TaxonomyTerm } = require('./taxonomyTerm.ctrl');
 
 const { ARCHIVEPATH } = process.env;
 
@@ -37,21 +40,6 @@ const arrayIntersect = (array1 = [], array2 = []) => {
   const intersect = array1.find((i) => array2.indexOf(i) > -1) || null;
   const result = intersect !== null ? true : false;
   return result;
-};
-
-const parseFormDataPromise = (req) => {
-  return new Promise((resolve) => {
-    new formidable.IncomingForm().parse(req, (err, fields, files) => {
-      if (err) {
-        console.error('Error', err);
-        throw err;
-      }
-      const output = {};
-      output.fields = fields;
-      output.file = files;
-      resolve(output);
-    });
-  });
 };
 
 const uploadFilePath = (importDataLabel = null) => {
@@ -126,7 +114,7 @@ const parseUploadedFile = async ({
   if (importData === null || path === null) {
     return false;
   }
-  const fileExists = await fs.existsSync(path);
+  const fileExists = fs.existsSync(path);
   if (fileExists) {
     if (extension === 'csv') {
       const csvHeaders = await new Promise((resolve, reject) => {
@@ -372,12 +360,17 @@ class ImportPlan {
       const { uploadedFileDetails = null } = this;
 
       if (uploadedFileDetails !== null) {
-        const filePath = JSON.parse(uploadedFileDetails.paths[0]).path;
+        const filePath =
+          typeof uploadedFileDetails.paths[0] === 'string'
+            ? JSON.parse(uploadedFileDetails.paths[0]).path
+            : uploadedFileDetails.paths[0].path;
         const pathParts = filePath.split('/');
         const index = pathParts.length;
         pathParts.splice(index - 1, 1);
         const dir = pathParts.join('/');
-        fs.rmdirSync(dir, { recursive: true });
+        if (fs.existsSync(dir)) {
+          fs.rmSync(dir, { recursive: true });
+        }
       }
       await deleteUploadedFile(this.uploadedFile);
     }
@@ -416,6 +409,83 @@ class ImportPlan {
     return deleteRecord;
   }
 }
+
+const exportImportPlan = async (req, resp) => {
+  const { _id } = req.params;
+  const importPlanData = new ImportPlan({ _id });
+  await importPlanData.load();
+
+  const { label, uploadedFileDetails = null } = importPlanData;
+  // create new directory to dump results
+  const directory = `${ARCHIVEPATH}imports/exports/${_id}`;
+  if (!fs.existsSync(directory)) {
+    fs.mkdirSync(directory, { recursive: true }, (err) => {
+      console.log(err);
+    });
+  }
+
+  // import plan rules
+  const rules = await loadImportPlanRules(_id);
+
+  // import plan data cleaning
+  const session = driver.session();
+  const queryDataCleaningInstances = `MATCH (n:DataCleaning {importPlanId: $_id}) RETURN n`;
+  const nodesPromise = await session
+    .writeTransaction((tx) => tx.run(queryDataCleaningInstances, { _id }))
+    .then((result) => {
+      return result.records;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+  const dataCleaningNodes = normalizeRecordsOutput(nodesPromise);
+  const dataCleaning = dataCleaningNodes.map((n) => {
+    n.rule = JSON.parse(n.rule);
+    return n;
+  });
+
+  // import plan uploaded spreadsheet
+  if (uploadedFileDetails !== null) {
+    const { paths, hashedName } = uploadedFileDetails;
+    const { path = '' } = JSON.parse(paths);
+    if (path !== '') {
+      const sourcePath = path.replace('/archive/', ARCHIVEPATH);
+      fs.copyFileSync(sourcePath, `${directory}/${hashedName}`);
+    }
+  }
+
+  // put everything into a file
+  const file = {
+    plan: importPlanData,
+    rules,
+    dataCleaning,
+  };
+
+  // store the file to the filesystem
+  const fileLabel = normalizeLabelId(label);
+  fs.writeFileSync(
+    `${directory}/${fileLabel}.json`,
+    JSON.stringify(file),
+    { encoding: 'utf8' },
+    (error) => {
+      if (error) throw error;
+      console.log('Data file has been saved successfully!');
+    }
+  );
+
+  // compress the entire directory
+  const compress = await compressDirectory(directory);
+  if (compress) {
+    const stat = fs.statSync(`${directory}.tar.gz`);
+    resp.writeHead(200, {
+      'Content-Type': 'application/zip',
+      'Content-Length': stat.size,
+    });
+    const readStream = fs.createReadStream(`${directory}.tar.gz`);
+    readStream.pipe(resp);
+    // resp.send(Buffer.from(`${directory}.tar.gz`));
+  } else resp.status(500);
+};
 
 /**
  * @api {get} /import-plans Get imports
@@ -609,7 +679,7 @@ const copyDataCleaning = async (
     return false;
   }
   const session = driver.session();
-  const queryDataCleaningInstances = `MATCH (n:DataCleaning {importId: ${existingImportPlanId}}) RETURN n`;
+  const queryDataCleaningInstances = `MATCH (n:DataCleaning {importPlanId: ${existingImportPlanId}}) RETURN n`;
   const nodesPromise = await session
     .writeTransaction((tx) => tx.run(queryDataCleaningInstances, {}))
     .then((result) => {
@@ -1541,8 +1611,11 @@ const getImportPreviewResults = async (req, resp) => {
 
   // load import rules
   importPlanData.rules = await loadImportPlanRules(_id);
-  const filepath =
-    JSON.parse(importPlanData?.uploadedFileDetails?.paths[0]) || null;
+  const parsePath =
+    typeof importPlanData?.uploadedFileDetails?.paths[0] === 'string'
+      ? JSON.parse(importPlanData?.uploadedFileDetails?.paths[0])
+      : importPlanData?.uploadedFileDetails?.paths[0];
+  const filepath = typeof parsePath !== 'undefined' ? parsePath : null;
   const { path = null } = filepath;
   const outputRows = [];
   if (path !== null) {
@@ -2615,6 +2688,7 @@ const ingestImportPlanData = async (importPlanId, userId) => {
   );
   return true;
 };
+
 /**
  * @api {put} /import-plan-ingest Start ingestion according to import plan
  * @apiName put import plan ingest
@@ -2717,7 +2791,34 @@ const getImportPlanStatus = async (req, resp) => {
 
 const importPlanFileDownload = async (req, resp) => {
   const { params } = req;
-  console.log(params);
+  const { _id = null } = params;
+  if (_id === null) {
+    return resp.status(500).json({
+      data: [],
+      errors: [],
+      msg: 'Please provide a valid import plan id to continue',
+    });
+  }
+  const plan = new ImportPlan({ _id });
+  await plan.load();
+  const file = new UploadedFile({ _id: plan.uploadedFile });
+  await file.load();
+  const { filename } = file;
+  const mtype = mimeType.lookup(filename);
+  const { paths } = file;
+  const { path } =
+    typeof paths[0] === 'string' ? JSON.parse(paths[0]) : paths[0];
+  if (path !== '') {
+    const targetPath = path.replace('/archive/', ARCHIVEPATH);
+    const data = fs.readFileSync(targetPath);
+    resp.setHeader('Content-disposition', `attachment; filename=${filename}`);
+    resp.setHeader('Content-type', mtype);
+    resp.send(Buffer.from(data));
+  }
+};
+
+const importPlanBackupDownload = async (req, resp) => {
+  const { params } = req;
   const { _id = null } = params;
   if (_id === null) {
     return resp.status(500).json({
@@ -2742,8 +2843,254 @@ const importPlanFileDownload = async (req, resp) => {
   }
 };
 
+const parseFormDataPromise = (req) => {
+  return new Promise((resolve) => {
+    new formidable.IncomingForm().parse(req, (err, fields, files) => {
+      if (err) {
+        console.error('Error', err);
+        throw err;
+      }
+      let output = {};
+      output.fields = fields;
+      output.file = files;
+      resolve(output);
+    });
+  });
+};
+
+/* const saveImportPlanFromFileUploadedFile = async () => {
+
+}; */
+
+const addImportPlanFromFile = async (directory = '', label, userId) => {
+  try {
+    if (directory === '') {
+      throw new Error('The directory path cannot be empty');
+    }
+    const files = fs.readdirSync(directory);
+    let jsonFile = null;
+    const jsonMimeTypes = ['application/json'];
+    const spreadsheetMimeTypes = [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    let spreadsheet = null;
+    for (const file of files) {
+      const mtype = mimeType.lookup(file);
+      if (jsonMimeTypes.indexOf(mtype) > -1) {
+        jsonFile = file;
+      } else if (spreadsheetMimeTypes.indexOf(mtype) > -1) {
+        spreadsheet = file;
+      }
+    }
+
+    if (jsonFile === null) {
+      throw new Error(
+        `The provided directory doesn't contain a configuration json file`
+      );
+    }
+    const jsonData = await readJSONFile(`${directory}/${jsonFile}`);
+    const { data } = jsonData;
+    const { plan, rules, dataCleaning } = data;
+    const planCopy = { ...plan };
+    const { relations } = plan;
+    const existingRelations = relations.map((r) => JSON.parse(r));
+    const { length: existingRelationsLength } = existingRelations;
+    // save uploaded file
+    let uploadedFile = null;
+    if (spreadsheet !== null) {
+      const { uploadedFileDetails: originalUploadedFile } = planCopy;
+      const copyUploadedFile = { ...originalUploadedFile };
+      const date = new Date();
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      const spreadsheetAbsPath = `${directory}${spreadsheet}`;
+      const spreadsheetPath = spreadsheetAbsPath.replace(
+        ARCHIVEPATH,
+        '/archive/'
+      );
+
+      copyUploadedFile.year = year;
+      copyUploadedFile.month = month;
+      copyUploadedFile.paths = [JSON.stringify({ path: spreadsheetPath })];
+      delete copyUploadedFile._id;
+      delete copyUploadedFile.createdBy;
+      delete copyUploadedFile.createdAt;
+      delete copyUploadedFile.updatedBy;
+      delete copyUploadedFile.updatedAt;
+      const newUploadedFile = new UploadedFile(copyUploadedFile);
+      const newFile = await newUploadedFile.save(userId);
+      ({ _id: uploadedFile } = newFile.data);
+    }
+
+    // prepare and save plan
+    planCopy.label = label;
+    planCopy.uploadedFile = uploadedFile;
+    planCopy.ingestionStatus = 0;
+    planCopy.ingestionProgress = 0;
+    planCopy.ingestionCompleteMessage = '';
+    delete planCopy._id;
+    delete planCopy.createdBy;
+    delete planCopy.createdAt;
+    delete planCopy.updatedBy;
+    delete planCopy.updatedAt;
+    delete planCopy.uploadedFileDetails;
+
+    const importPlan = new ImportPlan(planCopy);
+    const importPlanSaved = await importPlan.save(userId);
+    const { status: importPlanSaveStatus, data: importPlanSaveData } =
+      importPlanSaved;
+    // the new plan was created successfully add the rules and data cleaning instances
+    if (importPlanSaveStatus) {
+      const { _id: planId } = importPlanSaveData;
+      // save rules
+      const { length: rulesLength } = rules;
+      for (let i = 0; i < rulesLength; i += 1) {
+        const rule = rules[i];
+        rule.importPlanId = planId;
+        const { _id: oldRuleId } = rule;
+        rule.rule = JSON.parse(rule.rule);
+
+        delete rule.createdAt;
+        delete rule.createdBy;
+        delete rule.updatedAt;
+        delete rule.updatedBy;
+        delete rule._id;
+
+        const newRule = new ImportRule(rule);
+        const savedRule = await newRule.save(userId);
+
+        // fix relations
+        const { _id: newRuleId } = savedRule.data;
+        // replace oldIds with newIds
+        for (let j = 0; j < existingRelationsLength; j += 1) {
+          const existingRelation = existingRelations[j];
+          const { srcId, targetId } = existingRelation;
+          if (srcId === oldRuleId) {
+            existingRelation.srcId = newRuleId;
+          }
+          if (targetId === oldRuleId) {
+            existingRelation.targetId = newRuleId;
+          }
+        }
+      }
+      const updatedRelations = existingRelations.map((e) => JSON.stringify(e));
+      importPlanSaveData.relations = updatedRelations;
+      const updatedImportPlan = new ImportPlan(importPlanSaveData);
+      await updatedImportPlan.save(userId);
+
+      // save data cleaning
+      const { length: dataCleaningLength } = dataCleaning;
+      for (let i = 0; i < dataCleaningLength; i += 1) {
+        const dataCleaningItem = dataCleaning[i];
+
+        dataCleaningItem.completed = false;
+        dataCleaningItem.importPlanId = planId;
+
+        delete dataCleaningItem.createdAt;
+        delete dataCleaningItem.createdBy;
+        delete dataCleaningItem.updatedAt;
+        delete dataCleaningItem.updatedBy;
+        delete dataCleaningItem._id;
+        delete dataCleaningItem.output;
+
+        const newDataCleaningItem = new DataCleaning(dataCleaningItem);
+        await newDataCleaningItem.save(userId);
+      }
+    }
+    return importPlanSaveData;
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+};
+
+const uploadFileAndExpand = async (uploadedFile = null, label = '', userId) => {
+  if (uploadedFile === null) {
+    return;
+  }
+  const { name, path } = uploadedFile;
+  const tempDir = `${ARCHIVEPATH}temp`;
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true }, (err) => {
+      console.log(err);
+    });
+  }
+  const tempPath = `${tempDir}/${name}`;
+  fs.copyFileSync(path, tempPath);
+
+  const dirName = hashFileName(label);
+  const newDir = uploadFilePath(dirName);
+  const targetPath = `${newDir}${name}`;
+  uploadedFile.path = targetPath;
+  if (!fs.existsSync(newDir)) {
+    fs.mkdirSync(newDir, { recursive: true }, (err) => {
+      console.log(err);
+    });
+  }
+  // move the file to its target directory
+  await new Promise((resolve) => {
+    fs.rename(tempPath, targetPath, function (error) {
+      const output = {};
+      if (error) {
+        output.status = false;
+        output.msg = error;
+      } else {
+        output.status = true;
+        output.msg = `File "${name}" uploaded successfully`;
+        output.path = targetPath;
+      }
+      resolve(output);
+    });
+  });
+
+  // unzip file
+  await expandDirectory(targetPath);
+
+  // delete zipped file
+  fs.unlinkSync(targetPath);
+
+  // create import plan from JSON Data
+  const newImportPlan = await addImportPlanFromFile(newDir, label, userId);
+  return newImportPlan;
+};
+
+const importPlanFileUpload = async (req, resp) => {
+  const data = await parseFormDataPromise(req);
+  const { fields, file } = data;
+  const { label } = fields;
+  const { id: userId } = req.decoded;
+  const { file: uploadedFile } = file;
+  if (Object.keys(uploadedFile).length === 0) {
+    resp.status(400).json({
+      errors: ['The uploaded file must not be empty.'],
+    });
+  } else {
+    const allowedFileTypes = ['application/x-gzip', 'application/gzip'];
+    const { type } = uploadedFile;
+    if (allowedFileTypes.indexOf(type) === -1) {
+      return resp.status(400).json({
+        errors: [`The uploaded file type "${type}" is not allowed.`],
+      });
+    } else {
+      const result = await uploadFileAndExpand(uploadedFile, label, userId);
+      return resp.status(200).json({
+        status: true,
+        data: result,
+        errors: [],
+        msg: '',
+      });
+    }
+  }
+  resp.status(500).json({
+    errors: [`Internal server error`],
+  });
+};
+
 module.exports = {
   ImportPlan: ImportPlan,
+  exportImportPlan,
   getImportPlans,
   getImportPlan,
   putImportPlan,
@@ -2756,4 +3103,6 @@ module.exports = {
   putImportPlanIngest,
   getImportPlanStatus,
   importPlanFileDownload,
+  importPlanFileUpload,
+  importPlanBackupDownload,
 };

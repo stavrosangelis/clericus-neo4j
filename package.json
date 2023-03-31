@@ -1,6 +1,6 @@
 {
   "name": "clericus-neo4j",
-  "version": "0.72.1",
+  "version": "0.72.5",
   "author": "Stavros Angelis",
   "license": "ISC",
   "description": "This is the Clericus API using neo4j as a database",
@@ -11,7 +11,7 @@
     "start": "NODE_ENV=production pm2 start babel-node ./src/app.js --name clericus",
     "dev": "NODE_ENV=development nodemon --exec babel-node ./src/app.js",
     "dev:ssl": "NODE_ENV=development.ssl nodemon --exec babel-node ./src/app.js",
-    "pm2-dev": "NODE_ENV=development pm2 start babel-node ./src/app.js --name clericus-dev",
+    "pm2-dev": "NODE_ENV=development.ssl pm2 start babel-node ./src/app.js --name clericus-dev",
     "pm2-devserver": "NODE_ENV=devserver pm2 start babel-node ./src/app.js --name clericus-devserver",
     "docs": "apidoc -f '.*\\.js$' -i src/ -o documentation/",
     "lint": "eslint --ext .js --ignore-path .eslintignore .",
@@ -51,7 +51,8 @@
     "sendmail": "^1.6.1",
     "soundex": "^0.2.1",
     "string-similarity": "^4.0.2",
-    "yargs": "^16.1.0"
+    "yargs": "^16.1.0",
+    "zip-a-folder": "^1.1.5"
   },
   "devDependencies": {
     "@babel/core": "^7.12.10",

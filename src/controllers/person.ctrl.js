@@ -24,6 +24,7 @@ class Person {
     description = '',
     gender = '',
     personType = 'Clergy',
+    nationality = '',
     status = 'private',
     createdBy = null,
     createdAt = null,
@@ -63,6 +64,7 @@ class Person {
     this.description = description;
     this.gender = gender;
     this.personType = personType;
+    this.nationality = nationality;
     this.status = status;
     this.alternateAppelations = this.normalizeAppelations(alternateAppelations);
     this.createdBy = createdBy;

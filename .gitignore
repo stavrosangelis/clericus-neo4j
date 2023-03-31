@@ -48,6 +48,3 @@ src/__tests__
 src/controllers/local-tools
 
 /export-import-plan.txt
-
-# packaged app
-/packages
