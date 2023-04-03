@@ -6,7 +6,7 @@ const sizeOfImage = require('image-size');
 const { ExifImage } = require('exif');
 const IptcImage = require('node-iptc');
 const { tar } = require('zip-a-folder');
-const { exec } = require('node:child_process');
+const { exec } = require('child_process');
 
 const driver = require('../config/db-driver');
 
