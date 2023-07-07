@@ -21,7 +21,7 @@ class Slideshow {
     if (_id !== null) {
       this._id = _id;
     }
-    this.label = label;
+    this.label = label !== null ? label.toString() : label;
     this.caption = caption;
     this.order = order;
     this.url = url;

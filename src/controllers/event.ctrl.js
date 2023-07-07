@@ -16,7 +16,7 @@ class Event {
     if (_id !== null) {
       this._id = _id;
     }
-    this.label = label;
+    this.label = label !== null ? label.toString() : label;
     this.description = description;
     this.eventType = eventType;
     this.status = status;

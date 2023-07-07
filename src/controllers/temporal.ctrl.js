@@ -17,7 +17,7 @@ class Temporal {
     if (_id !== null) {
       this._id = _id;
     }
-    this.label = label;
+    this.label = label !== null ? label.toString() : label;
     this.startDate = startDate;
     this.endDate = endDate;
     this.format = format;

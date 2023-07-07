@@ -24,7 +24,7 @@ class MenuItem {
       this._id = _id;
     }
     this.menuId = menuId;
-    this.label = label;
+    this.label = label !== null ? label.toString() : label;
     this.order = parseInt(order, 10);
     this.parentId = parseInt(parentId, 10);
     this.type = type;

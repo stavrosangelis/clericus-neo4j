@@ -20,7 +20,7 @@ class TaxonomyTerm {
     if (_id !== null) {
       this._id = _id;
     }
-    this.label = label;
+    this.label = label !== null ? label.toString() : label;
     this.labelId = labelId;
     this.locked = locked;
     this.inverseLabel = inverseLabel;

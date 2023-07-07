@@ -6,8 +6,8 @@ const hasSSL = ['development.ssl', 'production'];
 const config =
   hasSSL.indexOf(NODE_ENV) > -1
     ? {
-        encrypted: 'ENCRYPTION_ON',
-        trust: 'TRUST_ALL_CERTIFICATES',
+        // encrypted: 'ENCRYPTION_ON',
+        // trust: 'TRUST_ALL_CERTIFICATES',
         trustedCertificates: [path.resolve(__dirname, SSL_CERT_PATH)],
       }
     : {};

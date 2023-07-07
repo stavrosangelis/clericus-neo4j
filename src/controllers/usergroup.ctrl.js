@@ -17,7 +17,7 @@ class Usergroup {
     if (_id !== null) {
       this._id = _id;
     }
-    this.label = label;
+    this.label = label !== null ? label.toString() : label;
     this.description = description;
     this.isAdmin = isAdmin;
     this.isDefault = isDefault;

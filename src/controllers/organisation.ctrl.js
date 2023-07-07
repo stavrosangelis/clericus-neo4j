@@ -19,7 +19,7 @@ class Organisation {
     if (_id !== null) {
       this._id = _id;
     }
-    this.label = label;
+    this.label = label !== null ? label.toString() : label;
     this.labelSoundex = labelSoundex;
     this.description = description;
     this.organisationType = organisationType;
