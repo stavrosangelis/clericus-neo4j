@@ -128,6 +128,10 @@ server.get('/ui-temporal', temporalsUiController.getTemporal);
 server.get('/timeline', visualisationsController.getTimeline);
 server.get('/item-timeline', visualisationsController.getItemTimeline);
 server.get('/heatmap', visualisationsController.getHeatmap);
+server.get(
+  '/deceased-columbans-map',
+  visualisationsController.getDeceasedColumbansMap
+);
 server.get('/graph-network-size', visualisationsController.getGraphNetworkSize);
 server.get('/graph-network', visualisationsController.getGraphNetwork);
 server.get('/item-network', visualisationsController.getItemNetwork);

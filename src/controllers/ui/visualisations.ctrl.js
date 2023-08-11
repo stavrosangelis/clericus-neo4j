@@ -1153,8 +1153,55 @@ const findShortestPath = async (req, resp) => {
   });
 };
 
+const getDeceasedColumbansMap = async (req, resp) => {
+  const { query: params } = req;
+  const { labelId = '' } = params;
+  if (labelId === '') {
+    return resp.status(400).json({
+      data: null,
+      errors: ['Please set a valid labelId to continue'],
+    });
+  }
+  const eventType = new TaxonomyTerm({ labelId });
+  await eventType.load();
+  const { _id: etId = null } = eventType;
+  if (etId !== null) {
+    const query = `MATCH (n:Event {eventType: "${etId}", status: 'public'})-[r]->(t:Resource) WHERE id(t)=111140 RETURN n ORDER BY n.label`;
+    const session = driver.session();
+    const nodesPromise = await session
+      .writeTransaction((tx) => tx.run(query, {}))
+      .then((result) => result.records);
+    const nodes = helpers.normalizeRecordsOutput(nodesPromise);
+    const { length } = nodes;
+    const data = [];
+    for (let i = 0; i < length; i += 1) {
+      const node = nodes[i];
+      const { _id } = node;
+      const spatial = await helpers.loadRelations(_id, 'Event', 'Spatial');
+      node.spatial = spatial;
+      const organisations = await helpers.loadRelations(
+        _id,
+        'Event',
+        'Organisation'
+      );
+      node.organisations = organisations;
+      data.push(node);
+    }
+    return resp.status(200).json({
+      data,
+      errors: [],
+    });
+  }
+
+  return resp.status(400).json({
+    data: null,
+    errors: [`"${labelId}" event type is not defined`],
+  });
+};
+
 module.exports = {
   getItemNetwork,
+  getDeceasedColumbansMap,
   getRelatedNodes,
   getRelatedPaths,
   getHeatmap,
