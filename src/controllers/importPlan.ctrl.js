@@ -31,7 +31,7 @@ const { Temporal } = require('./temporal.ctrl');
 const { updateReference } = require('./references.ctrl');
 const { TaxonomyTerm } = require('./taxonomyTerm.ctrl');
 
-const { ARCHIVEPATH } = process.env;
+const { ARCHIVEPATH, NODE_ENV } = process.env;
 
 /*
  * A simple function to compare two arrays and see if they have common values
@@ -76,6 +76,8 @@ const uploadFile = async (
   const newDir = uploadFilePath(importDataLabel);
   const targetPath = `${newDir}${hashedName}`;
   uploadedFile.path = targetPath;
+  console.log(newDir);
+  console.log(targetPath);
 
   if (!fs.existsSync(newDir)) {
     fs.mkdirSync(newDir, { recursive: true }, (err) => {
@@ -1071,10 +1073,11 @@ const parseEvents = async (value, rows = []) => {
     const { columns } = value;
     const { length: cLength } = columns;
     for (let v = 0; v < cLength; v += 1) {
+      const { property: columnType = '' } = columns[v];
       const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (columns[v].type === 'condition') {
+      } else if (columnType === 'condition') {
         data.push({ condition: false });
       }
     }
@@ -1619,7 +1622,8 @@ const getImportPreviewResults = async (req, resp) => {
   const { path = null } = filepath;
   const outputRows = [];
   if (path !== null) {
-    const absPath = path.replace('archive/', ARCHIVEPATH);
+    const absPath =
+      NODE_ENV === 'production' ? path.replace('archive/', ARCHIVEPATH) : path;
     const fileExists = fs.existsSync(absPath);
     if (fileExists) {
       const mtype = mimeType.lookup(absPath);
@@ -1758,7 +1762,6 @@ const uploadedFile = async (req, resp) => {
   const year = date.getFullYear();
   const newDir = uploadFilePath(importDataLabel);
   const targetPath = `${newDir}${hashedName}`;
-
   // store file reference to the db
   const postData = {
     filename: uploadedFileDetails.name,
@@ -2592,7 +2595,7 @@ const ingestImportPlanData = async (importPlanId, userId) => {
       const extension = mimeType.extension(mtype);
       const rowsData = await loadFileData(path, extension);
       const outputRows = [];
-      const rowsLength = rowsData.length;
+      const { length: rowsLength } = rowsData;
       for (let i = 0; i < rowsLength; i += 1) {
         const r = rowsData[i];
         if (i > 0) {
@@ -2600,7 +2603,6 @@ const ingestImportPlanData = async (importPlanId, userId) => {
         }
       }
       rowsNum = outputRows.length;
-
       // prepare the rules
       parsedRules = await parseRules(importPlanData.rules, outputRows);
     }
