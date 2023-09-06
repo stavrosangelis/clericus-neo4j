@@ -562,6 +562,9 @@ const prepareDate = (dateParam = null) => {
   if (sy.includes('c.')) {
     sy = sy.replace('c.', '');
   }
+  if (sy.includes('?')) {
+    sy = sy.replaceAll('?', '0');
+  }
   if (sm === '??') {
     sm = `01`;
   }

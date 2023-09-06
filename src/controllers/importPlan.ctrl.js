@@ -1127,10 +1127,11 @@ const parseOrganisations = async (value, rows = []) => {
     const { columns } = value;
     const { length: cLength } = columns;
     for (let v = 0; v < cLength; v += 1) {
+      const { property: columnType = '' } = columns[v];
       const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (columns[v].type === 'condition') {
+      } else if (columnType === 'condition') {
         data.push({ condition: false });
       }
     }
@@ -1182,10 +1183,11 @@ const parsePersons = async (value, rows = []) => {
     const { columns } = value;
     const { length: cLength } = columns;
     for (let v = 0; v < cLength; v += 1) {
+      const { property: columnType = '' } = columns[v];
       const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (columns[v].type === 'condition') {
+      } else if (columnType === 'condition') {
         data.push({ condition: false });
       }
     }
@@ -1240,10 +1242,11 @@ const parseResources = async (value, rows = []) => {
     const { columns } = value;
     const { length: cLength } = columns;
     for (let v = 0; v < cLength; v += 1) {
+      const { property: columnType = '' } = columns[v];
       const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (columns[v].type === 'condition') {
+      } else if (columnType === 'condition') {
         data.push({ condition: false });
       }
     }
@@ -1292,10 +1295,11 @@ const parseSpatials = async (value, rows = []) => {
     const { columns } = value;
     const { length: cLength } = columns;
     for (let v = 0; v < cLength; v += 1) {
+      const { property: columnType = '' } = columns[v];
       const newValue = parseColumn(columns[v], row);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (columns[v].type === 'condition') {
+      } else if (columnType === 'condition') {
         data.push({ condition: false });
       }
     }
@@ -1337,17 +1341,18 @@ const parseSpatials = async (value, rows = []) => {
 
 const parseTemporals = async (value, rows = []) => {
   const temporals = [];
-  const length = rows.length;
+  const { length } = rows;
   for (let i = 0; i < length; i += 1) {
     const data = [];
     const row = rows[i];
     const { columns } = value;
     const { length: cLength } = columns;
     for (let v = 0; v < cLength; v += 1) {
+      const { property: columnType = '' } = columns[v];
       const newValue = parseColumn(columns[v], row, true);
       if (newValue !== null) {
         data.push(newValue);
-      } else if (columns[v].type === 'condition') {
+      } else if (columnType === 'condition') {
         data.push({ condition: false });
       }
     }
