@@ -578,9 +578,13 @@ const prepareDate = (dateParam = null) => {
     endDate = startDate;
   } else {
     if (parts.length === 1) {
+      let ly = sy;
+      if (sParts[0].includes('?')) {
+        ly = sParts[0].replaceAll('?', '9');
+      }
       const lm = sParts[1] !== '??' ? sm : '12';
-      const ld = getDaysInMonth(lm, sy);
-      endDate = `${ld}-${lm}-${sy}`;
+      const ld = getDaysInMonth(lm, ly);
+      endDate = `${ld}-${lm}-${ly}`;
     }
     if (parts.length > 1) {
       const lParts = parts[1].trim().split('-');
@@ -589,6 +593,9 @@ const prepareDate = (dateParam = null) => {
       let ld = lParts[2];
       if (ly.includes('c.')) {
         ly = ly.replace('c.', '');
+      }
+      if (ly.includes('?')) {
+        ly = ly.replaceAll('?', '9');
       }
       if (lm === '??') {
         lm = `12`;
