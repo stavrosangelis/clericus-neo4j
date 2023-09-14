@@ -31,7 +31,7 @@ const { Temporal } = require('./temporal.ctrl');
 const { updateReference } = require('./references.ctrl');
 const { TaxonomyTerm } = require('./taxonomyTerm.ctrl');
 
-const { ARCHIVEPATH, NODE_ENV } = process.env;
+const { ARCHIVEPATH } = process.env;
 
 /*
  * A simple function to compare two arrays and see if they have common values
@@ -68,6 +68,7 @@ const uploadFile = async (
       console.log(err);
     });
   }
+
   const tempPath = `${tempDir}${hashedName}`;
   fs.copyFileSync(uploadedFile.path, tempPath);
   uploadedFile.path = tempPath;
@@ -76,14 +77,13 @@ const uploadFile = async (
   const newDir = uploadFilePath(importDataLabel);
   const targetPath = `${newDir}${hashedName}`;
   uploadedFile.path = targetPath;
-  console.log(newDir);
-  console.log(targetPath);
 
   if (!fs.existsSync(newDir)) {
     fs.mkdirSync(newDir, { recursive: true }, (err) => {
       console.log(err);
     });
   }
+
   const uploadFilePromise = await new Promise((resolve) => {
     fs.rename(sourcePath, targetPath, function (error) {
       const output = {};
@@ -1608,7 +1608,8 @@ const getImportPreviewResults = async (req, resp) => {
       msg: 'Please provide a valid id to continue.',
     });
   }
-  if (rows.length === 0) {
+  const { length: rowsLength } = rows;
+  if (rowsLength === 0) {
     rows = [2];
   }
   rows = rows.map((r) => Number(r) - 1);
@@ -1627,14 +1628,17 @@ const getImportPreviewResults = async (req, resp) => {
   const { path = null } = filepath;
   const outputRows = [];
   if (path !== null) {
+    const pathParts = path.split('/');
+    const firstPart = path.charAt(0) === '/' ? pathParts[1] : pathParts[0];
     const absPath =
-      NODE_ENV === 'production' ? path.replace('archive/', ARCHIVEPATH) : path;
+      firstPart === 'archive' ? path.replace('archive/', ARCHIVEPATH) : path;
     const fileExists = fs.existsSync(absPath);
+
     if (fileExists) {
       const mtype = mimeType.lookup(absPath);
       const extension = mimeType.extension(mtype);
       const rowsData = await loadFileData(absPath, extension);
-      const rowsLength = rows.length;
+
       for (let i = 0; i < rowsLength; i += 1) {
         outputRows.push({ key: rows[i] + 1, data: rowsData[rows[i]] });
       }
@@ -1987,7 +1991,7 @@ const uniqueResources = (recources) => {
 
 const uniqueSpatials = (spatials) => {
   const items = [];
-  const length = spatials.length;
+  const { length } = spatials;
   for (let i = 0; i < length; i += 1) {
     const item = spatials[i];
     const { row, refId } = item;
@@ -2023,7 +2027,7 @@ const uniqueSpatials = (spatials) => {
 
 const uniqueTemporals = (temporals) => {
   const items = [];
-  const length = temporals.length;
+  const { length } = temporals;
   for (let i = 0; i < length; i += 1) {
     const item = temporals[i];
     const { row, refId } = item;
@@ -2034,7 +2038,10 @@ const uniqueTemporals = (temporals) => {
     if (typeof item.refs === 'undefined') {
       item.refs = [ref];
     }
-    const find = items.find((t) => t.label === item.label) || null;
+    const find =
+      items.find(
+        (t) => t.startDate === item.startDate && t.endDate === item.endDate
+      ) || null;
     if (find === null) {
       items.push(item);
     } else {
@@ -3025,11 +3032,16 @@ const uploadFileAndExpand = async (uploadedFile = null, label = '', userId) => {
     });
   }
   const tempPath = `${tempDir}/${name}`;
+  // create the directory
   fs.copyFileSync(path, tempPath);
 
   const dirName = hashFileName(label);
   const newDir = uploadFilePath(dirName);
-  const targetPath = `${newDir}${name}`;
+
+  const targetPath = `${newDir}${name
+    .replace(/(\W+)/gi, '-')
+    .replace('-tar-gz', '.tar.gz')}`;
+
   uploadedFile.path = targetPath;
   if (!fs.existsSync(newDir)) {
     fs.mkdirSync(newDir, { recursive: true }, (err) => {

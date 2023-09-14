@@ -638,6 +638,7 @@ const expandDirectory = async (source = '') => {
     const { length } = pathArray;
     const sliced = pathArray.slice(0, length - 1);
     const path = sliced.join('/');
+    console.log(path);
     const expand = await new Promise((resolve, reject) => {
       exec(`tar -xf ${source} -C ${path}`, (error) => {
         if (error) {
