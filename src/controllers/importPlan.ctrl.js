@@ -1548,7 +1548,7 @@ const parseRule = async (value = null, rows = []) => {
   ]
  */
 const parseRules = async (rules, rows) => {
-  const length = rules.length;
+  const { length } = rules;
   const output = {
     events: [],
     organisations: [],
@@ -1561,7 +1561,7 @@ const parseRules = async (rules, rows) => {
     const entities = await parseRule(rules[i], rows);
     if (entities !== null) {
       const key = Object.keys(entities);
-      const entityLength = entities[key].length;
+      const { length: entityLength } = entities[key];
       if (entityLength > 0) {
         for (let j = 0; j < entityLength; j += 1) {
           output[key].push(entities[key][j]);
@@ -1907,7 +1907,7 @@ const deleteImportPlanRelation = async (req, resp) => {
 
 const uniqueOrganisations = (organisations) => {
   const items = [];
-  const length = organisations.length;
+  const { length } = organisations;
   for (let i = 0; i < length; i += 1) {
     const item = organisations[i];
     const { row, refId } = item;
@@ -2209,7 +2209,7 @@ const uniqueEvents = (events, spatials, temporals, relations) => {
 
 const ingestItems = async (items, type, userId) => {
   const output = [];
-  const length = items.length;
+  const { length } = items;
   for (let i = 0; i < length; i += 1) {
     const item = items[i];
     let newItemSave;
@@ -2599,13 +2599,19 @@ const ingestImportPlanData = async (importPlanId, userId) => {
   const { path = null } = filepath;
   let parsedRules = {};
   let rowsNum = 0;
+
   // check to see if there is an excel/csv file attached to the import plan
   if (path !== null) {
-    const fileExists = await fs.existsSync(path);
+    const pathParts = path.split('/');
+    const firstPart = path.charAt(0) === '/' ? pathParts[1] : pathParts[0];
+    const absPath =
+      firstPart === 'archive' ? path.replace('archive/', ARCHIVEPATH) : path;
+    const fileExists = fs.existsSync(absPath);
+
     if (fileExists) {
-      const mtype = mimeType.lookup(path);
+      const mtype = mimeType.lookup(absPath);
       const extension = mimeType.extension(mtype);
-      const rowsData = await loadFileData(path, extension);
+      const rowsData = await loadFileData(absPath, extension);
       const outputRows = [];
       const { length: rowsLength } = rowsData;
       for (let i = 0; i < rowsLength; i += 1) {
@@ -2615,10 +2621,12 @@ const ingestImportPlanData = async (importPlanId, userId) => {
         }
       }
       rowsNum = outputRows.length;
+
       // prepare the rules
       parsedRules = await parseRules(importPlanData.rules, outputRows);
     }
   }
+
   // create a relation reference to this ingestion for each entity
   const importResourceRows = [];
   for (let i = 0; i < rowsNum; i += 1) {
@@ -2652,6 +2660,7 @@ const ingestImportPlanData = async (importPlanId, userId) => {
   resources.push(importResource);
   const spatials = uniqueSpatials(parsedRules.spatials);
   const temporals = uniqueTemporals(parsedRules.temporals);
+
   const eventsRelations =
     relations.filter(
       (r) => r.srcType === 'Event' || r.targetType === 'Event'

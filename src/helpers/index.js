@@ -535,7 +535,7 @@ const msToTime = (s) => {
 
 // temporal functions
 const getDaysInMonth = (m, y) => {
-  return new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, 0).getDate();
 };
 
 const splitMultiString = (value = '') => {
@@ -601,6 +601,8 @@ const prepareDate = (dateParam = null) => {
         lm = `12`;
       }
       if (ld === '??') {
+        console.log(dateParam);
+        console.log(lm, ly);
         ld = getDaysInMonth(lm, ly);
       }
       endDate = `${ld}-${sm}-${sy}`;
